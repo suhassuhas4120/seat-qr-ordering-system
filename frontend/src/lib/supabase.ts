@@ -1,5 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './supabaseClient';
+import { getSocket } from './socket';
+import { SOCKET_EVENTS } from '@seat-order/shared';
 
 export interface OrderItemRecord {
   id?: string;
@@ -150,7 +152,123 @@ export type KDSCallbacks = {
 const activeKdsSubscribers = new Set<KDSCallbacks>();
 let sharedSupabaseChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let sharedLocalListenerInitialized = false;
+let sharedSocketBridgeInitialized = false;
 const processedOrderIds = new Set<string>();
+
+function initSocketBridge() {
+  if (typeof window === 'undefined' || sharedSocketBridgeInitialized) return;
+  sharedSocketBridgeInitialized = true;
+
+  try {
+    const socket = getSocket();
+
+    // Join all operational rooms for broadcast reception
+    socket.emit(SOCKET_EVENTS.JOIN_KDS);
+    socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'mobile' });
+    socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'tablet' });
+    socket.emit(SOCKET_EVENTS.JOIN_MANAGER);
+
+    socket.on(SOCKET_EVENTS.ORDER_PLACED, (payload: any) => {
+      const order = payload.order;
+      if (!order) return;
+      if (processedOrderIds.has(order.id)) return;
+      processedOrderIds.add(order.id);
+
+      const chairId = String(order.seatId || payload.seat?.id || '01');
+      const orderRec: OrderRecord = {
+        id: order.id,
+        ticket_number: order.orderNumber,
+        chair_id: chairId,
+        seat_label: `SEAT ${chairId}`,
+        status: 'pending',
+        total_amount: payload.seat?.activeOrderTotal || 0,
+        items: order.items?.map((it: any) => ({
+          id: it.id,
+          order_id: order.id,
+          chair_id: chairId,
+          seat_label: `SEAT ${chairId}`,
+          dish_id: `dish-${it.menuItemId}`,
+          dish_name: it.nameSnapshot,
+          quantity: it.quantity,
+          price: it.priceSnapshot,
+          stage: it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED',
+          notes: it.notes || '',
+        })),
+      };
+
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onNewOrder?.({ order: orderRec, items: orderRec.items || [] });
+        cb.onSeatOccupancyChange?.({ chairId, isOccupied: true });
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.ITEM_STAGE_UPDATED, (payload: any) => {
+      const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
+        QUEUED: 'PLACED',
+        COOKING: 'PREP',
+        READY: 'READY',
+        SERVED: 'SERVED',
+      };
+      const stage = stageMap[payload.newStage] || 'PLACED';
+      const chairId = String(payload.seatId);
+
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onStageChange?.({
+          key: payload.itemId,
+          stage,
+          chairId,
+          itemId: payload.itemId,
+        });
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.SEAT_CLAIMED, (payload: any) => {
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onSeatOccupancyChange?.({ chairId: String(payload.seatId), isOccupied: true });
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.SEAT_VACATED, (payload: any) => {
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onSeatOccupancyChange?.({ chairId: String(payload.seatId), isOccupied: false });
+        cb.onBillSettled?.({ chairId: String(payload.seatId) });
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.PAYMENT_SUCCESS, (payload: any) => {
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onBillSettled?.({ chairId: String(payload.seatId), amount: payload.amount, ticketNumber: payload.paymentId });
+        cb.onSeatOccupancyChange?.({ chairId: String(payload.seatId), isOccupied: false });
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.MENU_ITEM_AVAILABILITY_CHANGED, (payload: any) => {
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onAvailabilityChange?.({ dishId: `dish-${payload.itemId}`, isAvailable: payload.isAvailable });
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.WAITER_CALLED, (payload: any) => {
+      const alert: ServiceAlertRecord = {
+        id: `call-${Date.now()}`,
+        type: 'customer_call',
+        seatNumber: payload.seatNumber || `Seat ${payload.seatId}`,
+        chairId: String(payload.seatId),
+        title: `Seat ${payload.seatNumber || payload.seatId} Assistance`,
+        message: `Guest requested ${payload.reason || 'assistance'}`,
+        timeAgo: 'Just now',
+        isUrgent: true,
+        isResolved: false,
+        createdAt: Date.now(),
+      };
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onNewAlert?.(alert);
+      });
+    });
+  } catch (err) {
+    console.warn('Socket bridge initialization:', err);
+  }
+}
 
 function initSharedRealtimeChannel() {
   if (!supabase || sharedSupabaseChannel) return;
@@ -546,8 +664,62 @@ export const realtimeBridge = {
           items: broadcastItems,
         });
 
+        // Fastify backend sync
+        try {
+          const cleanSeatId = Number(order.chair_id.replace(/[^0-9]/g, '')) || 1;
+          const apiItems = items.map((it) => ({
+            menuItemId: Number(it.dish_id.replace(/[^0-9]/g, '')) || 1,
+            quantity: it.quantity,
+            notes: it.notes || undefined,
+          }));
+          fetch('http://localhost:4000/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              seatId: cleanSeatId,
+              items: apiItems,
+              createdByRole: 'CUSTOMER',
+            }),
+          }).catch(() => {});
+        } catch {}
+
         return { success: true, orderId };
       }
+
+      // Fallback: Synchronize local orders entry and notify Fastify
+      try {
+        const cleanSeatId = Number(order.chair_id.replace(/[^0-9]/g, '')) || 1;
+        const apiItems = items.map((it) => ({
+          menuItemId: Number(it.dish_id.replace(/[^0-9]/g, '')) || 1,
+          quantity: it.quantity,
+          notes: it.notes || undefined,
+        }));
+        fetch('http://localhost:4000/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            seatId: cleanSeatId,
+            items: apiItems,
+            createdByRole: 'CUSTOMER',
+          }),
+        }).catch(() => {});
+      } catch {}
+
+      const currentLocals = getLocalOrdersList();
+      const updatedOrders = [
+        { order: { ...order, id: generatedId }, items },
+        ...currentLocals.filter((x) => x.order.id !== generatedId),
+      ];
+      setLocalOrdersList(updatedOrders);
+
+      broadcastRealtime('SEAT_OCCUPIED', {
+        chairId: order.chair_id,
+        occupancy: occupancyMap[order.chair_id],
+      });
+      broadcastRealtime('NEW_ORDER', {
+        order: { ...order, id: generatedId },
+        items,
+      });
 
       return { success: true, orderId: generatedId };
     } catch (err) {
@@ -850,7 +1022,42 @@ export const realtimeBridge = {
         };
 
         broadcastRealtime('STAGE_CHANGE', broadcastPayload);
+      } else {
+        const chairVal = (meta?.chairId || '').replace(/[^0-9]/g, '');
+        const normC = chairVal.replace(/^0+/, '') || '1';
+        const padC = normC.padStart(2, '0');
+        const broadcastPayload = {
+          key: itemIdOrKey,
+          stage,
+          ...meta,
+          chairId: chairVal || meta?.chairId,
+          rawChairId: meta?.chairId,
+          normChairId: normC,
+          paddedChairId: padC,
+          itemId: targetItemId,
+        };
+
+        broadcastRealtime('STAGE_CHANGE', broadcastPayload);
       }
+
+      // Notify Fastify backend of stage transition
+      try {
+        const stageToBackend: Record<string, string> = {
+          PLACED: 'QUEUED',
+          REC: 'QUEUED',
+          PREP: 'COOKING',
+          READY: 'READY',
+          SERVED: 'SERVED',
+        };
+        fetch(`http://localhost:4000/api/orders/items/${targetItemId || itemIdOrKey}/stage`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            newStage: stageToBackend[stage] || 'COOKING',
+            staffId: 3,
+          }),
+        }).catch(() => {});
+      } catch {}
 
       // 5. If marked READY, alert waitstaff for immediate pass pickup
       if (stage === 'READY') {
@@ -987,6 +1194,15 @@ export const realtimeBridge = {
           isAvailable,
         });
       }
+      // Fastify backend sync for 86 out-of-stock
+      try {
+        const numId = Number(cleanId) || 1;
+        fetch(`http://localhost:4000/api/menu/items/${numId}/availability`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isAvailable }),
+        }).catch(() => {});
+      } catch {}
       return true;
     } catch (err) {
       console.error('Error updating availability:', err);
@@ -1190,6 +1406,19 @@ export const realtimeBridge = {
     setLocalAlertsList(updated);
 
     broadcastRealtime('NEW_ALERT', { alert: newAlert, ...newAlert });
+
+    // Realtime Socket.io broadcast to all waiter and manager devices
+    try {
+      const socket = getSocket();
+      const numSeat = Number(normChair) || 1;
+      socket.emit(SOCKET_EVENTS.WAITER_CALLED, {
+        seatId: numSeat,
+        seatNumber: alert.seatNumber || `Seat ${normChair}`,
+        zone: 'COUNTER_A',
+        reason: alert.type === 'kitchen_ready' ? 'ASSISTANCE' : 'WATER',
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
 
     return newAlert;
   },
@@ -1396,6 +1625,20 @@ export const realtimeBridge = {
     const settledTicket = meta?.ticketNumber;
     broadcastRealtime('BILL_SETTLED', { chairId: cleanChair, rawChairId: chairId, normChairId: unpadded, paymentMethod, amount, ticketNumber: settledTicket });
     broadcastRealtime('SEAT_RELEASED', { chairId: cleanChair, rawChairId: chairId, normChairId: unpadded });
+
+    // Notify Fastify backend of payment settlement
+    try {
+      const cleanSeatId = Number(cleanChair) || 1;
+      fetch('http://localhost:4000/api/payments/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seatId: cleanSeatId,
+          gateway: paymentMethod || 'RAZORPAY',
+          settledByRole: 'CUSTOMER_SELF',
+        }),
+      }).catch(() => {});
+    } catch {}
 
     return true;
   },
@@ -1709,7 +1952,10 @@ export const realtimeBridge = {
   subscribeKDS(callbacks: KDSCallbacks) {
     activeKdsSubscribers.add(callbacks);
 
-    // 1. Initialize Supabase Realtime Channel once as singleton
+    // 1. Initialize Socket.io Bridge to Fastify backend
+    initSocketBridge();
+
+    // 2. Initialize Supabase Realtime Channel once as singleton
     initSharedRealtimeChannel();
 
     // 2. Initialize Local Broadcast Channel listener once

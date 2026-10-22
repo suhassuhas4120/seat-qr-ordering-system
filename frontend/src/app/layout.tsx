@@ -1,11 +1,18 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { CartProvider } from '../lib/context/CartContext';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: 'LUMIÈRE - Real-Time Dining & Ordering System',
-  description: '100-Seat Collaborative Real-Time Restaurant Management System',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0',
+  title: 'Thoogudeepa Donne Biryani Mane',
+  description: '100-Seat Real-Time Restaurant Management System',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -14,10 +21,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-black">
-        {children}
-        <Toaster position="top-right" richColors theme="dark" closeButton />
+    <html lang="en" className="h-full antialiased">
+      <body className="min-h-full w-full flex flex-col m-0 p-0 overflow-x-hidden bg-white text-black font-sans">
+        <CartProvider>
+          {children}
+          <Toaster position="top-right" richColors closeButton />
+        </CartProvider>
       </body>
     </html>
   );
