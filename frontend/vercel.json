@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build --workspace=@seat-order/shared && next build",
+  "cleanUrls": true
+}

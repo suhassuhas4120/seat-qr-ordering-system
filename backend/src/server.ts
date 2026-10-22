@@ -2,6 +2,7 @@ import fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
+import crypto from 'crypto';
 import { db } from './db/index.js';
 import { orderService } from './services/orderService.js';
 import { paymentService } from './services/paymentService.js';
@@ -201,6 +202,44 @@ app.post('/api/payments/webhook', async (req, reply) => {
       gatewayPaymentId: paymentId,
     });
     return reply.send({ received: true, ...result });
+  } catch (error: any) {
+    return reply.status(400).send({ error: error.message });
+  }
+});
+
+// 10B. Dynamic Zero-MDR Merchant UPI Configuration
+app.get('/api/payments/upi-config', async () => {
+  return {
+    upiVpa: process.env.MERCHANT_UPI_VPA || 'thoogudeepa@okicici',
+    merchantName: process.env.MERCHANT_NAME || 'Thoogudeepa Donne Biryani Mane',
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID || '',
+  };
+});
+
+// 10C. Razorpay Order Creation & Webhook Signature Verification
+app.post('/api/payments/razorpay/verify', async (req, reply) => {
+  const { seatId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body as any;
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (secret && razorpayOrderId && razorpayPaymentId && razorpaySignature) {
+    const expected = crypto
+      .createHmac('sha256', secret)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+
+    if (expected !== razorpaySignature) {
+      return reply.status(400).send({ error: 'Invalid Razorpay payment signature' });
+    }
+  }
+
+  try {
+    const result = await paymentService.processPayment({
+      seatId: Number(seatId),
+      gateway: 'RAZORPAY',
+      settledByRole: 'CUSTOMER_SELF',
+      gatewayPaymentId: razorpayPaymentId || `PAY_RZP_${Date.now()}`,
+    });
+    return reply.send(result);
   } catch (error: any) {
     return reply.status(400).send({ error: error.message });
   }

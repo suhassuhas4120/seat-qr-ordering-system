@@ -43,3 +43,35 @@ body {
 .pulse-glow {
   animation: pulseGlow 2s infinite ease-in-out;
 }
+
+/* 80mm & 58mm Thermal Receipt & KOT Printer Optimization */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    font-family: 'Courier New', Courier, monospace !important;
+  }
+
+  /* Hide navigation, buttons, and decorative elements during thermal printing */
+  nav, header, button, .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Force full width on printable slip */
+  .receipt-container, .bill-print-slip {
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    padding: 4mm !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

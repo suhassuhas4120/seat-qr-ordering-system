@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: thoogudeepa-backend
+    env: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build --workspace=@seat-order/shared && npm run build --workspace=@seat-order/backend
+    startCommand: npm run start --workspace=@seat-order/backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: HMAC_SECRET
+        generateValue: true
+      - key: MERCHANT_UPI_VPA
+        value: thoogudeepa@okicici
+      - key: MERCHANT_NAME
+        value: Thoogudeepa Donne Biryani Mane
