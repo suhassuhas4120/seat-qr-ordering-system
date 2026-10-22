@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { supabaseSync } from './supabaseSync.js';
 import type {
   Seat,
   SeatZone,
@@ -94,8 +95,9 @@ class InDatabase {
   }
 
   /**
-   * Append-only Write-Ahead Transaction Logger (WAL).
-   * Appends an immutable record of every order, item bump, and payment for 100% financial auditing.
+   * Append-only Write-Ahead Transaction Logger (WAL) + Asynchronous Cloud Mirror.
+   * Appends an immutable record of every order, item bump, and payment for 100% financial auditing,
+   * and mirrors changes to Supabase PostgreSQL when credentials are configured.
    */
   public logTransaction(type: string, payload: any) {
     const entry = JSON.stringify({
@@ -108,6 +110,26 @@ class InDatabase {
       fs.appendFileSync(WAL_FILE, entry, 'utf-8');
     } catch (err) {
       console.error('Failed to append to WAL log:', err);
+    }
+
+    // Non-blocking cloud persistence
+    try {
+      supabaseSync.syncAuditLog(type, payload);
+
+      if (type === 'ORDER_PLACED' && payload.orderId) {
+        const order = this.data.orders.find((o) => o.id === payload.orderId);
+        if (order) supabaseSync.syncOrder(order);
+      } else if (type === 'ITEM_STAGE_BUMPED') {
+        supabaseSync.syncItemStage(payload.orderId, payload.itemId, payload.stage);
+      } else if (type === 'PAYMENT_SETTLED' && payload.paymentId) {
+        const payment = this.data.payments.find((p) => p.id === payload.paymentId);
+        if (payment) supabaseSync.syncPayment(payment);
+      } else if (type === 'SEAT_CLAIMED' && payload.seatId) {
+        const seat = this.data.seats.find((s) => s.id === payload.seatId);
+        if (seat) supabaseSync.syncSeat(seat);
+      }
+    } catch (err) {
+      // Cloud backup errors must never disrupt core transaction flow
     }
   }
 
