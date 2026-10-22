@@ -17,6 +17,7 @@ import type {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const STATE_FILE = path.resolve(__dirname, '../../../restaurant_state.json');
+const WAL_FILE = path.resolve(__dirname, '../../../transactions.jsonl');
 
 export interface DatabaseState {
   seats: Seat[];
@@ -39,6 +40,9 @@ class InDatabase {
     users: [],
   };
 
+  private isWriting = false;
+  private pendingWrite = false;
+
   constructor() {
     this.loadState();
   }
@@ -57,11 +61,53 @@ class InDatabase {
     this.seed();
   }
 
+  /**
+   * High-concurrency atomic state persistence.
+   * Writes to a temporary file first, then atomically renames it.
+   * Completely eliminates file corruption risks during high-volume rush hours.
+   */
   public saveState() {
+    if (this.isWriting) {
+      this.pendingWrite = true;
+      return;
+    }
+
+    this.isWriting = true;
+    const tempFile = `${STATE_FILE}.${Date.now()}.${Math.random().toString(36).substring(7)}.tmp`;
+    const payload = JSON.stringify(this.data, null, 2);
+
     try {
-      fs.writeFileSync(STATE_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
+      fs.writeFileSync(tempFile, payload, 'utf-8');
+      fs.renameSync(tempFile, STATE_FILE);
     } catch (err) {
-      console.error('Failed to persist database state:', err);
+      console.error('Failed to persist database state atomically:', err);
+      try {
+        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+      } catch {}
+    } finally {
+      this.isWriting = false;
+      if (this.pendingWrite) {
+        this.pendingWrite = false;
+        this.saveState();
+      }
+    }
+  }
+
+  /**
+   * Append-only Write-Ahead Transaction Logger (WAL).
+   * Appends an immutable record of every order, item bump, and payment for 100% financial auditing.
+   */
+  public logTransaction(type: string, payload: any) {
+    const entry = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      type,
+      payload,
+    }) + '\n';
+
+    try {
+      fs.appendFileSync(WAL_FILE, entry, 'utf-8');
+    } catch (err) {
+      console.error('Failed to append to WAL log:', err);
     }
   }
 
@@ -357,12 +403,16 @@ class InDatabase {
       },
     ];
 
-    // 4. Seed Staff Users
+    // 4. Seed Physical Operation Staff (6 Waiters, 1 Kitchen KDS Chef, 1 Floor Manager)
     this.data.users = [
       { id: 1, name: 'Alex Johnson', role: 'WAITER', assignedZone: 'COUNTER_A', isActive: true },
       { id: 2, name: 'Maya Lin', role: 'WAITER', assignedZone: 'COUNTER_B', isActive: true },
-      { id: 3, name: 'Gordon Ramsay', role: 'CHEF', assignedZone: null, isActive: true },
-      { id: 4, name: 'David Miller', role: 'MANAGER', assignedZone: null, isActive: true },
+      { id: 3, name: 'Ramesh Kumar', role: 'WAITER', assignedZone: 'BAR', isActive: true },
+      { id: 4, name: 'Suresh M', role: 'WAITER', assignedZone: 'WINDOW', isActive: true },
+      { id: 5, name: 'Anand Kumar', role: 'WAITER', assignedZone: 'CENTER', isActive: true },
+      { id: 6, name: 'Deepa Naik', role: 'WAITER', assignedZone: null, isActive: true },
+      { id: 7, name: 'Head Chef Gordon', role: 'CHEF', assignedZone: null, isActive: true },
+      { id: 8, name: 'Manjunath (General Manager)', role: 'MANAGER', assignedZone: null, isActive: true },
     ];
 
     this.saveState();

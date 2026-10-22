@@ -89,6 +89,14 @@ export class PaymentService {
       seat.updatedAt = now;
 
       db.saveState();
+      db.logTransaction('PAYMENT_SETTLED', {
+        seatId,
+        paymentId: txId,
+        amount: finalAmount,
+        gateway,
+        settledByRole,
+        staffId,
+      });
 
       const payload = {
         seatId,

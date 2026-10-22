@@ -1,0 +1,4 @@
+{"timestamp":"2026-10-22T23:23:50.490Z","type":"ORDER_PLACED","payload":{"orderId":"94a5b604-3b58-451c-aaff-493d040c9e45","orderNumber":"ORD-0486","seatId":5,"itemCount":2,"total":609,"createdByRole":"WAITER_MOBILE","waiterId":1}}
+{"timestamp":"2026-10-22T23:23:50.609Z","type":"ITEM_STAGE_BUMPED","payload":{"itemId":"7bcdf848-098b-4988-bafc-3f50466d0f71","orderId":"94a5b604-3b58-451c-aaff-493d040c9e45","seatId":5,"newStage":"COOKING","staffId":7}}
+{"timestamp":"2026-10-22T23:23:50.645Z","type":"ITEM_STAGE_BUMPED","payload":{"itemId":"7bcdf848-098b-4988-bafc-3f50466d0f71","orderId":"94a5b604-3b58-451c-aaff-493d040c9e45","seatId":5,"newStage":"READY","staffId":7}}
+{"timestamp":"2026-10-22T23:23:50.658Z","type":"PAYMENT_SETTLED","payload":{"seatId":5,"paymentId":"PAY_1792711430654_EEA858A6","amount":609,"gateway":"CASH","settledByRole":"WAITER","staffId":1}}

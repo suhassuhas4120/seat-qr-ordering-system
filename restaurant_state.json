@@ -5,1110 +5,1110 @@
       "seatNumber": "S001",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "6543113498ee1c9d",
+      "epochHash": "b6c69b4adbd33688",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.197Z"
+      "updatedAt": "2026-10-22T23:23:25.540Z"
     },
     {
       "id": 2,
       "seatNumber": "S002",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "e64cef4188765fa0",
+      "epochHash": "447729d51c68e093",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 3,
       "seatNumber": "S003",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "ba27a9772ee0f76d",
+      "epochHash": "380541ed7f5b53a1",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 4,
       "seatNumber": "S004",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "2ee56bf026b62030",
+      "epochHash": "e03fdcabc748af4c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 5,
       "seatNumber": "S005",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "c96709c2c281359f",
+      "epochHash": "88f8bc47163123a4",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:50.654Z"
     },
     {
       "id": 6,
       "seatNumber": "S006",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "7d6aa2b421504982",
+      "epochHash": "c414931d6813f73d",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 7,
       "seatNumber": "S007",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "68229db42153a847",
+      "epochHash": "773138af801a52cb",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 8,
       "seatNumber": "S008",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "ed8cc1683b44a102",
+      "epochHash": "f5e7d0e456d5d821",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 9,
       "seatNumber": "S009",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "fae49a8c10b90fcc",
+      "epochHash": "153a9445c9e2306c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 10,
       "seatNumber": "S010",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "747586a45d5d08fc",
+      "epochHash": "791551863cdd4bea",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 11,
       "seatNumber": "S011",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "177989b5dfedf0e1",
+      "epochHash": "dff2c7c264054e3a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 12,
       "seatNumber": "S012",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "34dc5ee08212cde9",
+      "epochHash": "d4adbdb5d6979e5a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 13,
       "seatNumber": "S013",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "ee1c48b6e113dc9d",
+      "epochHash": "670beabfa664185a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 14,
       "seatNumber": "S014",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "60bbe7cf155e9f31",
+      "epochHash": "d8b4535b0792556f",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:59:03.036Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 15,
       "seatNumber": "S015",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "38c92f2c16802fff",
+      "epochHash": "36c0fbd3639cdda4",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 16,
       "seatNumber": "S016",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "ab9d80b002411fe7",
+      "epochHash": "8da06443d72b8c6a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 17,
       "seatNumber": "S017",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "0691a8aa2320e9eb",
+      "epochHash": "fcbfe75197e9eedd",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 18,
       "seatNumber": "S018",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "b26e3a40138896a4",
+      "epochHash": "624b02ac4f69c5f0",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 19,
       "seatNumber": "S019",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "d20ebc1ac4ee5dcf",
+      "epochHash": "04c40224ce705a87",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.198Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 20,
       "seatNumber": "S020",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "9dc009592abf7727",
+      "epochHash": "db58292b4c50e67c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 21,
       "seatNumber": "S021",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "73c5804dcfe58d25",
+      "epochHash": "e520a3a84aec70af",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 22,
       "seatNumber": "S022",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "daf270ddecd190d8",
+      "epochHash": "474a6ab896f8700c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 23,
       "seatNumber": "S023",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "4fdff2c04592f507",
+      "epochHash": "a2410fd966f79885",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 24,
       "seatNumber": "S024",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "c048b4354c80a1c4",
+      "epochHash": "d445164994cecf39",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 25,
       "seatNumber": "S025",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "eddc3530ac89d20b",
+      "epochHash": "ea31ddf8ef5a263e",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 26,
       "seatNumber": "S026",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "6be80df8ce73613c",
+      "epochHash": "cf48091a873d9299",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 27,
       "seatNumber": "S027",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "71d16bc655a09bb0",
+      "epochHash": "43a564917a760c3b",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 28,
       "seatNumber": "S028",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "62ae4cb96461e900",
+      "epochHash": "03dc9a7638e8fcc1",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 29,
       "seatNumber": "S029",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "f98996ffd33d010b",
+      "epochHash": "3d5b95a9a60e6ce8",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 30,
       "seatNumber": "S030",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "5a9462c127ce1ed8",
+      "epochHash": "a9e8d02006bdfcf3",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 31,
       "seatNumber": "S031",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "352ab5ce27e4f538",
+      "epochHash": "0624b5c7a3333bdc",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 32,
       "seatNumber": "S032",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "270a3f5ab4460286",
+      "epochHash": "3919fda5e978faf1",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 33,
       "seatNumber": "S033",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "43ec6dc463c2d238",
+      "epochHash": "e7622e612a94f01d",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 34,
       "seatNumber": "S034",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "fd33df9fb9bb608b",
+      "epochHash": "be9ffeaed2ecb72e",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 35,
       "seatNumber": "S035",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "178405f238e464e4",
+      "epochHash": "0eb461a160a5ea96",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 36,
       "seatNumber": "S036",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "3cd51f3fb95729a2",
+      "epochHash": "17fe8c9d8c8904f0",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 37,
       "seatNumber": "S037",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "41f26dea5b58843f",
+      "epochHash": "df517ad8dcab5429",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 38,
       "seatNumber": "S038",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "71548cc0ffa2c31e",
+      "epochHash": "7cba550fc4b11c6a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 39,
       "seatNumber": "S039",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "1d61706156f572f8",
+      "epochHash": "ab500d51d2f3b791",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 40,
       "seatNumber": "S040",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "822db3f999c90884",
+      "epochHash": "00e1f6ddbce98c84",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 41,
       "seatNumber": "S041",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "1e9a356b67e02db8",
+      "epochHash": "62e9b75ee770c1de",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 42,
       "seatNumber": "S042",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "6fd6d134f06bdbb0",
+      "epochHash": "e5e5a566e01815c0",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 43,
       "seatNumber": "S043",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "42faf959888a6d3b",
+      "epochHash": "fb79169e68c3fbc1",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 44,
       "seatNumber": "S044",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "6e220813b9ff0687",
+      "epochHash": "4dad46c99dc0bb2c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 45,
       "seatNumber": "S045",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "18624b236148e9f5",
+      "epochHash": "d3d2a72812a39bcc",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.541Z"
     },
     {
       "id": 46,
       "seatNumber": "S046",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "db1d4fcd604a1392",
+      "epochHash": "28f6f6cad5cf5a9b",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 47,
       "seatNumber": "S047",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "0eb3157a95009980",
+      "epochHash": "d6dec89c8665d421",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 48,
       "seatNumber": "S048",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "0723304fa9fc36ec",
+      "epochHash": "c4a856e96ffe71da",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 49,
       "seatNumber": "S049",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "15fd9404fb6449a6",
+      "epochHash": "18f2bea7c736881d",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 50,
       "seatNumber": "S050",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "d2595096e796f8c9",
+      "epochHash": "d9a9837ebe559275",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 51,
       "seatNumber": "S051",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "767067d86555cf12",
+      "epochHash": "a8a98ee5526e7cb2",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 52,
       "seatNumber": "S052",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "2a79b103be9cfd03",
+      "epochHash": "22aef1e83f4b9fde",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 53,
       "seatNumber": "S053",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "2cd87b26154dfbfd",
+      "epochHash": "fb9e3d638ffe84a8",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 54,
       "seatNumber": "S054",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "835bd40775042826",
+      "epochHash": "525e1bae23b0e9cf",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 55,
       "seatNumber": "S055",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "a5cef1c9bb745e5f",
+      "epochHash": "10e99b4854110d16",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 56,
       "seatNumber": "S056",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "fd8d29093f60bba4",
+      "epochHash": "5191793c80127937",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 57,
       "seatNumber": "S057",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "488e4c5d314ff60d",
+      "epochHash": "1a88f9324fbc1599",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 58,
       "seatNumber": "S058",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "3bdf73554b3bc749",
+      "epochHash": "2727e0c942c998d3",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 59,
       "seatNumber": "S059",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "0956dabb72f9542e",
+      "epochHash": "026c2457c6b78a4c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 60,
       "seatNumber": "S060",
       "zone": "BAR",
       "currentStatus": "VACANT",
-      "epochHash": "8ff5bb7499e0d185",
+      "epochHash": "d2d85a02fc9f3270",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 61,
       "seatNumber": "S061",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "d88f19fd0a8df8b1",
+      "epochHash": "aabc924da3601275",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 62,
       "seatNumber": "S062",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "4a8cba974ec07305",
+      "epochHash": "7e439e8b2cf88aa0",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 63,
       "seatNumber": "S063",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "3492c75b80ffdc91",
+      "epochHash": "90d5c0353dece873",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 64,
       "seatNumber": "S064",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "619f5a81683d10f8",
+      "epochHash": "d5696d2240585e09",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 65,
       "seatNumber": "S065",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "bca5fc4c3d88ba2e",
+      "epochHash": "033c833753b4ea28",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 66,
       "seatNumber": "S066",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "26e49b9da6f840b3",
+      "epochHash": "0f0af01c2ed6a8d6",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 67,
       "seatNumber": "S067",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "4867e7eee1a7fec2",
+      "epochHash": "da49fed92239e1e6",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 68,
       "seatNumber": "S068",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "f923eed9c54a647e",
+      "epochHash": "30c1a5af79a34cac",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 69,
       "seatNumber": "S069",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "8b244751d651e219",
+      "epochHash": "b78671105338618f",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 70,
       "seatNumber": "S070",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "b416a69f5ffb102f",
+      "epochHash": "ef2e965286409999",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 71,
       "seatNumber": "S071",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "4d7c0e11c89d8148",
+      "epochHash": "158370c6fb4d745c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 72,
       "seatNumber": "S072",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "2bbe6994ad4dc907",
+      "epochHash": "0e66d9dc6aaccbd3",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 73,
       "seatNumber": "S073",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "99916818be8e6e24",
+      "epochHash": "01fc27081bb193fb",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 74,
       "seatNumber": "S074",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "11405915b92461d1",
+      "epochHash": "a1cfb1e67e94a68a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 75,
       "seatNumber": "S075",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "0e78cd5d6e995c97",
+      "epochHash": "988c8f07328956fc",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 76,
       "seatNumber": "S076",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "fa7c20751eb1b3d4",
+      "epochHash": "466bf69be10c33cd",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 77,
       "seatNumber": "S077",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "1aa1501978d05f5d",
+      "epochHash": "1d44396420208319",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 78,
       "seatNumber": "S078",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "32cd4a2ab2a1707f",
+      "epochHash": "d33847b64c0ac84b",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 79,
       "seatNumber": "S079",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "b4758abd71af7662",
+      "epochHash": "6741cb2367c89f68",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 80,
       "seatNumber": "S080",
       "zone": "WINDOW",
       "currentStatus": "VACANT",
-      "epochHash": "40b4b76be0980c11",
+      "epochHash": "b4fb4546e570ebbb",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 81,
       "seatNumber": "S081",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "c77fbbecde48e5e4",
+      "epochHash": "d443c4d28135ba9d",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 82,
       "seatNumber": "S082",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "bb1ea515ed5352e9",
+      "epochHash": "3fc84264534efa10",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 83,
       "seatNumber": "S083",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "9c5df1fa14ffb0ff",
+      "epochHash": "6a6744b00251b96b",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 84,
       "seatNumber": "S084",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "d54a17c26b00c556",
+      "epochHash": "8d9d182b5fcac7a1",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 85,
       "seatNumber": "S085",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "042cac281e1c8c3d",
+      "epochHash": "341d0ddb161aae66",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 86,
       "seatNumber": "S086",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "966631c9c37b910b",
+      "epochHash": "61d354d7f94c147a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 87,
       "seatNumber": "S087",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "850a4b94b733dd56",
+      "epochHash": "b76177cd7ece4732",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 88,
       "seatNumber": "S088",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "71c46ff5264609cd",
+      "epochHash": "b9a21299f2c53611",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 89,
       "seatNumber": "S089",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "799707c7b588ab64",
+      "epochHash": "8f1c8bcd8c094749",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 90,
       "seatNumber": "S090",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "b3d018232d9e02fb",
+      "epochHash": "db4fdfb058936299",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 91,
       "seatNumber": "S091",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "03a081f23e44fef7",
+      "epochHash": "72ef9219d2ff93bc",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 92,
       "seatNumber": "S092",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "427e4eb218e850dc",
+      "epochHash": "04cb8f0712ed252c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 93,
       "seatNumber": "S093",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "8a1a980b3fc5f443",
+      "epochHash": "0d9ebff9f25bc84c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 94,
       "seatNumber": "S094",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "207b973212931227",
+      "epochHash": "415db3db96f7aac1",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 95,
       "seatNumber": "S095",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "25e08dffa975c662",
+      "epochHash": "8e86988ebca99ada",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 96,
       "seatNumber": "S096",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "86216dc6b12cd90c",
+      "epochHash": "28bfaa8a57f72708",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 97,
       "seatNumber": "S097",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "561a6539c9712d79",
+      "epochHash": "3a0585a7d91d493a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 98,
       "seatNumber": "S098",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "48ed725d3244d952",
+      "epochHash": "d01b8d7f5ba9af32",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 99,
       "seatNumber": "S099",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "50bd4bc60ec233e5",
+      "epochHash": "a8059b20b7811570",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     },
     {
       "id": 100,
       "seatNumber": "S100",
       "zone": "CENTER",
       "currentStatus": "VACANT",
-      "epochHash": "d4fe31eea4b5b982",
+      "epochHash": "d967cf13472d63f6",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T22:54:18.199Z"
+      "updatedAt": "2026-10-22T23:23:25.542Z"
     }
   ],
   "seatSessions": [
     {
-      "id": "00c3c976-4d48-447e-a078-bd1b7635c125",
-      "seatId": 14,
-      "sessionToken": "f8308572dffbfa7acec9e66fc640512b94d26b6d4ffdf2dfdc8f580485a88c01",
+      "id": "01b6f094-3141-43fb-a55f-508ac8017d99",
+      "seatId": 5,
+      "sessionToken": "59a9ff91a85c98accc9cb46988dc25dbcabfbab0e66aa5d33facad186552c33a",
       "status": "COMPLETED",
-      "startedAt": "2026-10-22T22:58:21.528Z",
-      "endedAt": "2026-10-22T22:59:03.036Z"
+      "startedAt": "2026-10-22T23:23:50.486Z",
+      "endedAt": "2026-10-22T23:23:50.654Z"
     }
   ],
   "menuCategories": [
@@ -1377,58 +1377,56 @@
   ],
   "orders": [
     {
-      "id": "694dc82b-6957-4689-b6d2-d70d29412101",
-      "sessionId": "00c3c976-4d48-447e-a078-bd1b7635c125",
-      "seatId": 14,
-      "orderNumber": "ORD-1529",
+      "id": "94a5b604-3b58-451c-aaff-493d040c9e45",
+      "sessionId": "01b6f094-3141-43fb-a55f-508ac8017d99",
+      "seatId": 5,
+      "orderNumber": "ORD-0486",
       "overallStage": "PAID",
       "createdByRole": "WAITER_MOBILE",
       "waiterId": 1,
-      "placedAt": "2026-10-22T22:58:21.529Z",
+      "placedAt": "2026-10-22T23:23:50.486Z",
       "items": [
         {
-          "id": "82fc3025-0fbe-4e64-b365-83d41f0ebc65",
-          "orderId": "694dc82b-6957-4689-b6d2-d70d29412101",
+          "id": "7bcdf848-098b-4988-bafc-3f50466d0f71",
+          "orderId": "94a5b604-3b58-451c-aaff-493d040c9e45",
           "menuItemId": 20,
           "nameSnapshot": "Chicken Biryani",
           "priceSnapshot": 170,
-          "quantity": 1,
-          "notes": "Medium Spicy Chicken Biryani",
+          "quantity": 2,
+          "notes": "Donne Biryani Extra Spicy",
           "itemStage": "PAID",
-          "updatedAt": "2026-10-22T22:58:53.827Z",
-          "bumpedByChefId": 3,
-          "deliveredByWaiterId": 1
+          "updatedAt": "2026-10-22T23:23:50.640Z",
+          "bumpedByChefId": 7
         },
         {
-          "id": "1f4302dc-3424-4f7c-b4fd-db341429d097",
-          "orderId": "694dc82b-6957-4689-b6d2-d70d29412101",
-          "menuItemId": 18,
-          "nameSnapshot": "Chicken Kabab",
-          "priceSnapshot": 160,
+          "id": "2d026b53-3de3-4d8a-82bf-1f330689611f",
+          "orderId": "94a5b604-3b58-451c-aaff-493d040c9e45",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
           "quantity": 2,
-          "notes": "Crispy Boneless Chicken Kabab",
+          "notes": "Kaalu Soup Hot",
           "itemStage": "PAID",
-          "updatedAt": "2026-10-22T22:58:53.835Z",
-          "deliveredByWaiterId": 1
+          "updatedAt": "2026-10-22T23:23:50.486Z"
         }
       ]
     }
   ],
   "payments": [
     {
-      "id": "6f7cf1ab-1416-4332-a31d-0bde9dbe9f30",
-      "sessionId": "00c3c976-4d48-447e-a078-bd1b7635c125",
-      "seatId": 14,
-      "subtotal": 490,
-      "taxAmount": 24.5,
+      "id": "d6782833-a8da-4f41-b5b1-cbf8a1117d90",
+      "sessionId": "01b6f094-3141-43fb-a55f-508ac8017d99",
+      "seatId": 5,
+      "subtotal": 580,
+      "taxAmount": 29,
       "discountAmount": 0,
-      "finalAmount": 514.5,
-      "gateway": "UPI_QR",
-      "gatewayPaymentId": "PAY_UPI_THOOGUDEEPA_TEST_001",
+      "finalAmount": 609,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792711430654_EEA858A6",
       "status": "SUCCESS",
-      "settledByRole": "CUSTOMER_SELF",
-      "staffId": null,
-      "completedAt": "2026-10-22T22:59:03.036Z"
+      "settledByRole": "WAITER",
+      "staffId": 1,
+      "completedAt": "2026-10-22T23:23:50.654Z"
     }
   ],
   "users": [
@@ -1448,14 +1446,42 @@
     },
     {
       "id": 3,
-      "name": "Gordon Ramsay",
+      "name": "Ramesh Kumar",
+      "role": "WAITER",
+      "assignedZone": "BAR",
+      "isActive": true
+    },
+    {
+      "id": 4,
+      "name": "Suresh M",
+      "role": "WAITER",
+      "assignedZone": "WINDOW",
+      "isActive": true
+    },
+    {
+      "id": 5,
+      "name": "Anand Kumar",
+      "role": "WAITER",
+      "assignedZone": "CENTER",
+      "isActive": true
+    },
+    {
+      "id": 6,
+      "name": "Deepa Naik",
+      "role": "WAITER",
+      "assignedZone": null,
+      "isActive": true
+    },
+    {
+      "id": 7,
+      "name": "Head Chef Gordon",
       "role": "CHEF",
       "assignedZone": null,
       "isActive": true
     },
     {
-      "id": 4,
-      "name": "David Miller",
+      "id": 8,
+      "name": "Manjunath (General Manager)",
       "role": "MANAGER",
       "assignedZone": null,
       "isActive": true

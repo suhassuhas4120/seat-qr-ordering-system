@@ -213,17 +213,24 @@ app.post('/api/staff/login', async (req, reply) => {
     return reply.status(400).send({ error: '4-digit PIN is required' });
   }
 
+  const pin = parseResult.data.pin;
   const user = db.data.users.find((u) => {
-    // Demo pins: 1234 for Alex, 5678 for Maya, 9999 for Gordon, 0000 for David
-    if (parseResult.data.pin === '1234' && u.name === 'Alex Johnson') return true;
-    if (parseResult.data.pin === '5678' && u.name === 'Maya Lin') return true;
-    if (parseResult.data.pin === '9999' && u.name === 'Gordon Ramsay') return true;
-    if (parseResult.data.pin === '0000' && u.name === 'David Miller') return true;
+    // 6 Waiters PIN mapping
+    if ((pin === '1001' || pin === '1234') && u.name === 'Alex Johnson') return true;
+    if ((pin === '1002' || pin === '5678') && u.name === 'Maya Lin') return true;
+    if ((pin === '1003' || pin === '1111') && u.name === 'Ramesh Kumar') return true;
+    if ((pin === '1004' || pin === '2222') && u.name === 'Suresh M') return true;
+    if ((pin === '1005' || pin === '3333') && u.name === 'Anand Kumar') return true;
+    if ((pin === '1006' || pin === '4444') && u.name === 'Deepa Naik') return true;
+    // Kitchen KDS Chef PIN
+    if (pin === '9999' && u.role === 'CHEF') return true;
+    // Floor / General Manager PIN
+    if ((pin === '0000' || pin === '1234') && u.role === 'MANAGER') return true;
     return false;
   });
 
   if (!user) {
-    return reply.status(401).send({ error: 'Invalid PIN code. Try 1234, 5678, 9999, or 0000.' });
+    return reply.status(401).send({ error: 'Invalid PIN code. Try 1001-1006 for 6 Waiters, 9999 for Kitchen, 0000 for Manager.' });
   }
 
   return reply.send({

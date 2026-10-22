@@ -71,6 +71,7 @@ export class OrderService {
       currentSeat.updatedAt = now;
 
       db.saveState();
+      db.logTransaction('SEAT_CLAIMED', { seatId: currentSeat.id, seatNumber: currentSeat.seatNumber });
 
       // Broadcast real-time claim to all staff and manager
       io?.emit(SOCKET_EVENTS.SEAT_CLAIMED, {
@@ -186,6 +187,15 @@ export class OrderService {
     seat.updatedAt = now;
 
     db.saveState();
+    db.logTransaction('ORDER_PLACED', {
+      orderId: newOrder.id,
+      orderNumber: newOrder.orderNumber,
+      seatId,
+      itemCount: newOrder.items.length,
+      total: tabSummary.total,
+      createdByRole,
+      waiterId,
+    });
 
     const payload = {
       order: newOrder,
@@ -249,6 +259,13 @@ export class OrderService {
 
     targetOrder.overallStage = newOrderStage;
     db.saveState();
+    db.logTransaction('ITEM_STAGE_BUMPED', {
+      itemId,
+      orderId: targetOrder.id,
+      seatId: targetOrder.seatId,
+      newStage,
+      staffId,
+    });
 
     const payload = {
       itemId,
@@ -350,6 +367,7 @@ export class OrderService {
     if (item) {
       item.isAvailable = isAvailable;
       db.saveState();
+      db.logTransaction('ITEM_AVAILABILITY_CHANGED', { itemId, isAvailable });
     }
     if (io) {
       io.emit(SOCKET_EVENTS.MENU_ITEM_AVAILABILITY_CHANGED, { itemId, isAvailable });
