@@ -199,9 +199,17 @@ function initSocketBridge() {
       };
 
       const currentLocals = getLocalOrdersList();
+      const cleanTargetChair = chairId.replace(/[^0-9]/g, '');
       const updatedOrders = [
         { order: orderRec, items: orderRec.items || [] },
-        ...currentLocals.filter((x) => x.order.id !== order.id),
+        ...currentLocals.filter((x) => {
+          if (x.order.id === order.id) return false;
+          const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
+          if (xChair === cleanTargetChair && String(x.order.ticket_number).startsWith('TK-')) {
+            return false;
+          }
+          return true;
+        }),
       ];
       setLocalOrdersList(updatedOrders);
 
@@ -611,132 +619,18 @@ function broadcastRealtime(event: string, payload: any) {
 }
 
 export const realtimeBridge = {
-  // Post order to Supabase, update local resilience store, and broadcast locally
-  async placeOrder(order: OrderRecord, items: OrderItemRecord[]): Promise<{ success: boolean; orderId?: string }> {
+  // Post order to Fastify backend (primary source of truth), update Supabase & local resilience store, and broadcast
+  async placeOrder(order: OrderRecord, items: OrderItemRecord[]): Promise<{ success: boolean; orderId?: string; ticketNumber?: string }> {
     try {
       const deviceToken = order.device_token || '';
       const generatedId = `ord-${Date.now()}`;
-
-      // 1. Record seat occupancy locally & broadcast
-      const occupancyMap = getLocalOccupancyMap();
-      occupancyMap[order.chair_id] = {
-        chairId: order.chair_id,
-        ticketNumber: order.ticket_number,
-        orderId: generatedId,
-        deviceToken,
-        status: order.status || 'pending',
-        placedAt: Date.now(),
-      };
-      setLocalOccupancyMap(occupancyMap);
-
       const cleanChair = order.chair_id.replace(/[^0-9]/g, '');
+      const cleanSeatId = Number(cleanChair) || 1;
 
-      // 3. Remote Supabase insertion if connected (authoritative database transaction)
-      if (supabase) {
-        const { data: orderData, error: orderErr } = await supabase
-          .from('orders')
-          .insert({
-            ticket_number: order.ticket_number,
-            chair_id: order.chair_id,
-            seat_label: order.seat_label,
-            status: order.status || 'pending',
-            total_amount: order.total_amount,
-          })
-          .select('id')
-          .single();
-
-        if (orderErr) throw orderErr;
-
-        const orderId = orderData.id;
-        processedOrderIds.add(orderId);
-
-        // Update occupancy map with confirmed orderId
-        if (occupancyMap[order.chair_id]) {
-          occupancyMap[order.chair_id].orderId = orderId;
-          setLocalOccupancyMap(occupancyMap);
-        }
-
-        const itemsToInsert = items.map((it) => {
-          const isPlaced = it.stage === 'PLACED' || !it.stage;
-          const addonsList = Array.isArray(it.addons) ? [...it.addons] : [];
-          if (isPlaced && !addonsList.includes('PLACED')) {
-            addonsList.push('PLACED');
-          }
-          return {
-            order_id: orderId,
-            chair_id: it.chair_id,
-            seat_label: it.seat_label,
-            dish_id: it.dish_id,
-            dish_name: it.dish_name,
-            quantity: it.quantity,
-            price: it.price,
-            stage: 'REC' as const,
-            notes: it.notes || '',
-            addons: addonsList,
-          };
-        });
-
-        const { data: insertedItemsData, error: itemsErr } = await supabase
-          .from('order_items')
-          .insert(itemsToInsert)
-          .select('*');
-        if (itemsErr) throw itemsErr;
-
-        const broadcastItems =
-          insertedItemsData && insertedItemsData.length > 0
-            ? insertedItemsData.map((it, idx) => ({
-                ...it,
-                stage: 'PLACED' as const,
-                notes: items[idx]?.notes || it.notes,
-                addons: items[idx]?.addons || it.addons,
-              }))
-            : items.map(it => ({ ...it, stage: 'PLACED' as const }));
-
-        // Synchronize local orders entry strictly with confirmed database ID and items
-        const currentLocals = getLocalOrdersList();
-        const updatedOrders = [
-          { order: { ...order, id: orderId }, items: broadcastItems },
-          ...currentLocals.filter((x) => x.order.id !== orderId && !String(x.order.id).startsWith('ord-')),
-        ];
-        setLocalOrdersList(updatedOrders);
-
-        // Broadcast ONCE across tabs and cross-device
-        broadcastRealtime('SEAT_OCCUPIED', {
-          chairId: order.chair_id,
-          occupancy: occupancyMap[order.chair_id],
-        });
-        broadcastRealtime('NEW_ORDER', {
-          order: { ...order, id: orderId },
-          items: broadcastItems,
-        });
-
-        // Fastify backend sync
-        try {
-          const cleanSeatId = Number(order.chair_id.replace(/[^0-9]/g, '')) || 1;
-          const apiItems = items.map((it) => ({
-            menuItemId: Number(it.dish_id.replace(/[^0-9]/g, '')) || 1,
-            quantity: it.quantity,
-            notes: it.notes || undefined,
-          }));
-          fetch(`${BACKEND_URL}/api/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              seatId: cleanSeatId,
-              items: apiItems,
-              createdByRole: 'CUSTOMER',
-            }),
-          }).catch((e) => console.warn('Order sync warning:', e));
-        } catch {}
-
-        return { success: true, orderId };
-      }
-
-      // Authoritative Fastify backend sync
+      // 1. Authoritative Fastify backend sync (PRIMARY SOURCE OF TRUTH)
       let backendOrderId = generatedId;
       let backendTicketNumber = order.ticket_number;
       try {
-        const cleanSeatId = Number(order.chair_id.replace(/[^0-9]/g, '')) || 1;
         const apiItems = items.map((it) => ({
           menuItemId: Number(it.dish_id.replace(/[^0-9]/g, '')) || 1,
           quantity: it.quantity,
@@ -759,39 +653,102 @@ export const realtimeBridge = {
           }
         }
       } catch (e) {
-        console.warn('Order sync warning:', e);
+        console.warn('Backend order placement warning:', e);
       }
 
+      // 2. Authoritative Order Record strictly matching server orderNumber (ORD-XXXX)
+      const authoritativeOrder: OrderRecord = {
+        ...order,
+        id: backendOrderId,
+        ticket_number: backendTicketNumber,
+      };
+
+      // 3. Record seat occupancy locally & broadcast
+      const occupancyMap = getLocalOccupancyMap();
+      occupancyMap[order.chair_id] = {
+        chairId: order.chair_id,
+        ticketNumber: backendTicketNumber,
+        orderId: backendOrderId,
+        deviceToken,
+        status: order.status || 'pending',
+        placedAt: Date.now(),
+      };
+      setLocalOccupancyMap(occupancyMap);
+
+      const confirmedItems = items.map((it, idx) => ({
+        ...it,
+        order_id: backendOrderId,
+        id: `${backendOrderId}-${it.dish_id}-${idx}`,
+        stage: 'PLACED' as const,
+      }));
+
+      // 4. Remote Supabase insertion if connected (strictly matching authoritative backend data)
+      if (supabase) {
+        try {
+          const { data: orderData, error: orderErr } = await supabase
+            .from('orders')
+            .insert({
+              ticket_number: backendTicketNumber,
+              chair_id: order.chair_id,
+              seat_label: order.seat_label,
+              status: order.status || 'pending',
+              total_amount: order.total_amount,
+            })
+            .select('id')
+            .single();
+
+          if (!orderErr && orderData) {
+            processedOrderIds.add(orderData.id);
+            const itemsToInsert = confirmedItems.map((it) => ({
+              order_id: orderData.id,
+              chair_id: it.chair_id,
+              seat_label: it.seat_label,
+              dish_id: it.dish_id,
+              dish_name: it.dish_name,
+              quantity: it.quantity,
+              price: it.price,
+              stage: 'REC' as const,
+              notes: it.notes || '',
+              addons: ['PLACED'],
+            }));
+            await supabase.from('order_items').insert(itemsToInsert);
+          }
+        } catch (supabaseErr) {
+          console.warn('Supabase sync warning:', supabaseErr);
+        }
+      }
+
+      // 5. Purge any temporary client-draft orders or phantom TK- tickets for this chair
       const currentLocals = getLocalOrdersList();
-      const cleanChairVal = order.chair_id.replace(/[^0-9]/g, '');
-      // Purge any temporary client-generated draft orders for this chair to prevent duplicate items
       const filteredLocals = currentLocals.filter((x) => {
         const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
-        if (xChair === cleanChairVal && (String(x.order.id).startsWith('ord-') || String(x.order.id).startsWith('local-'))) {
-          return false;
+        if (xChair === cleanChair) {
+          if (String(x.order.id).startsWith('ord-') || String(x.order.id).startsWith('local-')) return false;
+          if (String(x.order.ticket_number).startsWith('TK-')) return false;
         }
         return x.order.id !== backendOrderId && x.order.id !== generatedId;
       });
 
       const updatedOrders = [
         {
-          order: { ...order, id: backendOrderId, ticket_number: backendTicketNumber },
-          items: items.map((it, idx) => ({ ...it, order_id: backendOrderId, id: `${backendOrderId}-${it.dish_id}-${idx}` })),
+          order: authoritativeOrder,
+          items: confirmedItems,
         },
         ...filteredLocals,
       ];
       setLocalOrdersList(updatedOrders);
 
+      // Broadcast across tabs and cross-device
       broadcastRealtime('SEAT_OCCUPIED', {
         chairId: order.chair_id,
         occupancy: occupancyMap[order.chair_id],
       });
       broadcastRealtime('NEW_ORDER', {
-        order: { ...order, id: backendOrderId, ticket_number: backendTicketNumber },
-        items,
+        order: authoritativeOrder,
+        items: confirmedItems,
       });
 
-      return { success: true, orderId: backendOrderId };
+      return { success: true, orderId: backendOrderId, ticketNumber: backendTicketNumber };
     } catch (err) {
       console.error('Error placing order:', err);
       const generatedId = `local-${Date.now()}`;
@@ -1373,16 +1330,22 @@ export const realtimeBridge = {
             };
           });
 
-          const remoteTickets = new Set(remoteOrders.map((ro) => ro.order.ticket_number));
-          const remoteOrderIds = new Set(remoteOrders.map((ro) => ro.order.id));
+          const hasAuthRemote = remoteOrders.some((ro) => String(ro.order.ticket_number).startsWith('ORD-'));
+          const cleanedRemoteOrders = hasAuthRemote
+            ? remoteOrders.filter((ro) => !String(ro.order.ticket_number).startsWith('TK-'))
+            : remoteOrders;
+
+          const remoteTickets = new Set(cleanedRemoteOrders.map((ro) => ro.order.ticket_number));
+          const remoteOrderIds = new Set(cleanedRemoteOrders.map((ro) => ro.order.id));
           const validLocalOrders = localOrders.filter((lo) => {
             if (!lo.order?.id || !lo.order?.ticket_number) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
+            if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
             if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
             return true;
           });
           const merged = [
-            ...remoteOrders,
+            ...cleanedRemoteOrders,
             ...validLocalOrders.map((lo) => ({
               order: lo.order,
               items: this.hydrateOrderItemStages(lo.order, lo.items),
@@ -1461,7 +1424,7 @@ export const realtimeBridge = {
             const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
             if (backendIds.has(lo.order.id) || backendTickets.has(lo.order.ticket_number)) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
-            if (backendChairs.has(loChair) && (String(lo.order.id).startsWith('ord-') || String(lo.order.id).startsWith('local-'))) {
+            if (backendChairs.has(loChair) && (String(lo.order.id).startsWith('ord-') || String(lo.order.id).startsWith('local-') || String(lo.order.ticket_number).startsWith('TK-'))) {
               return false;
             }
             return true;
@@ -2146,9 +2109,14 @@ export const realtimeBridge = {
       );
       const sessionOrders = uncompletedOrders.length > 0 ? uncompletedOrders : matchingOrders;
 
+      const hasAuthoritative = sessionOrders.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
+      const effectiveOrders = hasAuthoritative
+        ? sessionOrders.filter((o) => !String(o.order.ticket_number).startsWith('TK-'))
+        : sessionOrders;
+
       const seenItemIds = new Set<string>();
       const allItems: OrderItemRecord[] = [];
-      sessionOrders.forEach((o) => {
+      effectiveOrders.forEach((o) => {
         const hydratedItems = this.hydrateOrderItemStages(o.order, o.items);
         hydratedItems.forEach((it, idx) => {
           const itemKey = it.id || `${o.order.id || o.order.ticket_number}-${it.dish_id}-${idx}`;
@@ -2162,11 +2130,11 @@ export const realtimeBridge = {
           }
         });
       });
-      const latestOrder = sessionOrders[0].order;
+      const latestOrder = effectiveOrders[0].order;
       const sub = allItems.reduce((acc, it) => acc + (it.price * (it.quantity || 1)), 0);
       const combinedTotal = sub + Math.round(sub * 0.05);
       const allTickets = Array.from(
-        new Set(sessionOrders.map((o) => o.order.ticket_number).filter(Boolean))
+        new Set(effectiveOrders.map((o) => o.order.ticket_number).filter(Boolean))
       ).join(' • ');
 
       return {

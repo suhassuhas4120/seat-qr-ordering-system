@@ -73,8 +73,6 @@ export default function CustomerCartPage() {
     if (isSubmitting || activeItemIds.length === 0) return;
     setIsSubmitting(true);
     try {
-      const ticketNum = `TK-${chairId}-${Math.floor(1000 + Math.random() * 9000)}`;
-      
       const nowTs = Date.now();
       const orderItems: OrderItemRecord[] = activeItemIds.map((id, idx) => {
         const qty = items[id]?.quantity || 1;
@@ -146,10 +144,12 @@ export default function CustomerCartPage() {
         } catch {}
       }
 
-      const activeTicketNumber = isSameSession ? existingSession.ticketNumber : ticketNum;
+      const fallbackTicket = isSameSession && existingSession.ticketNumber && !existingSession.ticketNumber.startsWith('TK-')
+        ? existingSession.ticketNumber
+        : `ORD-${chairId}`;
 
       const orderRecord = {
-        ticket_number: activeTicketNumber,
+        ticket_number: fallbackTicket,
         chair_id: chairId,
         seat_label: `SEAT ${chairId}`,
         status: 'pending' as const,
@@ -158,37 +158,48 @@ export default function CustomerCartPage() {
       };
 
       const result = await realtimeBridge.placeOrder(orderRecord, orderItems);
-      const generatedOrderId = result.orderId || `ord-${Date.now()}`;
+      const confirmedTicket = result.ticketNumber || orderRecord.ticket_number;
+      const confirmedOrderId = result.orderId || `ord-${Date.now()}`;
 
-      const newDishes = orderItems.map((oi) => ({
-        id: oi.id || oi.dish_id,
-        dish_id: oi.dish_id,
-        title: oi.dish_name,
-        quantity: oi.quantity,
-        price: oi.price,
-        stage: 'PLACED' as const,
-        notes: oi.notes,
-        addons: oi.addons,
-      }));
+      // Immediately synchronize authoritative active seat tab from server to guarantee exact totals & tickets
+      const tab = await realtimeBridge.getOrderForSeat(cleanChair || chairId);
+      const authoritativeTicket = tab.order?.ticket_number || confirmedTicket;
+      const authoritativeTotal = tab.order?.total_amount && tab.order.total_amount > 0
+        ? tab.order.total_amount
+        : ((isSameSession && existingSession.totalAmount ? existingSession.totalAmount : 0) + grandTotal);
 
-      const mergedDishes =
-        isSameSession && existingSession.items && existingSession.items.length > 0
-          ? [...existingSession.items, ...newDishes]
-          : newDishes;
-
-      const mergedTotal =
-        (isSameSession && existingSession.totalAmount ? existingSession.totalAmount : 0) + grandTotal;
+      const authoritativeItems = tab.items && tab.items.length > 0
+        ? tab.items.map((it) => ({
+            id: it.id,
+            dish_id: it.dish_id,
+            title: it.dish_name || 'Dish',
+            quantity: it.quantity,
+            price: it.price,
+            stage: it.stage,
+            notes: it.notes,
+            addons: it.addons,
+          }))
+        : orderItems.map((oi) => ({
+            id: oi.id || oi.dish_id,
+            dish_id: oi.dish_id,
+            title: oi.dish_name,
+            quantity: oi.quantity,
+            price: oi.price,
+            stage: 'PLACED' as const,
+            notes: oi.notes,
+            addons: oi.addons,
+          }));
 
       setActiveDiningSession({
         seatId: chairId,
-        ticketNumber: activeTicketNumber,
-        orderId: isSameSession ? existingSession.orderId : generatedOrderId,
+        ticketNumber: authoritativeTicket,
+        orderId: confirmedOrderId,
         orderStatus: 'pending',
         paymentStatus: 'unpaid',
         orderedAt: isSameSession ? existingSession.orderedAt : Date.now(),
-        totalAmount: mergedTotal,
+        totalAmount: authoritativeTotal,
         deviceToken,
-        items: mergedDishes,
+        items: authoritativeItems,
       });
 
       // Clear tray after dispatch and reset any previous bill requests for fresh ordering

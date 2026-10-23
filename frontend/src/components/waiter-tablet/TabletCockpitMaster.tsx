@@ -728,7 +728,7 @@ export const TabletCockpitMaster: React.FC = () => {
     try {
       // Determine Ticket Number: Reuse existing active ticket if present, else generate fresh
       const existingTicket = activeTicketNumber || undefined;
-      const ticketNum = existingTicket || `TK-${padChair}-${String(Date.now()).slice(-4)}`;
+      const ticketNum = existingTicket || `ORD-${padChair}-${String(Date.now()).slice(-4)}`;
 
       // Calculate batch total for only the newly fired items
       const batchAmount = unplacedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);

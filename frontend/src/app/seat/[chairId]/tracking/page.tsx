@@ -59,45 +59,28 @@ export default function LiveOrderTrackingPage() {
         const tNum = res.order?.ticket_number || '';
         // 1. Sync session dishes with latest items from database
         setSession((prev) => {
-          if (!prev) {
-            return {
-              seatId: cleanChair || chairId,
-              ticketNumber: tNum,
-              orderId: res.order?.id || `ord-${Date.now()}`,
-              orderStatus: (res.order?.status as any) || 'pending',
-              orderedAt: res.order?.created_at ? new Date(res.order.created_at).getTime() : Date.now(),
-              totalAmount: res.order?.total_amount || 0,
-              items: res.items.map((it, idx) => ({
-                id: it.id || (it.order_id ? `${it.order_id}-${it.dish_id}-${idx}` : `dish-${it.dish_id}-${idx}`),
-                dish_id: it.dish_id,
-                title: it.dish_name || 'Dish',
-                quantity: it.quantity,
-                price: it.price,
-                stage: it.stage,
-                notes: it.notes,
-                addons: it.addons,
-              })),
-              paymentStatus: 'unpaid',
-            };
-          }
-          const updatedItems = res.items.map((it) => {
-            const prevItem = prev.items?.find((p) => p.id && it.id && p.id === it.id);
-            return {
-              id: it.id || prevItem?.id || `dish-${it.dish_id}`,
-              dish_id: it.dish_id,
-              title: it.dish_name || prevItem?.title || 'Dish',
-              quantity: it.quantity,
-              price: it.price,
-              stage: it.stage,
-              notes: it.notes || prevItem?.notes,
-              addons: it.addons || prevItem?.addons,
-            };
-          });
+          const freshTotal = res.order?.total_amount || 0;
+          const freshTicket = res.order?.ticket_number || tNum || prev?.ticketNumber || '';
+          const freshItems = res.items.map((it, idx) => ({
+            id: it.id || (it.order_id ? `${it.order_id}-${it.dish_id}-${idx}` : `dish-${it.dish_id}-${idx}`),
+            dish_id: it.dish_id,
+            title: it.dish_name || 'Dish',
+            quantity: it.quantity,
+            price: it.price,
+            stage: it.stage,
+            notes: it.notes,
+            addons: it.addons,
+          }));
+
           return {
-            ...prev,
-            ticketNumber: tNum || prev.ticketNumber,
-            totalAmount: res.order?.total_amount || prev.totalAmount,
-            items: updatedItems,
+            seatId: cleanChair || chairId,
+            ticketNumber: freshTicket,
+            orderId: res.order?.id || prev?.orderId || `ord-${Date.now()}`,
+            orderStatus: (res.order?.status as any) || prev?.orderStatus || 'pending',
+            orderedAt: res.order?.created_at ? new Date(res.order.created_at).getTime() : (prev?.orderedAt || Date.now()),
+            totalAmount: freshTotal > 0 ? freshTotal : (prev?.totalAmount || 0),
+            items: freshItems,
+            paymentStatus: 'unpaid',
           };
         });
 
@@ -132,6 +115,12 @@ export default function LiveOrderTrackingPage() {
       if (cleanSessionChair && cleanSessionChair !== cleanCurrentChair) {
         router.replace(`/seat/${s.seatId}/tracking`);
         return;
+      }
+      if (s.ticketNumber && s.ticketNumber.includes('TK-')) {
+        const parts = s.ticketNumber.split(' • ').filter((t) => !t.startsWith('TK-'));
+        if (parts.length > 0) {
+          s.ticketNumber = parts.join(' • ');
+        }
       }
       setSession(s);
     }
