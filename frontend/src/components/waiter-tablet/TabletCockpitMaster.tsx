@@ -363,6 +363,12 @@ export const TabletCockpitMaster: React.FC = () => {
           const curSeat = (activeSeatNameRef.current || '').split(':')[0].trim();
           const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
           const targetChair = (data.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+          if (targetChair) {
+            setAlerts(prev => prev.filter(a => {
+              const aChair = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+              return aChair !== targetChair;
+            }));
+          }
           if (targetChair && cleanCurSeat && targetChair === cleanCurSeat) {
             setTicketItems([]);
             setDishQuantities({});
@@ -436,6 +442,10 @@ export const TabletCockpitMaster: React.FC = () => {
             delete next[data?.chairId || ''];
             return next;
           });
+          setAlerts(prev => prev.filter(a => {
+            const aChair = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+            return aChair !== targetChair;
+          }));
         }
       },
       onClearAll: () => {

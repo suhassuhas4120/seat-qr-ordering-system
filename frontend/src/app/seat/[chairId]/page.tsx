@@ -52,10 +52,12 @@ export default function CustomerSeatPage() {
       const cleanCurrentChair = chairId.replace(/[^0-9]/g, '').replace(/^0+/, '');
       const cleanSessionChair = (session?.seatId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
 
-      // 1. If backend says seat is vacant and session was for this seat, clear stale session
-      if (!occ.isOccupied && cleanSessionChair === cleanCurrentChair) {
-        clearActiveDiningSession();
-        setActiveSession(null);
+      // 1. If backend says seat is vacant, clear any lingering session for this seat immediately
+      if (!occ.isOccupied) {
+        if (!cleanSessionChair || cleanSessionChair === cleanCurrentChair) {
+          clearActiveDiningSession();
+          setActiveSession(null);
+        }
         return;
       }
 

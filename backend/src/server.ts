@@ -178,7 +178,7 @@ app.post('/api/menu/items/:itemId/availability', async (req, reply) => {
 app.post('/api/payments/process', async (req, reply) => {
   const { seatId, gateway, settledByRole, staffId, gatewayPaymentId } = req.body as any;
 
-  if (!seatId) {
+  if (seatId === undefined || seatId === null || seatId === '') {
     return reply.status(400).send({ error: 'Missing seatId.' });
   }
 

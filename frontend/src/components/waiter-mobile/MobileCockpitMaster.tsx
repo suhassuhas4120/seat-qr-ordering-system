@@ -453,6 +453,12 @@ export const MobileCockpitMaster: React.FC = () => {
           const curSeat = selectedSeatRef.current || '';
           const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
           const targetChair = (data.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+          if (targetChair) {
+            setAlerts(prev => prev.filter(a => {
+              const aChair = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+              return aChair !== targetChair;
+            }));
+          }
           if (targetChair && cleanCurSeat && targetChair === cleanCurSeat) {
             setCartItems([]);
             setActiveTicketNumber('');
@@ -510,6 +516,10 @@ export const MobileCockpitMaster: React.FC = () => {
             delete next[targetChair.padStart(2, '0')];
             return next;
           });
+          setAlerts(prev => prev.filter(a => {
+            const aChair = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+            return aChair !== targetChair;
+          }));
         }
         if (targetChair && cleanCurSeat && targetChair === cleanCurSeat) {
           setCartItems([]);

@@ -55,6 +55,33 @@ export class PaymentService {
       const seatOrders = db.data.orders.filter(
         (o) => (o.sessionId === session!.id || o.seatId === seatId) && o.overallStage !== 'PAID'
       );
+
+      if (seatOrders.length === 0) {
+        // Double-payment / idempotency guard: check if already settled
+        const recentPayment = db.data.payments
+          .filter((p) => p.seatId === seatId && p.status === 'SUCCESS')
+          .slice(-1)[0];
+
+        if (recentPayment) {
+          return {
+            success: true,
+            alreadySettled: true,
+            receipt: {
+              transactionId: recentPayment.gatewayPaymentId,
+              seatNumber: seat.seatNumber,
+              subtotal: recentPayment.subtotal,
+              taxAmount: recentPayment.taxAmount,
+              finalAmount: recentPayment.finalAmount,
+              amount: recentPayment.finalAmount,
+              settledBy: recentPayment.settledByRole,
+              completedAt: recentPayment.completedAt,
+            },
+          };
+        }
+
+        throw new Error('No pending or active orders to settle for this seat.');
+      }
+
       const allItems = seatOrders.flatMap((o) => o.items);
 
       const subtotal = allItems.reduce((acc, curr) => acc + curr.priceSnapshot * curr.quantity, 0);
@@ -148,6 +175,7 @@ export class PaymentService {
           subtotal,
           taxAmount,
           finalAmount,
+          amount: finalAmount,
           settledBy: settledByRole,
           completedAt: now,
         },

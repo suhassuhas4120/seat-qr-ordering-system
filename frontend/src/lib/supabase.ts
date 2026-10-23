@@ -916,8 +916,8 @@ export const realtimeBridge = {
     try {
       const rawStr = String(chairId || '').trim();
       const numStr = rawStr.replace(/[^0-9]/g, '').replace(/^0+/, '');
-      if (!numStr) return true;
-      const paddedStr = numStr.padStart(2, '0');
+      if (!rawStr && !numStr) return true;
+      const paddedStr = numStr ? numStr.padStart(2, '0') : '00';
       const possibleChairs = [
         rawStr,
         numStr,
@@ -928,6 +928,8 @@ export const realtimeBridge = {
         `Chair ${paddedStr}`,
         `SEAT ${numStr}`,
         `SEAT ${paddedStr}`,
+        'TK-01',
+        'Takeaway',
       ];
 
       // Remove from local occupancy registry
@@ -958,12 +960,23 @@ export const realtimeBridge = {
       // Clear seat-specific cached item stages and dining session
       if (typeof window !== 'undefined') {
         try {
-          const keys = [numStr, paddedStr, `Seat ${numStr}`, `Seat ${paddedStr}`];
+          const keys = [numStr, paddedStr, `Seat ${numStr}`, `Seat ${paddedStr}`, rawStr, 'TK-01'];
           for (const k of keys) {
-            localStorage.removeItem(`thoogudeepa_item_stages_${k}`);
-            localStorage.removeItem(`thoogudeepa_dining_session_${k}`);
-            localStorage.removeItem(`thoogudeepa_active_ticket_${k}`);
-            sessionStorage.removeItem(`thoogudeepa_cart_items_${k}`);
+            if (k) {
+              localStorage.removeItem(`thoogudeepa_item_stages_${k}`);
+              localStorage.removeItem(`thoogudeepa_dining_session_${k}`);
+              localStorage.removeItem(`thoogudeepa_active_ticket_${k}`);
+              sessionStorage.removeItem(`thoogudeepa_cart_items_${k}`);
+            }
+          }
+          // Also purge any active dining session if it was for this seat
+          const curSessRaw = localStorage.getItem('thoogudeepa_v2_active_dining_session');
+          if (curSessRaw) {
+            const parsed = JSON.parse(curSessRaw);
+            const sessSeatNum = (parsed.seatId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+            if (sessSeatNum === numStr || parsed.seatId === rawStr || parsed.seatId === paddedStr) {
+              localStorage.removeItem('thoogudeepa_v2_active_dining_session');
+            }
           }
         } catch {}
       }
@@ -1939,7 +1952,8 @@ export const realtimeBridge = {
 
     // Notify Fastify backend of payment settlement
     try {
-      const cleanSeatId = Number(cleanNum) || 1;
+      const isTkOrder = rawChair.toLowerCase().includes('tk') || rawChair.toLowerCase().includes('takeaway') || rawChair.toLowerCase().includes('parcel');
+      const cleanSeatId = isTkOrder ? 0 : (Number(cleanNum) || 1);
       const gw = (paymentMethod ? String(paymentMethod).toUpperCase() : 'CASH');
       fetch(`${getBackendUrl()}/api/payments/process`, {
         method: 'POST',

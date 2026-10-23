@@ -54,12 +54,29 @@ class InDatabase {
         const raw = fs.readFileSync(STATE_FILE, 'utf-8');
         this.data = JSON.parse(raw);
         console.log(`📦 Loaded existing database state from ${STATE_FILE}`);
+        this.ensureTakeawaySeat();
         return;
       } catch (err) {
         console.warn('⚠️ Could not parse existing state file, initializing fresh seed.');
       }
     }
     this.seed();
+  }
+
+  private ensureTakeawaySeat() {
+    if (!this.data.seats.some((s) => s.id === 0)) {
+      this.data.seats.unshift({
+        id: 0,
+        seatNumber: 'TK-01',
+        zone: 'COUNTER_A',
+        currentStatus: 'VACANT',
+        epochHash: crypto.randomBytes(8).toString('hex'),
+        activeSessionId: null,
+        activeOrderTotal: 0,
+        activeItemCount: 0,
+        updatedAt: new Date().toISOString(),
+      });
+    }
   }
 
   /**
@@ -147,6 +164,19 @@ class InDatabase {
 
     const seatsList: Seat[] = [];
     let idCounter = 1;
+    // 0. Seed Takeaway / Parcel Seat 0
+    seatsList.push({
+      id: 0,
+      seatNumber: 'TK-01',
+      zone: 'COUNTER_A',
+      currentStatus: 'VACANT',
+      epochHash: crypto.randomBytes(8).toString('hex'),
+      activeSessionId: null,
+      activeOrderTotal: 0,
+      activeItemCount: 0,
+      updatedAt: new Date().toISOString(),
+    });
+
     for (const z of zones) {
       for (let i = 0; i < z.count; i++) {
         const num = z.prefix + i;
