@@ -152,7 +152,7 @@ export default function HomePage() {
             </div>
 
             <Link
-              href="/waiter"
+              href="/waiter/mobile"
               className="mt-6 flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 font-semibold text-sm transition-all shadow-lg shadow-blue-500/20"
             >
               <span>Open Waiter Mobile</span>
