@@ -1316,6 +1316,40 @@ export const realtimeBridge = {
         }
       }
 
+      // Live Cloud Backend Sync (Fetch authoritative orders from Fastify /api/kds/tickets)
+      try {
+        const ticketsRes = await fetch(`${BACKEND_URL}/api/kds/tickets`).then((r) => r.json());
+        if (Array.isArray(ticketsRes) && ticketsRes.length > 0) {
+          const backendOrders = ticketsRes.map((t: any) => {
+            const chairId = String(t.seatId || (t.seatNumber ? t.seatNumber.replace(/[^0-9]/g, '') : '14'));
+            return {
+              order: {
+                id: t.id,
+                ticket_number: t.orderNumber,
+                chair_id: chairId,
+                seat_label: `SEAT ${chairId}`,
+                status: t.overallStage === 'SERVED' ? 'completed' : 'pending',
+                total_amount: t.totalAmount || 0,
+              } as OrderRecord,
+              items: (t.items || []).map((it: any) => ({
+                id: it.id,
+                order_id: t.id,
+                chair_id: chairId,
+                seat_label: `SEAT ${chairId}`,
+                dish_id: `dish-${it.menuItemId}`,
+                dish_name: it.nameSnapshot,
+                quantity: it.quantity,
+                price: it.priceSnapshot,
+                stage: it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED',
+                notes: it.notes || '',
+              })) as OrderItemRecord[],
+            };
+          });
+          setLocalOrdersList(backendOrders);
+          return backendOrders;
+        }
+      } catch {}
+
       const hydratedLocal = localOrders.map((lo) => ({
         order: lo.order,
         items: this.hydrateOrderItemStages(lo.order, lo.items),
