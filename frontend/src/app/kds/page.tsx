@@ -12,7 +12,10 @@ import {
   AlertTriangle,
   RefreshCw,
   Ban,
-  ArrowRight
+  ArrowRight,
+  Square,
+  CheckSquare,
+  CheckCircle2
 } from 'lucide-react';
 import { fetchApi } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -96,6 +99,29 @@ export default function KitchenDisplayPage() {
         method: 'PATCH',
         body: JSON.stringify({ newStage, staffId: 3 }), // Gordon Ramsay
       });
+
+      // Synchronize with realtime bridge so customer tracking, waiter mobile/tablet, and manager update instantly
+      const parentOrder = orders.find((o) => (o.items || []).some((it: any) => it.id === itemId));
+      const targetItem = parentOrder?.items?.find((it: any) => it.id === itemId);
+      const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
+        QUEUED: 'REC',
+        COOKING: 'PREP',
+        READY: 'READY',
+        SERVED: 'SERVED',
+      };
+      if (parentOrder && targetItem) {
+        const chairId = parentOrder.seat?.seatNumber
+          ? String(parentOrder.seat.seatNumber).replace(/[^0-9]/g, '')
+          : '';
+        realtimeBridge.updateStage(itemId, stageMap[newStage] || 'PREP', {
+          chairId,
+          ticketNumber: parentOrder.orderNumber,
+          dishId: targetItem.menuItemId ? `dish-${targetItem.menuItemId}` : undefined,
+          dishName: targetItem.nameSnapshot,
+          itemId,
+        });
+      }
+
       // Optimistically update local state for instantaneous feedback
       setOrders((prev) =>
         prev.map((ord) => ({
@@ -105,7 +131,7 @@ export default function KitchenDisplayPage() {
           ),
         }))
       );
-      toast.success(`Dish stage set to ${newStage}`);
+      toast.success(`Dish stage set to ${newStage === 'COOKING' ? 'PREPARING' : newStage === 'QUEUED' ? 'RECEIVED' : newStage}`);
       loadTickets();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update item stage.');
@@ -122,18 +148,10 @@ export default function KitchenDisplayPage() {
     await handleSetItemStage(itemId, nextStage);
   };
 
-  // Bump entire order
-  const handleBumpAll = async (order: any) => {
-    const unservedItems = order.items.filter((i: any) => i.itemStage !== 'READY' && i.itemStage !== 'SERVED');
-    for (const item of unservedItems) {
-      let next = 'COOKING';
-      if (item.itemStage === 'QUEUED') next = 'COOKING';
-      else if (item.itemStage === 'COOKING') next = 'READY';
-
-      await fetchApi(`/api/orders/items/${item.id}/stage`, {
-        method: 'PATCH',
-        body: JSON.stringify({ newStage: next, staffId: 3 }),
-      });
+  // Bump entire order for that specific column
+  const handleBumpAll = async (order: any, nextStage: 'COOKING' | 'READY') => {
+    for (const item of order.items) {
+      await handleSetItemStage(item.id, nextStage);
     }
     loadTickets();
   };
@@ -313,11 +331,10 @@ export default function KitchenDisplayPage() {
                     order={order}
                     borderColor="border-blue-500/40 hover:border-blue-500"
                     headerBg="bg-blue-500/10 text-blue-300"
-                    actionText="Start Preparing"
-                    actionColor="bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                    columnStage="RECEIVED"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
-                    onBumpAll={() => handleBumpAll(order)}
+                    onBumpAll={() => handleBumpAll(order, 'COOKING')}
                   />
                 ))
               )}
@@ -343,11 +360,10 @@ export default function KitchenDisplayPage() {
                     order={order}
                     borderColor="border-amber-500/40 hover:border-amber-500"
                     headerBg="bg-amber-500/10 text-amber-300"
-                    actionText="Mark Ready"
-                    actionColor="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                    columnStage="PREPARING"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
-                    onBumpAll={() => handleBumpAll(order)}
+                    onBumpAll={() => handleBumpAll(order, 'READY')}
                   />
                 ))
               )}
@@ -373,11 +389,9 @@ export default function KitchenDisplayPage() {
                     order={order}
                     borderColor="border-emerald-500/40 hover:border-emerald-500"
                     headerBg="bg-emerald-500/10 text-emerald-300"
-                    actionText="Ready for Pickup"
-                    actionColor="bg-emerald-500/80 text-slate-950 font-bold cursor-default"
+                    columnStage="READY"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
-                    onBumpAll={() => {}}
                   />
                 ))
               )}
@@ -525,13 +539,12 @@ export default function KitchenDisplayPage() {
   );
 }
 
-// Reusable KDS Ticket Card with granular single dish status selection & quick bump
+// Reusable KDS Ticket Card matching user sketch
 function TicketCard({
   order,
   borderColor,
   headerBg,
-  actionText,
-  actionColor,
+  columnStage,
   onBumpItem,
   onSetItemStage,
   onBumpAll,
@@ -539,100 +552,107 @@ function TicketCard({
   order: any;
   borderColor: string;
   headerBg: string;
-  actionText: string;
-  actionColor: string;
+  columnStage: 'RECEIVED' | 'PREPARING' | 'READY';
   onBumpItem: (itemId: string, stage: string) => void;
   onSetItemStage: (itemId: string, stage: string) => void;
-  onBumpAll: () => void;
+  onBumpAll?: () => void;
 }) {
+  const totalItems = order.items.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
+
   return (
     <div className={`p-4 rounded-xl bg-slate-900 border ${borderColor} transition-all shadow-lg`}>
       {/* Ticket Header */}
-      <div className={`p-2 rounded-lg ${headerBg} flex items-center justify-between mb-3`}>
+      <div className={`p-2.5 rounded-lg ${headerBg} flex items-center justify-between mb-3`}>
         <div>
           <span className="text-sm font-black text-white">Seat #{order.seat?.seatNumber}</span>
-          <span className="text-[10px] text-slate-400 ml-2">({order.seat?.zone})</span>
+          <span className="text-[10px] text-slate-400 ml-2">({order.seat?.zone || 'Dining Floor'})</span>
         </div>
         <div className="text-right">
           <span className="text-xs font-mono font-bold text-white">{order.orderNumber}</span>
-          <span className="text-[10px] block text-slate-400">
+          <span className="text-[10px] block text-slate-400 font-mono">
             {new Date(order.placedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
       </div>
 
-      {/* Individual Dish Items with Direct Status Selector */}
-      <div className="space-y-2.5 mb-3">
+      {/* Individual Dish Items with Checkbox Buttons matching Sketch */}
+      <div className="space-y-2 mb-3">
         {order.items.map((item: any) => (
           <div
             key={item.id}
-            className="p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors group"
+            className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 transition-colors"
           >
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold text-white group-hover:text-amber-300 block truncate">
-                {item.quantity}x {item.nameSnapshot}
+              <span className="text-sm font-bold text-white block truncate">
+                <span className="text-amber-400 font-mono mr-1.5">{item.quantity}x</span>
+                {item.nameSnapshot}
               </span>
               {item.notes && (
                 <p className="text-[11px] text-amber-400 italic mt-0.5">★ {item.notes}</p>
               )}
             </div>
 
-            {/* Granular Single-Item Status Controls */}
-            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-              {/* Direct Stage Dropdown */}
-              <select
-                value={item.itemStage}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  onSetItemStage(item.id, e.target.value);
-                }}
-                className={`text-[11px] font-black px-2 py-1 rounded border cursor-pointer outline-none uppercase transition-colors ${
-                  item.itemStage === 'QUEUED'
-                    ? 'bg-blue-950/90 text-blue-300 border-blue-500/60'
-                    : item.itemStage === 'COOKING'
-                    ? 'bg-amber-950/90 text-amber-300 border-amber-500/60'
-                    : item.itemStage === 'READY'
-                    ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60'
-                    : 'bg-purple-950/90 text-purple-300 border-purple-500/60'
-                }`}
-                title="Select dish status directly"
-              >
-                <option value="QUEUED" className="bg-slate-900 text-blue-300">RECEIVED</option>
-                <option value="COOKING" className="bg-slate-900 text-amber-300">PREPARING</option>
-                <option value="READY" className="bg-slate-900 text-emerald-300">READY</option>
-              </select>
-
-              {/* 1-Tap Quick Advance Action */}
-              {item.itemStage !== 'READY' && item.itemStage !== 'SERVED' && (
+            {/* Checkbox button: 1-Click advances that single item to next column */}
+            <div className="shrink-0">
+              {columnStage === 'RECEIVED' && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onBumpItem(item.id, item.itemStage);
-                  }}
-                  className={`px-2 py-1 rounded text-[10px] font-bold border transition-all active:scale-95 ${
-                    item.itemStage === 'QUEUED'
-                      ? 'bg-blue-600/30 text-blue-200 border-blue-500/50 hover:bg-blue-600/60'
-                      : 'bg-amber-500/30 text-amber-200 border-amber-400/50 hover:bg-amber-500/60'
-                  }`}
-                  title="Advance item stage"
+                  onClick={() => onBumpItem(item.id, 'QUEUED')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border-2 border-blue-500/60 font-black text-xs transition-all active:scale-95 cursor-pointer shadow-sm group"
+                  title="Check to start preparing"
                 >
-                  {item.itemStage === 'QUEUED' ? '▶ Prepare' : '✓ Mark Ready'}
+                  <Square className="w-4 h-4 stroke-[2.5] group-hover:hidden" />
+                  <CheckSquare className="w-4 h-4 stroke-[2.5] hidden group-hover:block" />
+                  <span className="text-[11px] uppercase tracking-wider font-extrabold">Prep ✓</span>
                 </button>
+              )}
+
+              {columnStage === 'PREPARING' && (
+                <button
+                  type="button"
+                  onClick={() => onBumpItem(item.id, 'COOKING')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border-2 border-amber-500/60 font-black text-xs transition-all active:scale-95 cursor-pointer shadow-sm group"
+                  title="Check to mark ready"
+                >
+                  <Square className="w-4 h-4 stroke-[2.5] group-hover:hidden" />
+                  <CheckSquare className="w-4 h-4 stroke-[2.5] hidden group-hover:block" />
+                  <span className="text-[11px] uppercase tracking-wider font-extrabold">Ready ✓</span>
+                </button>
+              )}
+
+              {columnStage === 'READY' && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Ready</span>
+                </div>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Master Bump Button */}
-      <button
-        onClick={onBumpAll}
-        className={`w-full py-2 rounded-lg text-xs tracking-wider uppercase transition-all ${actionColor}`}
-      >
-        {actionText} ({order.items.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0)} Items) →
-      </button>
+      {/* Card Footer Master Bump Button (matches sketch: Mark all dishes are cooking) */}
+      {columnStage === 'RECEIVED' && onBumpAll && (
+        <button
+          type="button"
+          onClick={onBumpAll}
+          className="w-full py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase transition-all bg-blue-600 hover:bg-blue-500 text-white shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+        >
+          <span>Mark All Preparing ({totalItems} Items)</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {columnStage === 'PREPARING' && onBumpAll && (
+        <button
+          type="button"
+          onClick={onBumpAll}
+          className="w-full py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase transition-all bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+        >
+          <span>Mark All Ready ({totalItems} Items)</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 }
