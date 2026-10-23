@@ -3,6 +3,8 @@ import { getSupabaseClient } from './supabaseClient';
 import { getSocket } from './socket';
 import { SOCKET_EVENTS } from '@seat-order/shared';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 export interface OrderItemRecord {
   id?: string;
   order_id?: string;
@@ -195,6 +197,13 @@ function initSocketBridge() {
           notes: it.notes || '',
         })),
       };
+
+      const currentLocals = getLocalOrdersList();
+      const updatedOrders = [
+        { order: orderRec, items: orderRec.items || [] },
+        ...currentLocals.filter((x) => x.order.id !== order.id),
+      ];
+      setLocalOrdersList(updatedOrders);
 
       activeKdsSubscribers.forEach((cb) => {
         cb.onNewOrder?.({ order: orderRec, items: orderRec.items || [] });
@@ -672,7 +681,7 @@ export const realtimeBridge = {
             quantity: it.quantity,
             notes: it.notes || undefined,
           }));
-          fetch('http://localhost:4000/api/orders', {
+          fetch(`${BACKEND_URL}/api/orders`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -680,7 +689,7 @@ export const realtimeBridge = {
               items: apiItems,
               createdByRole: 'CUSTOMER',
             }),
-          }).catch(() => {});
+          }).catch((e) => console.warn('Order sync warning:', e));
         } catch {}
 
         return { success: true, orderId };
@@ -694,7 +703,7 @@ export const realtimeBridge = {
           quantity: it.quantity,
           notes: it.notes || undefined,
         }));
-        fetch('http://localhost:4000/api/orders', {
+        fetch(`${BACKEND_URL}/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -702,7 +711,7 @@ export const realtimeBridge = {
             items: apiItems,
             createdByRole: 'CUSTOMER',
           }),
-        }).catch(() => {});
+        }).catch((e) => console.warn('Order sync warning:', e));
       } catch {}
 
       const currentLocals = getLocalOrdersList();
@@ -1049,7 +1058,7 @@ export const realtimeBridge = {
           READY: 'READY',
           SERVED: 'SERVED',
         };
-        fetch(`http://localhost:4000/api/orders/items/${targetItemId || itemIdOrKey}/stage`, {
+        fetch(`${BACKEND_URL}/api/orders/items/${targetItemId || itemIdOrKey}/stage`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1197,7 +1206,7 @@ export const realtimeBridge = {
       // Fastify backend sync for 86 out-of-stock
       try {
         const numId = Number(cleanId) || 1;
-        fetch(`http://localhost:4000/api/menu/items/${numId}/availability`, {
+        fetch(`${BACKEND_URL}/api/menu/items/${numId}/availability`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isAvailable }),
@@ -1629,7 +1638,7 @@ export const realtimeBridge = {
     // Notify Fastify backend of payment settlement
     try {
       const cleanSeatId = Number(cleanChair) || 1;
-      fetch('http://localhost:4000/api/payments/process', {
+      fetch(`${BACKEND_URL}/api/payments/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

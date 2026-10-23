@@ -17,6 +17,7 @@ import {
 import { fetchApi } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { audioSynth } from '../../lib/audio';
+import { realtimeBridge } from '../../lib/supabase';
 import { toast } from 'sonner';
 import type { Order, OrderItem, MenuItem } from '@seat-order/shared';
 import { SOCKET_EVENTS } from '@seat-order/shared';
@@ -45,6 +46,19 @@ export default function KitchenDisplayPage() {
     const socket = getSocket();
     socket.emit(SOCKET_EVENTS.JOIN_KDS);
 
+    const unsubBridge = realtimeBridge.subscribeKDS({
+      onNewOrder: () => {
+        if (!isMuted) audioSynth.playKitchenChime();
+        loadTickets();
+      },
+      onStageChange: () => {
+        loadTickets();
+      },
+      onTicketDispatched: () => {
+        loadTickets();
+      },
+    });
+
     // Incoming Order
     const handleOrderPlaced = (payload: any) => {
       if (!isMuted) audioSynth.playKitchenChime();
@@ -67,6 +81,7 @@ export default function KitchenDisplayPage() {
     socket.on(SOCKET_EVENTS.SEAT_VACATED, handleSeatVacated);
 
     return () => {
+      unsubBridge();
       socket.off(SOCKET_EVENTS.ORDER_PLACED, handleOrderPlaced);
       socket.off(SOCKET_EVENTS.ITEM_STAGE_UPDATED, handleItemStageUpdated);
       socket.off(SOCKET_EVENTS.SEAT_VACATED, handleSeatVacated);

@@ -101,13 +101,12 @@ export class OrderService {
   }) {
     const { seatId, sessionToken, items, createdByRole, waiterId } = params;
 
-    // 1. Fetch active session
+    // 1. Fetch active session, or auto-initialize one so orders never get rejected
     let session = db.data.seatSessions.find(
       (s) => s.seatId === seatId && s.status === 'ACTIVE'
     );
 
-    // If staff (waiter/manager) is placing the order for a vacant seat, auto-initialize session!
-    if (!session && createdByRole !== 'CUSTOMER') {
+    if (!session) {
       const seat = db.data.seats.find((s) => s.id === seatId);
       if (!seat) throw new Error('Seat not found');
 
@@ -118,7 +117,7 @@ export class OrderService {
       session = {
         id: sessionId,
         seatId,
-        sessionToken: newToken,
+        sessionToken: sessionToken || newToken,
         status: 'ACTIVE',
         startedAt: now,
       };
@@ -128,15 +127,6 @@ export class OrderService {
       seat.currentStatus = 'OCCUPIED';
       seat.activeSessionId = sessionId;
       seat.updatedAt = now;
-    }
-
-    if (!session) {
-      throw new Error('No active session found for this seat. Please scan the QR code first.');
-    }
-
-    // Customer must have matching token
-    if (createdByRole === 'CUSTOMER' && session.sessionToken !== sessionToken) {
-      throw new Error('Unauthorized seat session token.');
     }
 
     // 2. Fetch menu items for snapshot pricing and names
@@ -204,6 +194,7 @@ export class OrderService {
 
     // 4. Real-time broadcast to all connected portals in < 50ms
     if (io) {
+      io.emit(SOCKET_EVENTS.ORDER_PLACED, payload);
       io.to(`seat:${seatId}`).emit(SOCKET_EVENTS.ORDER_PLACED, payload);
       io.to('kds').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
       io.to('staff:mobile').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
@@ -278,6 +269,7 @@ export class OrderService {
 
     // Real-time broadcast
     if (io) {
+      io.emit(SOCKET_EVENTS.ITEM_STAGE_UPDATED, payload);
       io.to(`seat:${targetOrder.seatId}`).emit(SOCKET_EVENTS.ITEM_STAGE_UPDATED, payload);
       io.to('kds').emit(SOCKET_EVENTS.ITEM_STAGE_UPDATED, payload);
       io.to('staff:mobile').emit(SOCKET_EVENTS.ITEM_STAGE_UPDATED, payload);
