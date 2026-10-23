@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import CustomerBottomNav from '../../../../components/navigation/CustomerBottomNav';
 import { useHardwareBack } from '../../../../lib/hooks/useHardwareBack';
-import { getActiveDiningSession, ActiveDiningSession, getDeviceToken } from '../../../../lib/session/diningSession';
+import { getActiveDiningSession,
+  clearActiveDiningSession,
+  ActiveDiningSession, getDeviceToken } from '../../../../lib/session/diningSession';
 import { realtimeBridge } from '../../../../lib/supabase';
 import { getMenuItemById } from '../../../../lib/data/menuData';
 
@@ -31,6 +33,11 @@ export default function LiveOrderTrackingPage() {
   useHardwareBack(`/seat/${chairId}/cart`);
 
   const seatNumber = chairId.replace(/[^0-9]/g, '') || chairId;
+
+  const handleOrderAgain = () => {
+    clearActiveDiningSession();
+    router.push(`/seat/${chairId}/menu`);
+  };
 
   const [session, setSession] = useState<ActiveDiningSession | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -346,6 +353,14 @@ export default function LiveOrderTrackingPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleOrderAgain}
+              className="text-[11px] font-black uppercase tracking-wider text-amber-900 bg-amber-400 hover:bg-amber-300 border border-amber-500 px-2.5 py-1 rounded-xl cursor-pointer transition-colors shadow-2xs active:scale-95"
+              title="Start a new meal session"
+            >
+              Order Again
+            </button>
             <div className="border border-[#244436]/20 px-2.5 py-1 rounded-xl text-xs font-bold bg-[#FFFEFC] text-[#244436] shadow-2xs">
               Seat {seatNumber}
             </div>
@@ -595,7 +610,7 @@ export default function LiveOrderTrackingPage() {
             </div>
 
             {/* Add More Items Button */}
-            <div className="w-full pt-1">
+            <div className="w-full pt-1 flex flex-col gap-2.5">
               <Link
                 href={`/seat/${chairId}/menu`}
                 className="w-full py-3.5 border border-[#244436]/20 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 bg-[#FFFEFC] text-[#244436] cursor-pointer active:opacity-80 transition-all shadow-2xs hover:bg-[#F9F8F5]"
@@ -603,6 +618,15 @@ export default function LiveOrderTrackingPage() {
                 <PlusCircle className="w-4 h-4 text-[#244436]" />
                 <span>Add More Dishes</span>
               </Link>
+
+              <button
+                type="button"
+                onClick={handleOrderAgain}
+                className="w-full py-3 border-2 border-dashed border-amber-600/50 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 bg-amber-500/10 text-amber-900 cursor-pointer active:scale-98 transition-all hover:bg-amber-500/20 shadow-xs"
+              >
+                <UtensilsCrossed className="w-4 h-4 text-amber-700" />
+                <span>Start New Meal / Order Again</span>
+              </button>
             </div>
           </>
         )}
@@ -624,12 +648,21 @@ export default function LiveOrderTrackingPage() {
           </div>
 
           {allDishesServed ? (
-            <Link
-              href={`/seat/${chairId}/bill`}
-              className="px-6 py-2.5 bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:opacity-90 cursor-pointer text-center shadow-md hover:shadow-lg transition-all"
-            >
-              Pay Bill
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOrderAgain}
+                className="px-3.5 py-2.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all"
+              >
+                Order Again
+              </button>
+              <Link
+                href={`/seat/${chairId}/bill`}
+                className="px-5 py-2.5 bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:opacity-90 cursor-pointer text-center shadow-md hover:shadow-lg transition-all"
+              >
+                Pay Bill
+              </Link>
+            </div>
           ) : (
             <button
               type="button"

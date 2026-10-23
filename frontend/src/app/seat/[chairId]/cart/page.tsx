@@ -105,14 +105,19 @@ export default function CustomerCartPage() {
       });
 
       // 1. Anti-Cheat Check: Cannot place order for another seat if device owes a different seat
+      const deviceToken = getDeviceToken();
       const lockCheck = isDeviceLockedToDifferentSeat(chairId);
       if (lockCheck.isLocked && lockCheck.activeSeatId) {
-        router.replace(`/seat/${lockCheck.activeSeatId}/tracking`);
-        return;
+        const prevOcc = await realtimeBridge.getSeatOccupancy(lockCheck.activeSeatId, deviceToken);
+        if (prevOcc.isOccupied) {
+          router.replace(`/seat/${lockCheck.activeSeatId}/tracking`);
+          return;
+        } else {
+          clearActiveDiningSession();
+        }
       }
 
       // 2. Anti-Hijack Check: Verify seat is not occupied by another customer
-      const deviceToken = getDeviceToken();
       const occupancy = await realtimeBridge.getSeatOccupancy(chairId, deviceToken);
       if (occupancy.isOccupied && !occupancy.isOwner) {
         router.replace(`/seat/${chairId}`);

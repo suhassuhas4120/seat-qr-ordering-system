@@ -116,11 +116,17 @@ export function isDeviceLockedToDifferentSeat(currentSeatId: string): {
   ticketNumber?: string;
 } {
   const session = getActiveDiningSession();
-  if (
-    session &&
-    session.seatId !== currentSeatId &&
-    session.paymentStatus === 'unpaid'
-  ) {
+  if (!session || session.paymentStatus !== 'unpaid') {
+    return { isLocked: false };
+  }
+
+  const cleanCurrent = currentSeatId.replace(/[^0-9]/g, '');
+  const cleanSession = (session.seatId || '').replace(/[^0-9]/g, '');
+  if (cleanCurrent && cleanSession && cleanCurrent === cleanSession) {
+    return { isLocked: false };
+  }
+
+  if (session.seatId !== currentSeatId) {
     return {
       isLocked: true,
       activeSeatId: session.seatId,

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Lock, ArrowRight, RotateCcw, AlertTriangle, UtensilsCrossed, CheckCircle2 } from 'lucide-react';
 import { 
-  getActiveDiningSession, 
+  getActiveDiningSession,
+  clearActiveDiningSession,
   ActiveDiningSession, 
   getDeviceToken 
 } from '../../../lib/session/diningSession';
@@ -48,16 +49,23 @@ export default function CustomerSeatPage() {
 
     checkSeatOccupancy().then((occ) => {
       const session = getActiveDiningSession();
-      // If customer has an active unpaid order (on this seat or any other seat),
-      // scanning ANY QR immediately opens their active unpaid order tracking screen.
       const cleanCurrentChair = chairId.replace(/[^0-9]/g, '');
       const cleanSessionChair = (session?.seatId || '').replace(/[^0-9]/g, '');
-      if (session && session.paymentStatus === 'unpaid') {
-        const targetSeat = cleanSessionChair === cleanCurrentChair ? chairId : (session.seatId || chairId);
-        router.replace(`/seat/${targetSeat}/tracking`);
+
+      // 1. If backend says seat is vacant and session was for this seat, clear stale session
+      if (!occ.isOccupied && cleanSessionChair === cleanCurrentChair) {
+        clearActiveDiningSession();
+        setActiveSession(null);
         return;
       }
 
+      // 2. Only redirect to tracking if returning to the SAME active seat that is occupied
+      if (session && session.paymentStatus === 'unpaid' && cleanSessionChair === cleanCurrentChair && occ.isOccupied) {
+        router.replace(`/seat/${chairId}/tracking`);
+        return;
+      }
+
+      // 3. If occupied and owner, go to tracking
       if (occ.isOccupied && occ.isOwner) {
         router.replace(`/seat/${chairId}/tracking`);
       }
@@ -165,15 +173,27 @@ export default function CustomerSeatPage() {
             href={`/seat/${activeSession.seatId}/tracking`}
             className="w-full border-2 border-black bg-black text-white py-3.5 text-xs font-black uppercase tracking-wider text-center rounded-xl flex items-center justify-center gap-2 cursor-pointer active:opacity-80 shadow-md"
           >
-            <span>Return to My Active Order (Seat {activeSession.seatId})</span>
+            <span>Return to Seat {activeSession.seatId} Order</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
+          <button
+            type="button"
+            onClick={() => {
+              clearActiveDiningSession();
+              setActiveSession(null);
+              router.push(`/seat/${chairId}/menu`);
+            }}
+            className="w-full border-2 border-amber-600 bg-amber-500 hover:bg-amber-400 text-slate-950 py-3.5 text-xs font-black uppercase tracking-wider text-center rounded-xl cursor-pointer active:opacity-90 shadow-sm flex items-center justify-center gap-2"
+          >
+            <span>Start Fresh Order at Seat {seatNumber} →</span>
+          </button>
+
           <Link
             href={`/seat/${activeSession.seatId}/bill`}
-            className="w-full border border-black bg-white text-black py-3 text-xs font-black uppercase tracking-wider text-center rounded-xl cursor-pointer active:bg-zinc-100"
+            className="w-full border border-black bg-white text-black py-2.5 text-xs font-black uppercase tracking-wider text-center rounded-xl cursor-pointer active:bg-zinc-100"
           >
-            Pay Seat {activeSession.seatId} Bill
+            Pay Seat ${activeSession.seatId} Bill
           </Link>
         </div>
       </div>
