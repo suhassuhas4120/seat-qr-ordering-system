@@ -124,15 +124,17 @@ export default function CustomerCartPage() {
         return;
       }
 
-      if (!occupancy.isOccupied) {
+      const cleanChair = chairId.replace(/[^0-9]/g, '');
+      const existingSession = getActiveDiningSession();
+      const cleanSessionSeat = (existingSession?.seatId || '').replace(/[^0-9]/g, '');
+      const isSameSession =
+        Boolean(existingSession &&
+        (cleanSessionSeat === cleanChair || existingSession.seatId === chairId) &&
+        existingSession.paymentStatus === 'unpaid');
+
+      if (!occupancy.isOccupied && !isSameSession) {
         clearActiveDiningSession();
       }
-
-      const existingSession = occupancy.isOccupied ? getActiveDiningSession() : null;
-      const isSameSession =
-        existingSession &&
-        existingSession.seatId === chairId &&
-        existingSession.paymentStatus === 'unpaid';
 
       if (typeof window !== 'undefined') {
         const cleanC = chairId.replace(/[^0-9]/g, '');

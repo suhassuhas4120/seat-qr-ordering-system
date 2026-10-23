@@ -1855,10 +1855,10 @@ export const realtimeBridge = {
         const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
         return oChair === chairId || oChair === unpadded || Number(oChair) === i || o.order.chair_id === seatNumber;
       });
-      const activeTicket = seatOrders[0]?.order?.ticket_number;
-      const currentTicketOrders = activeTicket
-        ? seatOrders.filter((o) => o.order.ticket_number === activeTicket)
-        : seatOrders;
+      const uncompletedOrders = seatOrders.filter(
+        (o) => o.order.status !== 'completed' && o.order.status !== 'cancelled'
+      );
+      const currentTicketOrders = uncompletedOrders.length > 0 ? uncompletedOrders : seatOrders;
 
       const allSeatItems: OrderItemRecord[] = [];
       const seenFloorItemIds = new Set<string>();
@@ -1920,6 +1920,10 @@ export const realtimeBridge = {
 
       const zoneName = i <= 10 ? 'Zone 1 (Seats 01-10)' : i <= 20 ? 'Zone 2 (Seats 11-20)' : i <= 30 ? 'Zone 3 (Seats 21-30)' : 'Zone 4 (Seats 31-40)';
 
+      const allSeatTickets = Array.from(
+        new Set(currentTicketOrders.map((o) => o.order.ticket_number).filter(Boolean))
+      ).join(' • ');
+
       list.push({
         id: chairId,
         seatNumber,
@@ -1935,7 +1939,7 @@ export const realtimeBridge = {
         alertMessage: seatAlert?.title,
         zone: zoneName,
         orderId: foundOrder?.order?.id,
-        ticketNumber: foundOrder?.order?.ticket_number
+        ticketNumber: allSeatTickets || foundOrder?.order?.ticket_number
       });
     }
     return list;
@@ -1955,11 +1959,11 @@ export const realtimeBridge = {
         (o.order.chair_id && o.order.chair_id.replace(/[^0-9]/g, '') === cleanId)
     );
     if (matchingOrders.length > 0) {
-      // Isolate strictly to the active ticket of the current dining session
-      const activeTicket = matchingOrders[0]?.order?.ticket_number;
-      const sessionOrders = activeTicket
-        ? matchingOrders.filter((o) => o.order.ticket_number === activeTicket)
-        : matchingOrders;
+      // Keep all active uncompleted batches for this seat session
+      const uncompletedOrders = matchingOrders.filter(
+        (o) => o.order.status !== 'completed' && o.order.status !== 'cancelled'
+      );
+      const sessionOrders = uncompletedOrders.length > 0 ? uncompletedOrders : matchingOrders;
 
       const seenItemIds = new Set<string>();
       const allItems: OrderItemRecord[] = [];
@@ -1978,11 +1982,16 @@ export const realtimeBridge = {
         });
       });
       const latestOrder = sessionOrders[0].order;
-      const sub = allItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+      const sub = allItems.reduce((acc, it) => acc + (it.price * (it.quantity || 1)), 0);
       const combinedTotal = sub + Math.round(sub * 0.05);
+      const allTickets = Array.from(
+        new Set(sessionOrders.map((o) => o.order.ticket_number).filter(Boolean))
+      ).join(' • ');
+
       return {
         order: {
           ...latestOrder,
+          ticket_number: allTickets || latestOrder.ticket_number,
           total_amount: combinedTotal,
         },
         items: allItems,
