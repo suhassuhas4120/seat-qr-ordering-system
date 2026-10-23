@@ -22,7 +22,7 @@ export const PlaceOrderInputSchema = z.object({
 });
 
 export const UpdateItemStageInputSchema = z.object({
-  itemId: z.string().uuid(),
+  itemId: z.string().min(1),
   newStage: z.enum(['QUEUED', 'COOKING', 'READY', 'SERVED', 'PAID']),
   staffId: z.number().int().positive().optional(),
 });

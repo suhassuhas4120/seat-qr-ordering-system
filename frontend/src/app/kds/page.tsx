@@ -27,7 +27,8 @@ export default function KitchenDisplayPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [is86ModalOpen, setIs86ModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'KANBAN' | 'BATCH'>('KANBAN');
+  const [viewMode, setViewMode] = useState<'KANBAN' | 'ITEMS' | 'BATCH'>('KANBAN');
+  const [itemFilter, setItemFilter] = useState<'ALL' | 'QUEUED' | 'COOKING' | 'READY' | 'SERVED'>('ALL');
 
   // Load active tickets
   const loadTickets = async () => {
@@ -88,22 +89,38 @@ export default function KitchenDisplayPage() {
     };
   }, [isMuted]);
 
-  // Bump individual dish stage
+  // Set explicit stage for a single dish item
+  const handleSetItemStage = async (itemId: string, newStage: string) => {
+    try {
+      await fetchApi(`/api/orders/items/${itemId}/stage`, {
+        method: 'PATCH',
+        body: JSON.stringify({ newStage, staffId: 3 }), // Gordon Ramsay
+      });
+      // Optimistically update local state for instantaneous feedback
+      setOrders((prev) =>
+        prev.map((ord) => ({
+          ...ord,
+          items: (ord.items || []).map((it: any) =>
+            it.id === itemId ? { ...it, itemStage: newStage } : it
+          ),
+        }))
+      );
+      toast.success(`Dish stage set to ${newStage}`);
+      loadTickets();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update item stage.');
+    }
+  };
+
+  // Bump individual dish stage sequentially
   const handleBumpItem = async (itemId: string, currentStage: string) => {
     let nextStage: string = 'COOKING';
     if (currentStage === 'QUEUED') nextStage = 'COOKING';
     else if (currentStage === 'COOKING') nextStage = 'READY';
     else if (currentStage === 'READY') nextStage = 'SERVED';
+    else if (currentStage === 'SERVED') nextStage = 'QUEUED';
 
-    try {
-      await fetchApi(`/api/orders/items/${itemId}/stage`, {
-        method: 'PATCH',
-        body: JSON.stringify({ newStage: nextStage, staffId: 3 }), // Gordon Ramsay
-      });
-      loadTickets();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update item stage.');
-    }
+    await handleSetItemStage(itemId, nextStage);
   };
 
   // Bump entire order
@@ -143,6 +160,22 @@ export default function KitchenDisplayPage() {
   const incomingOrders = orders.filter((o) => o.overallStage === 'PLACED');
   const cookingOrders = orders.filter((o) => o.overallStage === 'PREPARING');
   const readyOrders = orders.filter((o) => o.overallStage === 'READY');
+
+  // Aggregated single dish items across all active tickets
+  const allDishes = orders.flatMap((o) =>
+    (o.items || []).map((item: any) => ({
+      ...item,
+      orderId: o.id,
+      orderNumber: o.orderNumber,
+      placedAt: o.placedAt,
+      seatNumber: o.seat?.seatNumber,
+      seatZone: o.seat?.zone,
+    }))
+  );
+
+  const filteredDishes = itemFilter === 'ALL'
+    ? allDishes
+    : allDishes.filter((it: any) => it.itemStage === itemFilter);
 
   // Aggregated Batch Cooking Summary
   const batchCounts: Record<string, { name: string; count: number }> = {};
@@ -187,15 +220,28 @@ export default function KitchenDisplayPage() {
             <button
               onClick={() => setViewMode('KANBAN')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewMode === 'KANBAN' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                viewMode === 'KANBAN' ? 'bg-amber-500 text-slate-950 shadow font-black' : 'text-slate-400 hover:text-white'
               }`}
             >
               Ticket Kanban
             </button>
             <button
+              onClick={() => setViewMode('ITEMS')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                viewMode === 'ITEMS' ? 'bg-amber-500 text-slate-950 shadow font-black' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>Single Item Mode</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                viewMode === 'ITEMS' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {allDishes.length}
+              </span>
+            </button>
+            <button
               onClick={() => setViewMode('BATCH')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                viewMode === 'BATCH' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400'
+                viewMode === 'BATCH' ? 'bg-amber-500 text-slate-950 shadow font-black' : 'text-slate-400 hover:text-white'
               }`}
             >
               Batch Prep ({batchList.length})
@@ -253,8 +299,9 @@ export default function KitchenDisplayPage() {
                     borderColor="border-blue-500/40 hover:border-blue-500"
                     headerBg="bg-blue-500/10 text-blue-300"
                     actionText="Start Cooking"
-                    actionColor="bg-blue-600 hover:bg-blue-500 text-white"
+                    actionColor="bg-blue-600 hover:bg-blue-500 text-white font-bold"
                     onBumpItem={handleBumpItem}
+                    onSetItemStage={handleSetItemStage}
                     onBumpAll={() => handleBumpAll(order)}
                   />
                 ))
@@ -284,6 +331,7 @@ export default function KitchenDisplayPage() {
                     actionText="Mark Ready"
                     actionColor="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
                     onBumpItem={handleBumpItem}
+                    onSetItemStage={handleSetItemStage}
                     onBumpAll={() => handleBumpAll(order)}
                   />
                 ))
@@ -313,6 +361,7 @@ export default function KitchenDisplayPage() {
                     actionText="Deliver / Served"
                     actionColor="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
                     onBumpItem={handleBumpItem}
+                    onSetItemStage={handleSetItemStage}
                     onBumpAll={() => handleBumpAll(order)}
                   />
                 ))
@@ -322,7 +371,67 @@ export default function KitchenDisplayPage() {
         </div>
       )}
 
-      {/* VIEW 2: BATCH PREP SUMMARY */}
+      {/* VIEW 2: SINGLE ITEM MODE SELECTION */}
+      {viewMode === 'ITEMS' && (
+        <div className="flex-1 mt-4 flex flex-col min-h-0 bg-slate-950/60 rounded-2xl border border-slate-800 p-4">
+          {/* Subheader & Stage Filters */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800 shrink-0">
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <span>Single Item Focus Mode</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Directly select and update status for each individual dish item across all tickets.
+              </p>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {(['ALL', 'QUEUED', 'COOKING', 'READY', 'SERVED'] as const).map((filter) => {
+                const count = filter === 'ALL'
+                  ? allDishes.length
+                  : allDishes.filter((d) => d.itemStage === filter).length;
+                const isSelected = itemFilter === filter;
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setItemFilter(filter)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {filter} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Dishes Grid */}
+          <div className="flex-1 overflow-y-auto mt-4 pr-1">
+            {filteredDishes.length === 0 ? (
+              <div className="py-16 text-center text-slate-500 text-sm">
+                No individual dish items matching filter <span className="font-bold text-amber-400">{itemFilter}</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                {filteredDishes.map((dish) => (
+                  <SingleDishCard
+                    key={`${dish.orderId}-${dish.id}`}
+                    dish={dish}
+                    onSetStage={(stage) => handleSetItemStage(dish.id, stage)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: BATCH PREP SUMMARY */}
       {viewMode === 'BATCH' && (
         <div className="flex-1 mt-4 p-6 bg-slate-900/60 rounded-2xl border border-slate-800">
           <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider mb-4">
@@ -396,7 +505,7 @@ export default function KitchenDisplayPage() {
   );
 }
 
-// Reusable KDS Ticket Card with granular dish click-to-bump
+// Reusable KDS Ticket Card with granular single dish status selection & quick bump
 function TicketCard({
   order,
   borderColor,
@@ -404,6 +513,7 @@ function TicketCard({
   actionText,
   actionColor,
   onBumpItem,
+  onSetItemStage,
   onBumpAll,
 }: {
   order: any;
@@ -412,6 +522,7 @@ function TicketCard({
   actionText: string;
   actionColor: string;
   onBumpItem: (itemId: string, stage: string) => void;
+  onSetItemStage: (itemId: string, stage: string) => void;
   onBumpAll: () => void;
 }) {
   return (
@@ -430,37 +541,70 @@ function TicketCard({
         </div>
       </div>
 
-      {/* Individual Dish Items (Clickable to advance dish stage!) */}
-      <div className="space-y-2 mb-3">
+      {/* Individual Dish Items with Direct Status Selector */}
+      <div className="space-y-2.5 mb-3">
         {order.items.map((item: any) => (
           <div
             key={item.id}
-            onClick={() => onBumpItem(item.id, item.itemStage)}
-            className="p-2 rounded-lg bg-slate-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex items-center justify-between transition-colors group"
+            className="p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 hover:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors group"
           >
-            <div>
-              <span className="text-sm font-bold text-white group-hover:text-amber-300">
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-bold text-white group-hover:text-amber-300 block truncate">
                 {item.quantity}x {item.nameSnapshot}
               </span>
               {item.notes && (
-                <p className="text-[11px] text-amber-400 italic">★ {item.notes}</p>
+                <p className="text-[11px] text-amber-400 italic mt-0.5">★ {item.notes}</p>
               )}
             </div>
 
-            {/* Stage Badge on the Dish */}
-            <span
-              className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${
-                item.itemStage === 'QUEUED'
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                  : item.itemStage === 'COOKING'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  : item.itemStage === 'READY'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-purple-500/20 text-purple-300'
-              }`}
-            >
-              {item.itemStage}
-            </span>
+            {/* Granular Single-Item Status Controls */}
+            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+              {/* Direct Stage Dropdown */}
+              <select
+                value={item.itemStage}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onSetItemStage(item.id, e.target.value);
+                }}
+                className={`text-[11px] font-black px-2 py-1 rounded border cursor-pointer outline-none uppercase transition-colors ${
+                  item.itemStage === 'QUEUED'
+                    ? 'bg-blue-950/90 text-blue-300 border-blue-500/60'
+                    : item.itemStage === 'COOKING'
+                    ? 'bg-amber-950/90 text-amber-300 border-amber-500/60'
+                    : item.itemStage === 'READY'
+                    ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60'
+                    : 'bg-purple-950/90 text-purple-300 border-purple-500/60'
+                }`}
+                title="Select dish status directly"
+              >
+                <option value="QUEUED" className="bg-slate-900 text-blue-300">QUEUED</option>
+                <option value="COOKING" className="bg-slate-900 text-amber-300">COOKING</option>
+                <option value="READY" className="bg-slate-900 text-emerald-300">READY</option>
+                <option value="SERVED" className="bg-slate-900 text-purple-300">SERVED</option>
+              </select>
+
+              {/* 1-Tap Quick Advance Action */}
+              {item.itemStage !== 'SERVED' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBumpItem(item.id, item.itemStage);
+                  }}
+                  className={`px-2 py-1 rounded text-[10px] font-bold border transition-all active:scale-95 ${
+                    item.itemStage === 'QUEUED'
+                      ? 'bg-blue-600/30 text-blue-200 border-blue-500/50 hover:bg-blue-600/60'
+                      : item.itemStage === 'COOKING'
+                      ? 'bg-amber-500/30 text-amber-200 border-amber-400/50 hover:bg-amber-500/60'
+                      : 'bg-emerald-600/30 text-emerald-200 border-emerald-400/50 hover:bg-emerald-600/60'
+                  }`}
+                  title="Advance dish stage"
+                >
+                  {item.itemStage === 'QUEUED' ? '▶ Cook' : item.itemStage === 'COOKING' ? '✓ Ready' : '🍽 Serve'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -472,6 +616,89 @@ function TicketCard({
       >
         {actionText} (All Dishes) →
       </button>
+    </div>
+  );
+}
+
+// Single Item Mode Card for Dedicated Dish Status Management
+function SingleDishCard({
+  dish,
+  onSetStage,
+}: {
+  dish: any;
+  onSetStage: (stage: string) => void;
+}) {
+  const stage = dish.itemStage;
+
+  return (
+    <div
+      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 shadow-md ${
+        stage === 'QUEUED'
+          ? 'bg-blue-950/20 border-blue-500/40 hover:border-blue-500/70'
+          : stage === 'COOKING'
+          ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-500/70'
+          : stage === 'READY'
+          ? 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-500/70'
+          : 'bg-purple-950/20 border-purple-500/30'
+      }`}
+    >
+      {/* Card Header: Seat & Order Info */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="font-black text-white bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
+            Seat #{dish.seatNumber || '—'}
+          </span>
+          <span className="text-[10px] text-slate-400">({dish.seatZone || 'Floor'})</span>
+        </div>
+        <div className="text-right font-mono text-[11px] text-slate-400">
+          <span className="text-amber-400 font-bold">{dish.orderNumber}</span>
+        </div>
+      </div>
+
+      {/* Dish Name & Quantity */}
+      <div>
+        <h4 className="text-base font-black text-white leading-tight">
+          <span className="text-amber-400 font-mono mr-1.5">{dish.quantity}x</span>
+          {dish.nameSnapshot}
+        </h4>
+        {dish.notes && (
+          <p className="mt-1.5 text-xs text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/30 rounded-md px-2 py-0.5">
+            ★ {dish.notes}
+          </p>
+        )}
+      </div>
+
+      {/* Explicit 4-Stage Single Item Selector */}
+      <div className="pt-2 border-t border-slate-800/80">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+          Select Dish Status:
+        </span>
+        <div className="grid grid-cols-4 gap-1.5">
+          {(['QUEUED', 'COOKING', 'READY', 'SERVED'] as const).map((s) => {
+            const isSelected = stage === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => onSetStage(s)}
+                className={`py-1.5 px-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
+                  isSelected
+                    ? s === 'QUEUED'
+                      ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
+                      : s === 'COOKING'
+                      ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-sm'
+                      : s === 'READY'
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-sm'
+                      : 'bg-purple-600 text-white border-purple-400 shadow-sm'
+                    : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+                }`}
+              >
+                {s}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
