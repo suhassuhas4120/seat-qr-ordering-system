@@ -156,10 +156,27 @@ export default function KitchenDisplayPage() {
     }
   };
 
-  // Separate orders into 3 columns
-  const incomingOrders = orders.filter((o) => o.overallStage === 'PLACED');
-  const cookingOrders = orders.filter((o) => o.overallStage === 'PREPARING');
-  const readyOrders = orders.filter((o) => o.overallStage === 'READY');
+  // Separate active tickets into 3 stage columns based on individual item stages
+  const incomingOrders = orders
+    .map((o) => ({
+      ...o,
+      items: (o.items || []).filter((it: any) => it.itemStage === 'QUEUED'),
+    }))
+    .filter((o) => o.items.length > 0);
+
+  const cookingOrders = orders
+    .map((o) => ({
+      ...o,
+      items: (o.items || []).filter((it: any) => it.itemStage === 'COOKING'),
+    }))
+    .filter((o) => o.items.length > 0);
+
+  const readyOrders = orders
+    .map((o) => ({
+      ...o,
+      items: (o.items || []).filter((it: any) => it.itemStage === 'READY'),
+    }))
+    .filter((o) => o.items.length > 0);
 
   // Aggregated single dish items across all active tickets
   const allDishes = orders.flatMap((o) =>
@@ -284,7 +301,7 @@ export default function KitchenDisplayPage() {
             <div className="flex items-center justify-between pb-3 border-b border-blue-500/20">
               <span className="text-xs font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="w-4 h-4" />
-                <span>1. Incoming / Placed ({incomingOrders.length})</span>
+                <span>1. Incoming / Placed ({incomingOrders.reduce((acc, o) => acc + o.items.length, 0)} dishes)</span>
               </span>
             </div>
 
@@ -314,7 +331,7 @@ export default function KitchenDisplayPage() {
             <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
               <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <ChefHat className="w-4 h-4" />
-                <span>2. Cooking in Kitchen ({cookingOrders.length})</span>
+                <span>2. Cooking in Kitchen ({cookingOrders.reduce((acc, o) => acc + o.items.length, 0)} dishes)</span>
               </span>
             </div>
 
@@ -344,7 +361,7 @@ export default function KitchenDisplayPage() {
             <div className="flex items-center justify-between pb-3 border-b border-emerald-500/20">
               <span className="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4" />
-                <span>3. Ready for Pickup ({readyOrders.length})</span>
+                <span>3. Ready for Pickup ({readyOrders.reduce((acc, o) => acc + o.items.length, 0)} dishes)</span>
               </span>
             </div>
 
@@ -614,7 +631,7 @@ function TicketCard({
         onClick={onBumpAll}
         className={`w-full py-2 rounded-lg text-xs tracking-wider uppercase transition-all ${actionColor}`}
       >
-        {actionText} (All Dishes) →
+        {actionText} ({order.items.length} {order.items.length === 1 ? 'Dish' : 'Dishes'}) →
       </button>
     </div>
   );

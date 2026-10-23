@@ -242,9 +242,9 @@ export class OrderService {
 
     if (allStages.every((s) => s === 'SERVED')) {
       newOrderStage = 'SERVED';
-    } else if (allStages.some((s) => s === 'READY' || s === 'SERVED')) {
+    } else if (allStages.every((s) => s === 'READY' || s === 'SERVED')) {
       newOrderStage = 'READY';
-    } else if (allStages.some((s) => s === 'COOKING')) {
+    } else if (allStages.some((s) => s === 'COOKING' || s === 'READY')) {
       newOrderStage = 'PREPARING';
     }
 
