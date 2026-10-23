@@ -926,7 +926,7 @@ export const realtimeBridge = {
           !tNum ||
           o.order.ticket_number === tNum ||
           tNum.includes(o.order.ticket_number || '') ||
-          (o.order.ticket_number && tNum.split('•').some((part) => part.trim() === o.order.ticket_number));
+          (o.order.ticket_number && tNum.split(/[•,\s]+/).some((part) => part.trim() === o.order.ticket_number));
         if (isTargetChair && isTargetTicket) {
           o.items.forEach((it) => {
             if (hasUpdatedLocally) return;
@@ -938,7 +938,7 @@ export const realtimeBridge = {
               (cleanKey && it.id && it.id === cleanKey)
             );
 
-            const isFallbackMatch = !targetItemId && Boolean(
+            const isFallbackMatch = !isExactMatch && Boolean(
               (meta?.dishId && ((it.dish_id === meta.dishId) || (meta.dishId.replace(/^dish-/, '') === (it.dish_id || '').replace(/^dish-/, '')))) ||
               (meta?.dishName && it.dish_name?.toLowerCase().trim() === meta.dishName.toLowerCase().trim())
             ) && it.stage !== stage;
@@ -1111,6 +1111,8 @@ export const realtimeBridge = {
             staffId: 3,
             seatId: chairNum && !isNaN(chairNum) ? chairNum : undefined,
             ticketNumber: meta?.ticketNumber || undefined,
+            dishId: meta?.dishId || undefined,
+            dishName: meta?.dishName || undefined,
           }),
         }).catch(() => {});
       } catch {}

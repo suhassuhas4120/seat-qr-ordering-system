@@ -213,22 +213,22 @@ export class OrderService {
     itemId: string,
     newStage: ItemStage,
     staffId?: number,
-    options?: { seatId?: number; orderId?: string; ticketNumber?: string }
+    options?: { seatId?: number; orderId?: string; ticketNumber?: string; dishId?: string; dishName?: string }
   ) {
     let targetOrder: Order | undefined;
     let targetItem: OrderItem | undefined;
 
-    const strId = String(itemId);
+    const strId = String(itemId).trim();
     const cleanItemId = strId.replace(/-[0-9]+$/, '');
-    const cleanNumeric = parseInt(cleanItemId.replace(/[^0-9]/g, ''), 10);
-    const cleanName = strId.replace(/^dish-/, '').replace(/[-_]/g, ' ').toLowerCase().trim();
+    const cleanName = (options?.dishName || strId.replace(/^dish-/, '').replace(/[-_]/g, ' ')).toLowerCase().trim();
+    const targetDishId = (options?.dishId || '').replace(/^dish-/, '').trim();
+    const targetDishNum = parseInt(targetDishId, 10);
 
     // 1. Direct search by exact item ID
     for (const order of db.data.orders) {
       if (options?.seatId && order.seatId !== options.seatId) continue;
       if (options?.orderId && order.id !== options.orderId) continue;
-      if (options?.ticketNumber && order.orderNumber !== options.ticketNumber) continue;
-      const found = order.items.find((i) => i.id === strId);
+      const found = order.items.find((i) => i.id === strId || (cleanItemId && i.id === cleanItemId));
       if (found) {
         targetOrder = order;
         targetItem = found;
@@ -245,43 +245,48 @@ export class OrderService {
       if (options?.orderId) {
         candidateOrders = candidateOrders.filter((o) => o.id === options.orderId);
       }
-      if (options?.ticketNumber) {
-        candidateOrders = candidateOrders.filter((o) => o.orderNumber === options.ticketNumber);
+      if (options?.ticketNumber && candidateOrders.length > 1) {
+        const tTokens = options.ticketNumber.split(/[•,\s]+/).map(t => t.trim()).filter(Boolean);
+        const filtered = candidateOrders.filter((o) => tTokens.includes(o.orderNumber));
+        if (filtered.length > 0) {
+          candidateOrders = filtered;
+        }
       }
 
-      const matchFn = (i: OrderItem) => (
-        i.id === strId ||
-        i.id === cleanItemId ||
-        String(i.menuItemId) === strId ||
-        String(i.menuItemId) === cleanItemId ||
-        (!isNaN(cleanNumeric) && i.menuItemId === cleanNumeric) ||
-        `dish-${i.menuItemId}` === strId ||
-        `dish-${i.menuItemId}` === cleanItemId ||
-        (i.nameSnapshot && (
+      const matchFn = (i: OrderItem) => {
+        if (i.id === strId || i.id === cleanItemId) return true;
+        if (targetDishId && (String(i.menuItemId) === targetDishId || `dish-${i.menuItemId}` === options?.dishId)) return true;
+        if (!isNaN(targetDishNum) && i.menuItemId === targetDishNum) return true;
+        if (strId === `dish-${i.menuItemId}` || strId === String(i.menuItemId)) return true;
+        if (options?.dishName && i.nameSnapshot && i.nameSnapshot.toLowerCase().trim() === options.dishName.toLowerCase().trim()) return true;
+        if (cleanName && i.nameSnapshot && (
           i.nameSnapshot.toLowerCase().trim() === cleanName ||
-          i.nameSnapshot.toLowerCase().trim() === strId.toLowerCase().trim()
-        ))
-      );
+          cleanName.includes(i.nameSnapshot.toLowerCase().trim()) ||
+          i.nameSnapshot.toLowerCase().trim().includes(cleanName)
+        )) return true;
+        return false;
+      };
 
-      // Search newest orders first so the latest active batch is addressed
+      // 1st pass: Look for an item across candidate orders that is NOT yet at newStage (e.g. READY -> SERVED)
       for (let oIdx = candidateOrders.length - 1; oIdx >= 0; oIdx--) {
         const order = candidateOrders[oIdx];
-
-        // CRITICAL: Look for an item that is NOT yet at newStage!
-        // E.g., if newStage is SERVED, find the item that is READY (or COOKING or QUEUED)
         const pendingItem = order.items.find((i) => matchFn(i) && i.itemStage !== newStage);
         if (pendingItem) {
           targetOrder = order;
           targetItem = pendingItem;
           break;
         }
+      }
 
-        // Fallback: any matching item in this order if nothing else found
-        if (!targetItem) {
+      // 2nd pass fallback: any matching item if all were already updated
+      if (!targetItem) {
+        for (let oIdx = candidateOrders.length - 1; oIdx >= 0; oIdx--) {
+          const order = candidateOrders[oIdx];
           const anyItem = order.items.find(matchFn);
           if (anyItem) {
             targetOrder = order;
             targetItem = anyItem;
+            break;
           }
         }
       }

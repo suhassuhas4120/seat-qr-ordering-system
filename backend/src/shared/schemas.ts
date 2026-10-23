@@ -27,6 +27,8 @@ export const UpdateItemStageInputSchema = z.object({
   staffId: z.number().int().positive().optional(),
   seatId: z.number().int().positive().optional(),
   ticketNumber: z.string().optional(),
+  dishId: z.string().optional(),
+  dishName: z.string().optional(),
 });
 
 export const UpdateItemAvailabilityInputSchema = z.object({
