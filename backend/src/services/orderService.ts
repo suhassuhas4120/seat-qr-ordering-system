@@ -155,6 +155,8 @@ export class OrderService {
       });
     }
 
+    const calculatedSubtotal = createdOrderItems.reduce((acc, curr) => acc + curr.priceSnapshot * curr.quantity, 0);
+
     const newOrder: Order = {
       id: orderId,
       sessionId: session.id,
@@ -165,7 +167,8 @@ export class OrderService {
       waiterId: waiterId || null,
       placedAt: now,
       items: createdOrderItems,
-    };
+      totalAmount: calculatedSubtotal,
+    } as any;
 
     db.data.orders.push(newOrder);
 
@@ -426,10 +429,14 @@ export class OrderService {
 
     const seatMap = new Map(db.data.seats.map((s) => [s.id, s]));
 
-    return activeOrders.map((o) => ({
-      ...o,
-      seat: seatMap.get(o.seatId),
-    }));
+    return activeOrders.map((o) => {
+      const subtotal = (o.items || []).reduce((acc, curr) => acc + (curr.priceSnapshot || 0) * (curr.quantity || 1), 0);
+      return {
+        ...o,
+        totalAmount: (o as any).totalAmount || subtotal,
+        seat: seatMap.get(o.seatId),
+      };
+    });
   }
 
   /**
@@ -452,10 +459,14 @@ export class OrderService {
 
     const seatMap = new Map(db.data.seats.map((s) => [s.id, s]));
 
-    return activeOrders.map((o) => ({
-      ...o,
-      seat: seatMap.get(o.seatId),
-    }));
+    return activeOrders.map((o) => {
+      const subtotal = (o.items || []).reduce((acc, curr) => acc + (curr.priceSnapshot || 0) * (curr.quantity || 1), 0);
+      return {
+        ...o,
+        totalAmount: (o as any).totalAmount || subtotal,
+        seat: seatMap.get(o.seatId),
+      };
+    });
   }
 
   /**

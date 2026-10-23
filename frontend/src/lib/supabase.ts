@@ -250,9 +250,11 @@ function initSocketBridge() {
         const cleanItemId = strItemId.replace(/-[0-9]+$/, '');
         const cleanOrigKey = strOrigKey.replace(/-[0-9]+$/, '');
 
+        const cleanChairNum = chairId.replace(/[^0-9]/g, '').replace(/^0+/, '');
+
         orders.forEach((o) => {
-          const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
-          if (!cleanChair || oChair === cleanChair) {
+          const oNum = (o.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+          if (!cleanChairNum || oNum === cleanChairNum) {
             o.items.forEach((it) => {
               const matches =
                 it.id === strItemId ||
@@ -289,37 +291,57 @@ function initSocketBridge() {
     });
 
     const handleRemoteSeatVacated = (seatIdentifier: string | number, amount?: number, paymentId?: string) => {
-      const cleanChair = String(seatIdentifier || '').replace(/[^0-9]/g, '');
-      if (!cleanChair) return;
-      const unpadded = cleanChair.replace(/^0+/, '');
-      const padded = cleanChair.padStart(2, '0');
-      const possibleChairs = [cleanChair, unpadded, padded, `Seat ${cleanChair}`, `Seat ${padded}`];
+      const rawStr = String(seatIdentifier || '').trim();
+      const numStr = rawStr.replace(/[^0-9]/g, '').replace(/^0+/, '');
+      if (!numStr) return;
+      const paddedStr = numStr.padStart(2, '0');
+      const possibleChairs = [
+        rawStr,
+        numStr,
+        paddedStr,
+        `Seat ${numStr}`,
+        `Seat ${paddedStr}`,
+        `Chair ${numStr}`,
+        `Chair ${paddedStr}`,
+        `SEAT ${numStr}`,
+        `SEAT ${paddedStr}`,
+      ];
 
       // 1. Purge from local occupancy map
       const map = getLocalOccupancyMap();
       for (const k of possibleChairs) {
         delete map[k];
       }
+      for (const k of Object.keys(map)) {
+        const kNum = k.replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (kNum === numStr) {
+          delete map[k];
+        }
+      }
       setLocalOccupancyMap(map);
 
-      // 2. Purge from local orders list
+      // 2. Purge from local orders list strictly for this seat
       const orders = getLocalOrdersList();
       const updated = orders.filter((o) => {
-        const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
-        return oChair !== cleanChair && !possibleChairs.includes(o.order.chair_id);
+        const oRaw = (o.order.chair_id || '').trim();
+        const oNum = oRaw.replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (oNum === numStr || possibleChairs.includes(oRaw)) {
+          return false;
+        }
+        return true;
       });
       setLocalOrdersList(updated);
 
       // 3. Clear localStorage / sessionStorage caches
       if (typeof window !== 'undefined') {
         try {
-          localStorage.removeItem(`thoogudeepa_item_stages_${cleanChair}`);
-          localStorage.removeItem(`thoogudeepa_item_stages_${padded}`);
-          localStorage.removeItem(`thoogudeepa_item_stages_${unpadded}`);
-          localStorage.removeItem(`thoogudeepa_dining_session_${cleanChair}`);
-          localStorage.removeItem(`thoogudeepa_dining_session_${padded}`);
-          localStorage.removeItem(`thoogudeepa_active_ticket_${cleanChair}`);
-          sessionStorage.removeItem(`thoogudeepa_cart_items_${cleanChair}`);
+          const keys = [numStr, paddedStr, `Seat ${numStr}`, `Seat ${paddedStr}`];
+          for (const k of keys) {
+            localStorage.removeItem(`thoogudeepa_item_stages_${k}`);
+            localStorage.removeItem(`thoogudeepa_dining_session_${k}`);
+            localStorage.removeItem(`thoogudeepa_active_ticket_${k}`);
+            sessionStorage.removeItem(`thoogudeepa_cart_items_${k}`);
+          }
         } catch {}
       }
 
@@ -328,10 +350,17 @@ function initSocketBridge() {
         realtimeBridge.clearActiveBillRequest(k);
       }
 
-      // 5. Instantly notify all subscribers across components
+      // 5. Instantly notify all subscribers across components with normalized chair representations
       activeKdsSubscribers.forEach((cb) => {
-        cb.onSeatOccupancyChange?.({ chairId: cleanChair, isOccupied: false });
-        cb.onBillSettled?.({ chairId: cleanChair, amount, ticketNumber: paymentId });
+        cb.onSeatOccupancyChange?.({ chairId: numStr, isOccupied: false });
+        cb.onSeatOccupancyChange?.({ chairId: paddedStr, isOccupied: false });
+        cb.onBillSettled?.({
+          chairId: numStr,
+          rawChairId: rawStr,
+          normChairId: numStr,
+          amount,
+          ticketNumber: paymentId,
+        });
       });
     };
 
@@ -885,44 +914,65 @@ export const realtimeBridge = {
   // Release a seat (e.g. upon payment or checkout)
   async releaseSeat(chairId: string): Promise<boolean> {
     try {
-      const cleanChair = chairId.replace(/[^0-9]/g, '');
-      const padded = cleanChair.padStart(2, '0');
-      const unpadded = cleanChair.replace(/^0+/, '');
-      const possibleChairs = [chairId, cleanChair, padded, unpadded, `Seat ${cleanChair}`, `Seat ${padded}`];
+      const rawStr = String(chairId || '').trim();
+      const numStr = rawStr.replace(/[^0-9]/g, '').replace(/^0+/, '');
+      if (!numStr) return true;
+      const paddedStr = numStr.padStart(2, '0');
+      const possibleChairs = [
+        rawStr,
+        numStr,
+        paddedStr,
+        `Seat ${numStr}`,
+        `Seat ${paddedStr}`,
+        `Chair ${numStr}`,
+        `Chair ${paddedStr}`,
+        `SEAT ${numStr}`,
+        `SEAT ${paddedStr}`,
+      ];
 
       // Remove from local occupancy registry
       const map = getLocalOccupancyMap();
       for (const k of possibleChairs) {
         delete map[k];
       }
+      for (const k of Object.keys(map)) {
+        const kNum = k.replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (kNum === numStr) {
+          delete map[k];
+        }
+      }
       setLocalOccupancyMap(map);
 
-      // Remove from local orders list
+      // Remove from local orders list strictly for this seat
       const orders = getLocalOrdersList();
       const updated = orders.filter((o) => {
-        const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
-        return oChair !== cleanChair && !possibleChairs.includes(o.order.chair_id);
+        const oRaw = (o.order.chair_id || '').trim();
+        const oNum = oRaw.replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (oNum === numStr || possibleChairs.includes(oRaw)) {
+          return false;
+        }
+        return true;
       });
       setLocalOrdersList(updated);
 
       // Clear seat-specific cached item stages and dining session
       if (typeof window !== 'undefined') {
         try {
-          localStorage.removeItem(`thoogudeepa_item_stages_${cleanChair}`);
-          localStorage.removeItem(`thoogudeepa_item_stages_${padded}`);
-          localStorage.removeItem(`thoogudeepa_item_stages_${unpadded}`);
-          localStorage.removeItem(`thoogudeepa_dining_session_${cleanChair}`);
-          localStorage.removeItem(`thoogudeepa_dining_session_${padded}`);
-          localStorage.removeItem(`thoogudeepa_active_ticket_${cleanChair}`);
-          sessionStorage.removeItem(`thoogudeepa_cart_items_${cleanChair}`);
+          const keys = [numStr, paddedStr, `Seat ${numStr}`, `Seat ${paddedStr}`];
+          for (const k of keys) {
+            localStorage.removeItem(`thoogudeepa_item_stages_${k}`);
+            localStorage.removeItem(`thoogudeepa_dining_session_${k}`);
+            localStorage.removeItem(`thoogudeepa_active_ticket_${k}`);
+            sessionStorage.removeItem(`thoogudeepa_cart_items_${k}`);
+          }
         } catch {}
       }
 
       // Resolve any pending alerts for this seat
       const alerts = getLocalAlertsList();
       const nextAlerts = alerts.map((a) => {
-        const aSeatClean = a.seatNumber.replace(/[^0-9]/g, '');
-        if (aSeatClean === cleanChair || possibleChairs.includes(a.seatNumber)) {
+        const aSeatClean = a.seatNumber.replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (aSeatClean === numStr || possibleChairs.includes(a.seatNumber)) {
           return { ...a, isResolved: true };
         }
         return a;
@@ -943,9 +993,9 @@ export const realtimeBridge = {
       }
 
       broadcastRealtime('SEAT_RELEASED', {
-        chairId: cleanChair,
+        chairId: numStr,
         rawChairId: chairId,
-        normChairId: unpadded,
+        normChairId: numStr,
       });
 
       return true;
@@ -1472,49 +1522,87 @@ export const realtimeBridge = {
 
         if (backendSource.length > 0) {
           const backendOrders = backendSource.map((t: any) => {
-            const chairId = String(t.seatId || (t.seatNumber ? t.seatNumber.replace(/[^0-9]/g, '') : '14'));
+            const rawChair = String(t.seatId || (t.seatNumber ? t.seatNumber.replace(/[^0-9]/g, '') : '14'));
+            const chairNum = rawChair.replace(/[^0-9]/g, '').replace(/^0+/, '');
+            const chairId = chairNum.padStart(2, '0');
+
+            // Find matching local order by id, ticket, or normalized chair
+            const localOrder = localOrders.find((lo) => {
+              if (lo.order.id === t.id || (t.orderNumber && lo.order.ticket_number === t.orderNumber)) return true;
+              const loNum = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+              return loNum && chairNum && loNum === chairNum && lo.order.status !== 'completed';
+            });
+
+            const calculatedTotal = (t.items || []).reduce(
+              (acc: number, cur: any) => acc + (cur.priceSnapshot || 0) * (cur.quantity || 1),
+              0
+            );
+            const totalAmount = (t.totalAmount && t.totalAmount > 0) ? t.totalAmount : (localOrder?.order?.total_amount || calculatedTotal);
+
+            const items: OrderItemRecord[] = (t.items || []).map((it: any, idx: number) => {
+              const initialStage = it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED';
+
+              // Match corresponding local item intelligently
+              const localItem = localOrder?.items?.find((li) => {
+                if (li.id && it.id && (li.id === it.id || String(li.id).startsWith(String(it.id)) || String(it.id).startsWith(String(li.id)))) return true;
+                if (li.dish_id && (`dish-${it.menuItemId}` === li.dish_id || String(it.menuItemId) === li.dish_id.replace(/^dish-/, ''))) return true;
+                if (li.dish_name && it.nameSnapshot && li.dish_name.toLowerCase().trim() === it.nameSnapshot.toLowerCase().trim()) return true;
+                return false;
+              });
+
+              // Preserve rich local stages, addons, and item IDs so tracking and buttons are never disrupted
+              const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
+              const effectiveStage = localItem?.stage || (isLocallyServed ? 'SERVED' : initialStage);
+              const addonsList = Array.isArray(localItem?.addons) && localItem.addons.length > 0
+                ? localItem.addons
+                : (effectiveStage === 'SERVED' ? ['SERVED'] : (Array.isArray(it.addons) ? it.addons : []));
+              const effectiveItemId = localItem?.id || it.id || `${t.id}-${it.menuItemId}-${idx}`;
+
+              return {
+                id: effectiveItemId,
+                order_id: t.id,
+                chair_id: chairId,
+                seat_label: `SEAT ${chairId}`,
+                dish_id: `dish-${it.menuItemId}`,
+                dish_name: it.nameSnapshot || localItem?.dish_name || 'Dish',
+                quantity: it.quantity,
+                price: it.priceSnapshot || localItem?.price || 0,
+                stage: effectiveStage,
+                notes: it.notes || localItem?.notes || '',
+                addons: addonsList,
+              };
+            });
+
+            // If localOrder had any extra client-placed items not yet in backend response, preserve them
+            if (localOrder?.items) {
+              const matchedIds = new Set(items.map((it) => it.id));
+              const extraLocalItems = localOrder.items.filter((li) => !matchedIds.has(li.id));
+              if (extraLocalItems.length > 0) {
+                items.push(...extraLocalItems);
+              }
+            }
+
             return {
               order: {
                 id: t.id,
-                ticket_number: t.orderNumber,
+                ticket_number: t.orderNumber || localOrder?.order?.ticket_number,
                 chair_id: chairId,
-                seat_label: `SEAT ${chairId.padStart(2, '0')}`,
-                status: t.overallStage === 'PAID' ? 'completed' : 'pending',
-                total_amount: t.totalAmount || 0,
+                seat_label: `SEAT ${chairId}`,
+                status: t.overallStage === 'PAID' ? 'completed' : (localOrder?.order?.status || 'pending'),
+                total_amount: totalAmount,
               } as OrderRecord,
-              items: (t.items || []).map((it: any) => {
-                const initialStage = it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED';
-                const localOrder = localOrders.find((lo) => lo.order.id === t.id || lo.order.ticket_number === t.orderNumber);
-                const localItem = localOrder?.items?.find((li) => li.id && it.id && li.id === it.id);
-                const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
-                const effectiveStage = isLocallyServed ? 'SERVED' : initialStage;
-                const addonsList = effectiveStage === 'SERVED' ? ['SERVED'] : (Array.isArray(it.addons) ? it.addons : []);
-
-                return {
-                  id: it.id,
-                  order_id: t.id,
-                  chair_id: chairId,
-                  seat_label: `SEAT ${chairId.padStart(2, '0')}`,
-                  dish_id: `dish-${it.menuItemId}`,
-                  dish_name: it.nameSnapshot,
-                  quantity: it.quantity,
-                  price: it.priceSnapshot,
-                  stage: effectiveStage,
-                  notes: it.notes || '',
-                  addons: addonsList,
-                };
-              }) as OrderItemRecord[],
+              items,
             };
           });
 
           // Merge backend orders with any local orders not yet on backend
           const backendIds = new Set(backendOrders.map((bo) => bo.order.id));
           const backendTickets = new Set(backendOrders.map((bo) => bo.order.ticket_number));
-          const backendChairs = new Set(backendOrders.map((bo) => (bo.order.chair_id || '').replace(/[^0-9]/g, '')));
+          const backendChairNums = new Set(backendOrders.map((bo) => (bo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '')));
 
           const pendingLocals = localOrders.filter((lo) => {
-            const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
-            if (backendChairs.has(loChair)) return false;
+            const loNum = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+            if (backendChairNums.has(loNum)) return false;
             if (backendIds.has(lo.order.id) || backendTickets.has(lo.order.ticket_number)) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
             return true;
@@ -1761,14 +1849,18 @@ export const realtimeBridge = {
   },
 
   async settleBill(chairId: string, paymentMethod: string, amount: number, meta?: { ticketNumber?: string }): Promise<boolean> {
-    const cleanChair = chairId.replace(/[^0-9]/g, '');
-    const padded = cleanChair.padStart(2, '0');
-    const unpadded = cleanChair.replace(/^0+/, '');
-    const possibleChairs = [chairId, cleanChair, padded, unpadded, `Seat ${cleanChair}`, `Seat ${padded}`];
+    const rawChair = String(chairId || '').trim();
+    const cleanNum = rawChair.replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
+    const cleanChair = cleanNum.padStart(2, '0');
+    const padded = cleanChair;
+    const unpadded = cleanNum;
+    const possibleChairs = [rawChair, cleanChair, padded, unpadded, `Seat ${cleanChair}`, `Seat ${padded}`, `Seat ${unpadded}`];
 
     // 1. Release seat in local registry and clear bill requests
     await this.releaseSeat(chairId);
     this.clearActiveBillRequest(chairId);
+    this.clearActiveBillRequest(cleanNum);
+    this.clearActiveBillRequest(cleanChair);
 
     // 2. Mark order completed in Supabase
     if (supabase) {
@@ -1799,13 +1891,13 @@ export const realtimeBridge = {
         const STORAGE_SETTLED_BILLS = 'thoogudeepa_v2_settled_bills_history';
         const existingRaw = localStorage.getItem(STORAGE_SETTLED_BILLS);
         const list = existingRaw ? JSON.parse(existingRaw) : [];
-        const isTk = cleanChair === 'TK-01' || cleanChair.toLowerCase().includes('tk');
+        const isTk = cleanNum === '0' && (rawChair.toLowerCase().includes('tk') || rawChair.toLowerCase().includes('takeaway'));
         const billNumber = `INV-${Date.now().toString().slice(-6)}`;
         const localOrders = getLocalOrdersList();
         const matchingOrders = localOrders.filter((o) => {
-          const oC = (o.order.chair_id || '').replace(/[^0-9]/g, '');
+          const oNum = (o.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
           if (isTk) return o.order.chair_id?.toLowerCase().includes('tk') || o.order.chair_id?.toLowerCase().includes('takeaway');
-          return oC === cleanChair || oC === unpadded || o.order.chair_id === chairId;
+          return oNum === cleanNum || o.order.chair_id === rawChair;
         });
         const items: any[] = [];
         matchingOrders.forEach((mo) => {
@@ -1825,8 +1917,8 @@ export const realtimeBridge = {
         list.unshift({
           invoiceNumber: billNumber,
           tableName: isTk ? 'TK-01' : `T-${padded}`,
-          seatLabel: isTk ? 'Takeaway Parcel' : `Chair ${cleanChair}`,
-          seatNumber: isTk ? 0 : Number(cleanChair) || 1,
+          seatLabel: isTk ? 'Takeaway Parcel' : `Chair ${cleanNum}`,
+          seatNumber: isTk ? 0 : Number(cleanNum) || 1,
           captainName: isTk ? 'Takeaway Desk' : 'Floor Captain',
           subtotal,
           totalTax: tax,
@@ -1842,12 +1934,12 @@ export const realtimeBridge = {
     }
 
     const settledTicket = meta?.ticketNumber;
-    broadcastRealtime('BILL_SETTLED', { chairId: cleanChair, rawChairId: chairId, normChairId: unpadded, paymentMethod, amount, ticketNumber: settledTicket });
-    broadcastRealtime('SEAT_RELEASED', { chairId: cleanChair, rawChairId: chairId, normChairId: unpadded });
+    broadcastRealtime('BILL_SETTLED', { chairId: cleanNum, rawChairId: rawChair, normChairId: cleanNum, paymentMethod, amount, ticketNumber: settledTicket });
+    broadcastRealtime('SEAT_RELEASED', { chairId: cleanNum, rawChairId: rawChair, normChairId: cleanNum });
 
     // Notify Fastify backend of payment settlement
     try {
-      const cleanSeatId = Number(cleanChair) || 1;
+      const cleanSeatId = Number(cleanNum) || 1;
       const gw = (paymentMethod ? String(paymentMethod).toUpperCase() : 'CASH');
       fetch(`${getBackendUrl()}/api/payments/process`, {
         method: 'POST',

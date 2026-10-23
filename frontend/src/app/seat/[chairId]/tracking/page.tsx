@@ -54,9 +54,13 @@ export default function LiveOrderTrackingPage() {
       setIsSyncing(true);
       const cleanChair = chairId.replace(/[^0-9]/g, '');
       const res = await realtimeBridge.getOrderForSeat(cleanChair || chairId);
-      if (res.order?.status === 'completed') {
-        router.replace(`/seat/${chairId}/receipt`);
-        return;
+      if (res.order?.status === 'completed' || (!res.order && (!res.items || res.items.length === 0))) {
+        const hasReceipt = typeof window !== 'undefined' && localStorage.getItem(`thoogudeepa_settled_receipt_${chairId}`);
+        const currentSession = getActiveDiningSession();
+        if (hasReceipt || (currentSession && currentSession.paymentStatus === 'paid')) {
+          router.replace(`/seat/${chairId}/payment-success?mode=Paid&amount=${currentSession?.totalAmount || 0}`);
+          return;
+        }
       }
       if (res.items && res.items.length > 0) {
         const tNum = res.order?.ticket_number || '';
@@ -275,8 +279,9 @@ export default function LiveOrderTrackingPage() {
       },
       onSeatOccupancyChange: (data) => {
         if (!data.isOccupied) {
-          const cleanTarget = (data.chairId || '').replace(/[^0-9]/g, '');
-          if (cleanTarget === cleanCurrentChair) {
+          const targetNum = (data.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+          const currentNum = (cleanCurrentChair || chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+          if (targetNum && currentNum && targetNum === currentNum) {
             const amtVal = sessionRef.current?.totalAmount || 0;
             try {
               localStorage.setItem(
@@ -298,8 +303,9 @@ export default function LiveOrderTrackingPage() {
         }
       },
       onBillSettled: (data) => {
-        const cleanTarget = (data.chairId || data.rawChairId || data.normChairId || '').replace(/[^0-9]/g, '');
-        if (cleanTarget === cleanCurrentChair) {
+        const targetNum = (data.chairId || data.rawChairId || data.normChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        const currentNum = (cleanCurrentChair || chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (targetNum && currentNum && targetNum === currentNum) {
           const modeVal = data.paymentMethod || 'Paid via Counter / Waiter';
           const amtVal = data.amount || sessionRef.current?.totalAmount || 0;
           try {

@@ -49,8 +49,8 @@ export default function CustomerSeatPage() {
 
     checkSeatOccupancy().then((occ) => {
       const session = getActiveDiningSession();
-      const cleanCurrentChair = chairId.replace(/[^0-9]/g, '');
-      const cleanSessionChair = (session?.seatId || '').replace(/[^0-9]/g, '');
+      const cleanCurrentChair = chairId.replace(/[^0-9]/g, '').replace(/^0+/, '');
+      const cleanSessionChair = (session?.seatId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
 
       // 1. If backend says seat is vacant and session was for this seat, clear stale session
       if (!occ.isOccupied && cleanSessionChair === cleanCurrentChair) {
@@ -74,8 +74,8 @@ export default function CustomerSeatPage() {
     // Subscribe to live seat updates
     const unsubscribe = realtimeBridge.subscribeKDS({
       onSeatOccupancyChange: ({ chairId: changedChairId }) => {
-        const cleanChanged = (changedChairId || '').replace(/[^0-9]/g, '');
-        const cleanChair = chairId.replace(/[^0-9]/g, '');
+        const cleanChanged = (changedChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        const cleanChair = chairId.replace(/[^0-9]/g, '').replace(/^0+/, '');
         if (changedChairId === chairId || (cleanChanged && cleanChanged === cleanChair)) {
           checkSeatOccupancy();
         }

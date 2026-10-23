@@ -294,25 +294,27 @@ export default function KitchenDisplaySystemPage() {
         setStockStatus((prev) => ({ ...prev, [data.dishId]: data.isAvailable }));
       },
       onBillSettled: (data) => {
-        const chair = (data.chairId || data.normChairId || data.rawChairId || '').replace(/[^0-9]/g, '');
-        if (chair) {
+        const targetNum = (data.chairId || data.normChairId || data.rawChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (targetNum) {
           setActiveOrders((prev) =>
             prev.filter((o) => {
-              const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
-              return oChair !== chair && o.order.chair_id !== data.chairId;
+              const oNum = (o.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+              return oNum !== targetNum;
             })
           );
         }
       },
       onSeatOccupancyChange: (data) => {
         if (!data.isOccupied) {
-          const chair = (data.chairId || '').replace(/[^0-9]/g, '');
-          setActiveOrders((prev) =>
-            prev.filter((o) => {
-              const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
-              return oChair !== chair && o.order.chair_id !== data.chairId;
-            })
-          );
+          const targetNum = (data.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+          if (targetNum) {
+            setActiveOrders((prev) =>
+              prev.filter((o) => {
+                const oNum = (o.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+                return oNum !== targetNum;
+              })
+            );
+          }
         }
       },
       onClearAll: () => {
