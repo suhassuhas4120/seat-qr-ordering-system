@@ -732,7 +732,9 @@ export const realtimeBridge = {
         return { success: true, orderId };
       }
 
-      // Fallback: Synchronize local orders entry and notify Fastify
+      // Authoritative Fastify backend sync
+      let backendOrderId = generatedId;
+      let backendTicketNumber = order.ticket_number;
       try {
         const cleanSeatId = Number(order.chair_id.replace(/[^0-9]/g, '')) || 1;
         const apiItems = items.map((it) => ({
@@ -740,7 +742,7 @@ export const realtimeBridge = {
           quantity: it.quantity,
           notes: it.notes || undefined,
         }));
-        fetch(`${BACKEND_URL}/api/orders`, {
+        const res = await fetch(`${BACKEND_URL}/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -748,13 +750,35 @@ export const realtimeBridge = {
             items: apiItems,
             createdByRole: 'CUSTOMER',
           }),
-        }).catch((e) => console.warn('Order sync warning:', e));
-      } catch {}
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData?.order) {
+            backendOrderId = resData.order.id;
+            backendTicketNumber = resData.order.orderNumber;
+          }
+        }
+      } catch (e) {
+        console.warn('Order sync warning:', e);
+      }
 
       const currentLocals = getLocalOrdersList();
+      const cleanChairVal = order.chair_id.replace(/[^0-9]/g, '');
+      // Purge any temporary client-generated draft orders for this chair to prevent duplicate items
+      const filteredLocals = currentLocals.filter((x) => {
+        const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
+        if (xChair === cleanChairVal && (String(x.order.id).startsWith('ord-') || String(x.order.id).startsWith('local-'))) {
+          return false;
+        }
+        return x.order.id !== backendOrderId && x.order.id !== generatedId;
+      });
+
       const updatedOrders = [
-        { order: { ...order, id: generatedId }, items },
-        ...currentLocals.filter((x) => x.order.id !== generatedId),
+        {
+          order: { ...order, id: backendOrderId, ticket_number: backendTicketNumber },
+          items: items.map((it, idx) => ({ ...it, order_id: backendOrderId, id: `${backendOrderId}-${it.dish_id}-${idx}` })),
+        },
+        ...filteredLocals,
       ];
       setLocalOrdersList(updatedOrders);
 
@@ -763,11 +787,11 @@ export const realtimeBridge = {
         occupancy: occupancyMap[order.chair_id],
       });
       broadcastRealtime('NEW_ORDER', {
-        order: { ...order, id: generatedId },
+        order: { ...order, id: backendOrderId, ticket_number: backendTicketNumber },
         items,
       });
 
-      return { success: true, orderId: generatedId };
+      return { success: true, orderId: backendOrderId };
     } catch (err) {
       console.error('Error placing order:', err);
       const generatedId = `local-${Date.now()}`;
@@ -925,6 +949,7 @@ export const realtimeBridge = {
       const cleanTargetId = targetItemId ? targetItemId.replace(/-[0-9]+$/, '') : '';
       const cleanKey = itemIdOrKey ? itemIdOrKey.replace(/-[0-9]+$/, '') : '';
 
+      let hasUpdatedLocally = false;
       orders.forEach((o) => {
         const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
         const isTargetChair = !cleanChair || oChair === cleanChair || o.order.chair_id === meta?.chairId;
@@ -935,21 +960,28 @@ export const realtimeBridge = {
           (o.order.ticket_number && tNum.split('•').some((part) => part.trim() === o.order.ticket_number));
         if (isTargetChair && isTargetTicket) {
           o.items.forEach((it) => {
-            const matches =
-              Boolean(targetItemId && it.id && it.id === targetItemId) ||
-              Boolean(itemIdOrKey && it.id && it.id === itemIdOrKey) ||
-              Boolean(cleanTargetId && it.id && it.id === cleanTargetId) ||
-              Boolean(cleanKey && it.id && it.id === cleanKey) ||
-              Boolean(meta?.dishId && ((it.dish_id === meta.dishId) || (meta.dishId.replace(/^dish-/, '') === (it.dish_id || '').replace(/^dish-/, '')))) ||
-              Boolean(meta?.dishName && it.dish_name?.toLowerCase().trim() === meta.dishName.toLowerCase().trim());
+            if (hasUpdatedLocally) return;
 
-            if (matches) {
+            const isExactMatch = Boolean(
+              (targetItemId && it.id && it.id === targetItemId) ||
+              (itemIdOrKey && it.id && it.id === itemIdOrKey) ||
+              (cleanTargetId && it.id && it.id === cleanTargetId) ||
+              (cleanKey && it.id && it.id === cleanKey)
+            );
+
+            const isFallbackMatch = !targetItemId && Boolean(
+              (meta?.dishId && ((it.dish_id === meta.dishId) || (meta.dishId.replace(/^dish-/, '') === (it.dish_id || '').replace(/^dish-/, '')))) ||
+              (meta?.dishName && it.dish_name?.toLowerCase().trim() === meta.dishName.toLowerCase().trim())
+            ) && it.stage !== stage;
+
+            if (isExactMatch || isFallbackMatch) {
               it.stage = stage;
               if (stage === 'SERVED') {
                 const addons = Array.isArray(it.addons) ? [...it.addons] : [];
                 if (!addons.includes('SERVED')) addons.push('SERVED');
                 it.addons = addons;
               }
+              hasUpdatedLocally = true;
             }
           });
         }
@@ -1109,6 +1141,7 @@ export const realtimeBridge = {
             newStage: stageToBackend[stage] || 'COOKING',
             staffId: 3,
             seatId: chairNum && !isNaN(chairNum) ? chairNum : undefined,
+            ticketNumber: meta?.ticketNumber || undefined,
           }),
         }).catch(() => {});
       } catch {}
@@ -1397,7 +1430,7 @@ export const realtimeBridge = {
               items: (t.items || []).map((it: any) => {
                 const initialStage = it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED';
                 const localOrder = localOrders.find((lo) => lo.order.id === t.id || lo.order.ticket_number === t.orderNumber);
-                const localItem = localOrder?.items?.find((li) => li.id === it.id || (li.dish_id && `dish-${it.menuItemId}` === li.dish_id) || li.dish_name?.toLowerCase().trim() === it.nameSnapshot?.toLowerCase().trim());
+                const localItem = localOrder?.items?.find((li) => li.id && it.id && li.id === it.id);
                 const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
                 const effectiveStage = isLocallyServed ? 'SERVED' : initialStage;
                 const addonsList = effectiveStage === 'SERVED' ? ['SERVED'] : (Array.isArray(it.addons) ? it.addons : []);
@@ -1422,9 +1455,17 @@ export const realtimeBridge = {
           // Merge backend orders with any local orders not yet on backend
           const backendIds = new Set(backendOrders.map((bo) => bo.order.id));
           const backendTickets = new Set(backendOrders.map((bo) => bo.order.ticket_number));
-          const pendingLocals = localOrders.filter(
-            (lo) => !backendIds.has(lo.order.id) && !backendTickets.has(lo.order.ticket_number) && lo.order.status !== 'completed' && lo.order.status !== 'cancelled'
-          );
+          const backendChairs = new Set(backendOrders.map((bo) => (bo.order.chair_id || '').replace(/[^0-9]/g, '')));
+
+          const pendingLocals = localOrders.filter((lo) => {
+            const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+            if (backendIds.has(lo.order.id) || backendTickets.has(lo.order.ticket_number)) return false;
+            if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
+            if (backendChairs.has(loChair) && (String(lo.order.id).startsWith('ord-') || String(lo.order.id).startsWith('local-'))) {
+              return false;
+            }
+            return true;
+          });
           const combined = [...backendOrders, ...pendingLocals];
 
           setLocalOrdersList(combined);
@@ -2032,55 +2073,8 @@ export const realtimeBridge = {
     const cleanId = chairId.replace(/[^0-9]/g, '');
     const padded = cleanId.padStart(2, '0');
     const unpadded = cleanId.replace(/^0+/, '');
-    const activeOrders = await this.getActiveOrders();
-    const matchingOrders = activeOrders.filter(
-      (o) =>
-        o.order.chair_id === padded ||
-        o.order.chair_id === unpadded ||
-        o.order.chair_id === chairId ||
-        (o.order.chair_id && o.order.chair_id.replace(/[^0-9]/g, '') === cleanId)
-    );
-    if (matchingOrders.length > 0) {
-      // Keep all active uncompleted batches for this seat session
-      const uncompletedOrders = matchingOrders.filter(
-        (o) => o.order.status !== 'completed' && o.order.status !== 'cancelled'
-      );
-      const sessionOrders = uncompletedOrders.length > 0 ? uncompletedOrders : matchingOrders;
 
-      const seenItemIds = new Set<string>();
-      const allItems: OrderItemRecord[] = [];
-      sessionOrders.forEach((o) => {
-        const hydratedItems = this.hydrateOrderItemStages(o.order, o.items);
-        hydratedItems.forEach((it, idx) => {
-          const itemKey = it.id || `${o.order.id || o.order.ticket_number}-${it.dish_id}-${idx}`;
-          if (!seenItemIds.has(itemKey)) {
-            seenItemIds.add(itemKey);
-            allItems.push({
-              ...it,
-              id: it.id || itemKey,
-              order_id: it.order_id || o.order.id,
-            });
-          }
-        });
-      });
-      const latestOrder = sessionOrders[0].order;
-      const sub = allItems.reduce((acc, it) => acc + (it.price * (it.quantity || 1)), 0);
-      const combinedTotal = sub + Math.round(sub * 0.05);
-      const allTickets = Array.from(
-        new Set(sessionOrders.map((o) => o.order.ticket_number).filter(Boolean))
-      ).join(' • ');
-
-      return {
-        order: {
-          ...latestOrder,
-          ticket_number: allTickets || latestOrder.ticket_number,
-          total_amount: combinedTotal,
-        },
-        items: allItems,
-      };
-    }
-
-    // 2. Authoritative Seat Tab Fallback (directly query active seat tab from backend)
+    // 1. Authoritative Seat Tab directly from Fastify backend (Single Source of Truth)
     try {
       const tabRes = await fetch(`${BACKEND_URL}/api/seats/${cleanId || '1'}/tab`)
         .then((r) => (r.ok ? r.json() : null))
@@ -2135,6 +2129,55 @@ export const realtimeBridge = {
         };
       }
     } catch {}
+
+    // 2. Active Orders & Local Hydration Fallback
+    const activeOrders = await this.getActiveOrders();
+    const matchingOrders = activeOrders.filter(
+      (o) =>
+        o.order.chair_id === padded ||
+        o.order.chair_id === unpadded ||
+        o.order.chair_id === chairId ||
+        (o.order.chair_id && o.order.chair_id.replace(/[^0-9]/g, '') === cleanId)
+    );
+    if (matchingOrders.length > 0) {
+      // Keep all active uncompleted batches for this seat session
+      const uncompletedOrders = matchingOrders.filter(
+        (o) => o.order.status !== 'completed' && o.order.status !== 'cancelled'
+      );
+      const sessionOrders = uncompletedOrders.length > 0 ? uncompletedOrders : matchingOrders;
+
+      const seenItemIds = new Set<string>();
+      const allItems: OrderItemRecord[] = [];
+      sessionOrders.forEach((o) => {
+        const hydratedItems = this.hydrateOrderItemStages(o.order, o.items);
+        hydratedItems.forEach((it, idx) => {
+          const itemKey = it.id || `${o.order.id || o.order.ticket_number}-${it.dish_id}-${idx}`;
+          if (!seenItemIds.has(itemKey)) {
+            seenItemIds.add(itemKey);
+            allItems.push({
+              ...it,
+              id: it.id || itemKey,
+              order_id: it.order_id || o.order.id,
+            });
+          }
+        });
+      });
+      const latestOrder = sessionOrders[0].order;
+      const sub = allItems.reduce((acc, it) => acc + (it.price * (it.quantity || 1)), 0);
+      const combinedTotal = sub + Math.round(sub * 0.05);
+      const allTickets = Array.from(
+        new Set(sessionOrders.map((o) => o.order.ticket_number).filter(Boolean))
+      ).join(' • ');
+
+      return {
+        order: {
+          ...latestOrder,
+          ticket_number: allTickets || latestOrder.ticket_number,
+          total_amount: combinedTotal,
+        },
+        items: allItems,
+      };
+    }
 
     return { order: null, items: [] };
   },

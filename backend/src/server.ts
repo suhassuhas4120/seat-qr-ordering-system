@@ -130,11 +130,12 @@ app.patch('/api/orders/items/:itemId/stage', async (req, reply) => {
 
   try {
     const rawSeatId = parseResult.data.seatId || ((req.body as any)?.seatId ? Number((req.body as any).seatId) : undefined);
+    const rawTicketNum = parseResult.data.ticketNumber || (req.body as any)?.ticketNumber;
     const result = await orderService.updateItemStage(
       parseResult.data.itemId,
       parseResult.data.newStage,
       parseResult.data.staffId,
-      { seatId: rawSeatId }
+      { seatId: rawSeatId, ticketNumber: rawTicketNum }
     );
     return reply.send(result);
   } catch (error: any) {

@@ -67,8 +67,8 @@ export default function LiveOrderTrackingPage() {
               orderStatus: (res.order?.status as any) || 'pending',
               orderedAt: res.order?.created_at ? new Date(res.order.created_at).getTime() : Date.now(),
               totalAmount: res.order?.total_amount || 0,
-              items: res.items.map((it) => ({
-                id: it.id || `dish-${it.dish_id}`,
+              items: res.items.map((it, idx) => ({
+                id: it.id || (it.order_id ? `${it.order_id}-${it.dish_id}-${idx}` : `dish-${it.dish_id}-${idx}`),
                 dish_id: it.dish_id,
                 title: it.dish_name || 'Dish',
                 quantity: it.quantity,

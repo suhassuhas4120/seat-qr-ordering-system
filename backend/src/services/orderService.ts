@@ -213,7 +213,7 @@ export class OrderService {
     itemId: string,
     newStage: ItemStage,
     staffId?: number,
-    options?: { seatId?: number; orderId?: string }
+    options?: { seatId?: number; orderId?: string; ticketNumber?: string }
   ) {
     let targetOrder: Order | undefined;
     let targetItem: OrderItem | undefined;
@@ -227,6 +227,7 @@ export class OrderService {
     for (const order of db.data.orders) {
       if (options?.seatId && order.seatId !== options.seatId) continue;
       if (options?.orderId && order.id !== options.orderId) continue;
+      if (options?.ticketNumber && order.orderNumber !== options.ticketNumber) continue;
       const found = order.items.find((i) => i.id === strId);
       if (found) {
         targetOrder = order;
@@ -243,6 +244,9 @@ export class OrderService {
       }
       if (options?.orderId) {
         candidateOrders = candidateOrders.filter((o) => o.id === options.orderId);
+      }
+      if (options?.ticketNumber) {
+        candidateOrders = candidateOrders.filter((o) => o.orderNumber === options.ticketNumber);
       }
 
       const matchFn = (i: OrderItem) => (
@@ -427,8 +431,18 @@ export class OrderService {
    * Returns all active kitchen tickets with item-level tracking for KDS.
    */
   async getKdsActiveTickets() {
+    // Reconcile: If all items in an order are served, ensure order overallStage is SERVED
+    for (const order of db.data.orders) {
+      if (order.items && order.items.length > 0 && order.items.every((i) => i.itemStage === 'SERVED')) {
+        if (order.overallStage !== 'SERVED' && order.overallStage !== 'PAID') {
+          order.overallStage = 'SERVED';
+        }
+      }
+    }
+
     const activeOrders = db.data.orders.filter((o) =>
-      ['PLACED', 'PREPARING', 'READY'].includes(o.overallStage)
+      ['PLACED', 'PREPARING', 'READY'].includes(o.overallStage) &&
+      o.items.some((i) => i.itemStage !== 'SERVED')
     );
 
     const seatMap = new Map(db.data.seats.map((s) => [s.id, s]));

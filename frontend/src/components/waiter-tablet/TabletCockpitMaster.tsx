@@ -661,7 +661,7 @@ export const TabletCockpitMaster: React.FC = () => {
 
     realtimeBridge.updateStage(targetKey, 'SERVED', {
       chairId: cleanChair,
-      ticketNumber: activeTicketNumber || undefined,
+      ticketNumber: dish?.ticketNumber || activeTicketNumber || undefined,
       dishId: targetDishId,
       dishName: targetDishName,
       itemId: dish?.orderItemId || (typeof itemIdentifier === 'string' ? itemIdentifier : undefined)

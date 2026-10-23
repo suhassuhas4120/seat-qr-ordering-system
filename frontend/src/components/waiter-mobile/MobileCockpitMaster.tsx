@@ -918,7 +918,7 @@ export const MobileCockpitMaster: React.FC = () => {
     const targetKey = targetDish?.orderItemId || identifier;
     realtimeBridge.updateStage(targetKey, 'SERVED', {
       chairId: cleanChair,
-      ticketNumber: activeTicketNumber || undefined,
+      ticketNumber: targetDish?.ticketNumber || activeTicketNumber || undefined,
       dishId: targetDishId,
       dishName: targetDishName,
       itemId: targetDish?.orderItemId || identifier
