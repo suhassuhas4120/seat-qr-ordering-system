@@ -353,7 +353,7 @@ export const MobileCockpitMaster: React.FC = () => {
         const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
         const targetChair = payload?.order?.chair_id ? payload.order.chair_id.replace(/[^0-9]/g, '').replace(/^0+/, '') : '';
         if (targetChair && cleanCurSeat && targetChair === cleanCurSeat) {
-          syncCartForSeat(cleanCurSeat);
+          syncCartForSeat(cleanCurSeat, true);
         }
       },
       onStageChange: (data) => {
@@ -790,47 +790,42 @@ export const MobileCockpitMaster: React.FC = () => {
 
       setActiveTicketNumber(ticketNum);
 
-      // Immediately mark all newly fired draft items as fired with orderItemId
-      setCartItems((prev) =>
-        prev.map((c) => {
-          if (!c.orderItemId && !c.isFired) {
-            const matchingOrderItem = orderItems.find(
-              (o) =>
-                String(o.dish_id) === String(c.menuItem.id) ||
-                String(o.dish_id).replace(/^dish-/, '') === String(c.menuItem.id).replace(/^dish-/, '') ||
-                o.dish_name.toLowerCase() === c.menuItem.name.toLowerCase()
-            );
-            return {
-              ...c,
-              isFired: true,
-              stage: 'PLACED' as const,
-              orderItemId: matchingOrderItem?.id || `item-${padChair}-${c.menuItem.id}-${timestamp}`,
-              ticketNumber: ticketNum,
-            };
-          }
-          return c;
-        })
-      );
+      // Immediately fetch authoritative tab from server to guarantee exact sync & zero double-counting
+      const details = await realtimeBridge.getOrderForSeat(cleanChair);
 
-      // Instantly synchronize authoritative items from database and clear draft status
-      syncCartForSeat(cleanChair, true);
+      const authoritativeTotal = (details.order?.total_amount && details.order.total_amount > 0)
+        ? details.order.total_amount
+        : batchAmount;
 
-      // Update seat status and cumulative running balance
+      const authoritativeItems = details.items && details.items.length > 0
+        ? details.items
+        : orderItems;
+
+      const authoritativeItemCount = authoritativeItems.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
+
+      // Update seat status and cumulative running balance directly from authoritative tab
       setSeats(prev => prev.map(s => {
         const sClean = s.seatNumber.replace(/[^0-9]/g, '').replace(/^0+/, '');
         if (sClean === normChair) {
-          const prevTotal = s.status === 'occupied' ? (s.runningTotal || 0) : 0;
-          const newTotal = prevTotal + batchAmount;
           return {
             ...s,
             status: 'occupied',
             guestName: selectedGuestName || s.guestName || 'Walk-In Guest',
-            itemCount: (s.itemCount || 0) + unplacedItems.reduce((acc, c) => acc + c.quantity, 0),
-            runningTotal: newTotal,
+            itemCount: authoritativeItemCount,
+            runningTotal: authoritativeTotal,
           };
         }
         return s;
       }));
+
+      setSelectedBillAmount(authoritativeTotal);
+
+      // Instantly set cart items to authoritative server fired items
+      if (details.items && details.items.length > 0) {
+        setCartItems(expandOrderItemsToCart(details.items, details.order?.ticket_number || ticketNum, cleanChair));
+      } else {
+        setCartItems(expandOrderItemsToCart(orderItems, ticketNum, cleanChair));
+      }
 
       showToast(`KOT #${ticketNum} successfully sent to Kitchen printer!`);
       refreshSeats();

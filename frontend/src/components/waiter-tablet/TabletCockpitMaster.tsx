@@ -769,36 +769,35 @@ export const TabletCockpitMaster: React.FC = () => {
       setActiveTicketNumber(ticketNum);
       setDishQuantities({});
 
-      // Mark unplaced items as placed
-      setTicketItems(prev => prev.map(item => {
-        const wasUnplaced = unplacedItems.some(u => u.id === item.id);
-        if (wasUnplaced) {
-          const dishIdFormatted = String(item.id).startsWith('dish-') ? String(item.id) : `dish-${item.id}`;
-          return {
-            ...item,
-            status: 'PLACED',
-            isPunched: true,
-            orderItemId: `item-${padChair}-${dishIdFormatted}-${timestamp}`,
-          };
-        }
-        return item;
-      }));
+      // Immediately fetch authoritative tab from server to guarantee exact sync & zero double-counting
+      const details = await realtimeBridge.getOrderForSeat(cleanChair);
 
-      // Update seat status and cumulative running balance
+      const authoritativeTotal = (details.order?.total_amount && details.order.total_amount > 0)
+        ? details.order.total_amount
+        : batchAmount;
+
+      const authoritativeItems = details.items && details.items.length > 0
+        ? details.items
+        : orderItems;
+
+      const authoritativeItemCount = authoritativeItems.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
+
+      // Update seat status and cumulative running balance directly from authoritative tab
       setSeats(prev => prev.map(s => {
         const sClean = s.seatNumber.replace(/[^0-9]/g, '').replace(/^0+/, '');
         if (sClean === normChair) {
-          const prevTotal = s.status === 'occupied' ? (s.totalAmount || 0) : 0;
-          const newTotal = prevTotal + batchAmount;
           return {
             ...s,
             status: 'occupied',
-            totalAmount: newTotal,
-            orderCount: (s.orderCount || 0) + unplacedItems.reduce((acc, u) => acc + u.quantity, 0),
+            totalAmount: authoritativeTotal,
+            orderCount: authoritativeItemCount,
           };
         }
         return s;
       }));
+
+      // Instantly sync ticket items
+      syncTicketForSeat(cleanChair);
 
       setIsDining(true);
       showToast(`KOT #${ticketNum} fired to kitchen for ${activeSeatNum}`);

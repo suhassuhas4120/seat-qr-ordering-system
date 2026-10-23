@@ -121,18 +121,23 @@ export function ScreenM4BillingPOS({
     });
 
     const list: BillItem[] = [];
+    const seenItemKeys = new Set<string>();
     matchingLive.forEach((lo) => {
       if (lo.items) {
         lo.items.forEach((it, idx) => {
-          list.push({
-            id: it.id || `live-${activeSeat}-${idx}`,
-            name: it.dish_name,
-            price: it.price,
-            qty: it.quantity,
-            seatNumber: isTk ? 'TK-01' : num,
-            stage: it.stage || 'SERVED',
-            isDraft: false,
-          });
+          const itemKey = it.id || `${lo.order.id || lo.order.ticket_number}-${it.dish_id}-${idx}`;
+          if (!seenItemKeys.has(itemKey)) {
+            seenItemKeys.add(itemKey);
+            list.push({
+              id: itemKey,
+              name: it.dish_name,
+              price: it.price,
+              qty: it.quantity,
+              seatNumber: isTk ? 'TK-01' : num,
+              stage: it.stage || 'SERVED',
+              isDraft: false,
+            });
+          }
         });
       }
     });

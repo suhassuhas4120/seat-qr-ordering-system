@@ -3,7 +3,17 @@ import { getSupabaseClient } from './supabaseClient';
 import { getSocket } from './socket';
 import { SOCKET_EVENTS } from '@seat-order/shared';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export function getBackendUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      const proto = window.location.protocol || 'http:';
+      return `${proto}//${host}:4000`;
+    }
+  }
+  return 'http://localhost:4000';
+}
 
 export interface OrderItemRecord {
   id?: string;
@@ -173,8 +183,9 @@ function initSocketBridge() {
     socket.on(SOCKET_EVENTS.ORDER_PLACED, (payload: any) => {
       const order = payload.order;
       if (!order) return;
-      if (processedOrderIds.has(order.id)) return;
+      if (processedOrderIds.has(order.id) || (order.orderNumber && processedOrderIds.has(order.orderNumber))) return;
       processedOrderIds.add(order.id);
+      if (order.orderNumber) processedOrderIds.add(order.orderNumber);
 
       const chairId = String(order.seatId || payload.seat?.id || '01');
       const orderRec: OrderRecord = {
@@ -204,8 +215,9 @@ function initSocketBridge() {
         { order: orderRec, items: orderRec.items || [] },
         ...currentLocals.filter((x) => {
           if (x.order.id === order.id) return false;
+          if (order.orderNumber && x.order.ticket_number === order.orderNumber) return false;
           const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
-          if (xChair === cleanTargetChair && String(x.order.ticket_number).startsWith('TK-')) {
+          if (xChair === cleanTargetChair) {
             return false;
           }
           return true;
@@ -636,7 +648,7 @@ export const realtimeBridge = {
           quantity: it.quantity,
           notes: it.notes || undefined,
         }));
-        const res = await fetch(`${BACKEND_URL}/api/orders`, {
+        const res = await fetch(`${getBackendUrl()}/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -650,8 +662,11 @@ export const realtimeBridge = {
           if (resData?.order) {
             backendOrderId = resData.order.id;
             backendTicketNumber = resData.order.orderNumber;
+            processedOrderIds.add(backendOrderId);
+            if (backendTicketNumber) processedOrderIds.add(backendTicketNumber);
           }
         }
+        processedOrderIds.add(generatedId);
       } catch (e) {
         console.warn('Backend order placement warning:', e);
       }
@@ -718,14 +733,11 @@ export const realtimeBridge = {
         }
       }
 
-      // 5. Purge any temporary client-draft orders or phantom TK- tickets for this chair
+      // 5. Purge any temporary client-draft orders or phantom tickets for this chair
       const currentLocals = getLocalOrdersList();
       const filteredLocals = currentLocals.filter((x) => {
         const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
-        if (xChair === cleanChair) {
-          if (String(x.order.id).startsWith('ord-') || String(x.order.id).startsWith('local-')) return false;
-          if (String(x.order.ticket_number).startsWith('TK-')) return false;
-        }
+        if (xChair === cleanChair) return false;
         return x.order.id !== backendOrderId && x.order.id !== generatedId;
       });
 
@@ -1091,7 +1103,7 @@ export const realtimeBridge = {
           SERVED: 'SERVED',
         };
         const chairNum = meta?.chairId ? parseInt(meta.chairId.replace(/[^0-9]/g, ''), 10) : undefined;
-        fetch(`${BACKEND_URL}/api/orders/items/${targetItemId || itemIdOrKey}/stage`, {
+        fetch(`${getBackendUrl()}/api/orders/items/${targetItemId || itemIdOrKey}/stage`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1241,7 +1253,7 @@ export const realtimeBridge = {
       // Fastify backend sync for 86 out-of-stock
       try {
         const numId = Number(cleanId) || 1;
-        fetch(`${BACKEND_URL}/api/menu/items/${numId}/availability`, {
+        fetch(`${getBackendUrl()}/api/menu/items/${numId}/availability`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isAvailable }),
@@ -1335,9 +1347,12 @@ export const realtimeBridge = {
             ? remoteOrders.filter((ro) => !String(ro.order.ticket_number).startsWith('TK-'))
             : remoteOrders;
 
+          const remoteChairs = new Set(cleanedRemoteOrders.map((ro) => (ro.order.chair_id || '').replace(/[^0-9]/g, '')));
           const remoteTickets = new Set(cleanedRemoteOrders.map((ro) => ro.order.ticket_number));
           const remoteOrderIds = new Set(cleanedRemoteOrders.map((ro) => ro.order.id));
           const validLocalOrders = localOrders.filter((lo) => {
+            const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+            if (remoteChairs.has(loChair)) return false;
             if (!lo.order?.id || !lo.order?.ticket_number) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
             if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
@@ -1361,7 +1376,7 @@ export const realtimeBridge = {
       try {
         let backendSource: any[] = [];
         try {
-          const activeRes = await fetch(`${BACKEND_URL}/api/orders/active`);
+          const activeRes = await fetch(`${getBackendUrl()}/api/orders/active`);
           if (activeRes.ok) {
             const data = await activeRes.json();
             if (Array.isArray(data)) backendSource = data;
@@ -1370,7 +1385,7 @@ export const realtimeBridge = {
 
         if (backendSource.length === 0) {
           try {
-            const ticketsRes = await fetch(`${BACKEND_URL}/api/kds/tickets`);
+            const ticketsRes = await fetch(`${getBackendUrl()}/api/kds/tickets`);
             if (ticketsRes.ok) {
               const data = await ticketsRes.json();
               if (Array.isArray(data)) backendSource = data;
@@ -1422,11 +1437,9 @@ export const realtimeBridge = {
 
           const pendingLocals = localOrders.filter((lo) => {
             const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+            if (backendChairs.has(loChair)) return false;
             if (backendIds.has(lo.order.id) || backendTickets.has(lo.order.ticket_number)) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
-            if (backendChairs.has(loChair) && (String(lo.order.id).startsWith('ord-') || String(lo.order.id).startsWith('local-') || String(lo.order.ticket_number).startsWith('TK-'))) {
-              return false;
-            }
             return true;
           });
           const combined = [...backendOrders, ...pendingLocals];
@@ -1758,7 +1771,7 @@ export const realtimeBridge = {
     // Notify Fastify backend of payment settlement
     try {
       const cleanSeatId = Number(cleanChair) || 1;
-      fetch(`${BACKEND_URL}/api/payments/process`, {
+      fetch(`${getBackendUrl()}/api/payments/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2039,7 +2052,7 @@ export const realtimeBridge = {
 
     // 1. Authoritative Seat Tab directly from Fastify backend (Single Source of Truth)
     try {
-      const tabRes = await fetch(`${BACKEND_URL}/api/seats/${cleanId || '1'}/tab`)
+      const tabRes = await fetch(`${getBackendUrl()}/api/seats/${cleanId || '1'}/tab`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
 

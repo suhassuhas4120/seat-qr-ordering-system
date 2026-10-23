@@ -164,9 +164,16 @@ export default function CustomerCartPage() {
       // Immediately synchronize authoritative active seat tab from server to guarantee exact totals & tickets
       const tab = await realtimeBridge.getOrderForSeat(cleanChair || chairId);
       const authoritativeTicket = tab.order?.ticket_number || confirmedTicket;
-      const authoritativeTotal = tab.order?.total_amount && tab.order.total_amount > 0
+      let computedFromTab = 0;
+      if (tab.items && tab.items.length > 0) {
+        const sub = tab.items.reduce((acc, it) => acc + (it.price * (it.quantity || 1)), 0);
+        computedFromTab = sub + Math.round(sub * 0.05);
+      }
+      const authoritativeTotal = (tab.order?.total_amount && tab.order.total_amount > 0)
         ? tab.order.total_amount
-        : ((isSameSession && existingSession.totalAmount ? existingSession.totalAmount : 0) + grandTotal);
+        : (computedFromTab > 0
+            ? computedFromTab
+            : ((isSameSession && existingSession.totalAmount ? existingSession.totalAmount : 0) + grandTotal));
 
       const authoritativeItems = tab.items && tab.items.length > 0
         ? tab.items.map((it) => ({
