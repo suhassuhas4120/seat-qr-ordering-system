@@ -321,6 +321,31 @@ export const MobileCockpitMaster: React.FC = () => {
     refreshSeats();
     refreshAlerts();
 
+    const backgroundSyncTimer = setInterval(() => {
+      refreshSeats();
+      refreshAlerts();
+      const curSeat = selectedSeatRef.current || '';
+      const cleanCurSeat = curSeat.replace(/[^0-9]/g, '');
+      if (cleanCurSeat) {
+        syncCartForSeat(cleanCurSeat);
+      }
+    }, 3500);
+
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshSeats();
+        refreshAlerts();
+        const curSeat = selectedSeatRef.current || '';
+        const cleanCurSeat = curSeat.replace(/[^0-9]/g, '');
+        if (cleanCurSeat) {
+          syncCartForSeat(cleanCurSeat);
+        }
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
+
     const unsub = realtimeBridge.subscribeKDS({
       onNewOrder: (payload) => {
         refreshSeats();
@@ -465,11 +490,13 @@ export const MobileCockpitMaster: React.FC = () => {
     return () => {
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisibility);
+        document.removeEventListener('visibilitychange', handleVisibility);
       }
+      clearInterval(backgroundSyncTimer);
       clearInterval(pollInterval);
       unsub();
     };
-  }, [refreshSeats, refreshAlerts]);
+  }, [refreshSeats, refreshAlerts, syncCartForSeat]);
 
   // Persist navigation and auth state to survive browser refresh
   useEffect(() => {

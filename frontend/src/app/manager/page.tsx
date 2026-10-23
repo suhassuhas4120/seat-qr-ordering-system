@@ -79,6 +79,17 @@ export default function ManagerPortalPage() {
   useEffect(() => {
     refreshLiveState();
 
+    const intervalTimer = setInterval(refreshLiveState, 3500);
+
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshLiveState();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
+
     const unsubscribe = realtimeBridge.subscribeKDS({
       onNewOrder: () => refreshLiveState(),
       onStageChange: () => refreshLiveState(),
@@ -96,6 +107,10 @@ export default function ManagerPortalPage() {
     });
 
     return () => {
+      clearInterval(intervalTimer);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, []);

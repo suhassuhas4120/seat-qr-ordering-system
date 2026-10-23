@@ -891,14 +891,16 @@ export const realtimeBridge = {
       orders.forEach((o) => {
         const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
         const isTargetChair = !cleanChair || oChair === cleanChair || o.order.chair_id === meta?.chairId;
-        const isTargetTicket = !tNum || o.order.ticket_number === tNum;
+        const isTargetTicket = !tNum || o.order.ticket_number === tNum || tNum.includes(o.order.ticket_number || '');
         if (isTargetChair && isTargetTicket) {
           o.items.forEach((it) => {
             const matches =
               Boolean(targetItemId && it.id && it.id === targetItemId) ||
               Boolean(itemIdOrKey && it.id && it.id === itemIdOrKey) ||
               Boolean(cleanTargetId && it.id && it.id === cleanTargetId) ||
-              Boolean(cleanKey && it.id && it.id === cleanKey);
+              Boolean(cleanKey && it.id && it.id === cleanKey) ||
+              Boolean(meta?.dishId && ((it.dish_id === meta.dishId) || (meta.dishId.replace(/^dish-/, '') === (it.dish_id || '').replace(/^dish-/, '')))) ||
+              Boolean(meta?.dishName && it.dish_name?.toLowerCase().trim() === meta.dishName.toLowerCase().trim());
 
             if (matches) {
               it.stage = stage;
@@ -972,7 +974,7 @@ export const realtimeBridge = {
 
           if (activeOrdersList && activeOrdersList.length > 0) {
             const filteredOrders = meta.ticketNumber
-              ? activeOrdersList.filter((o) => o.ticket_number === meta.ticketNumber)
+              ? activeOrdersList.filter((o) => o.ticket_number === meta.ticketNumber || meta.ticketNumber.includes(o.ticket_number))
               : activeOrdersList;
             const targetIds = (filteredOrders.length > 0 ? filteredOrders : activeOrdersList).map((o) => o.id);
             if (targetIds.length > 0) {
@@ -1254,12 +1256,7 @@ export const realtimeBridge = {
           .in('status', ['pending', 'in_progress', 'ready'])
           .order('created_at', { ascending: false });
 
-        if (!oErr && orders) {
-          if (orders.length === 0) {
-            setLocalOrdersList([]);
-            return [];
-          }
-
+        if (!oErr && orders && orders.length > 0) {
           const orderIds = orders.map((o) => o.id);
           const { data: items } = await supabase
             .from('order_items')
@@ -1298,10 +1295,8 @@ export const realtimeBridge = {
           const validLocalOrders = localOrders.filter((lo) => {
             if (!lo.order?.id || !lo.order?.ticket_number) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
-            // Do not merge if remote database already contains this ticket or order
             if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
-            const isLocalTemp = String(lo.order.id).startsWith('local-');
-            return isLocalTemp;
+            return true;
           });
           const merged = [
             ...remoteOrders,

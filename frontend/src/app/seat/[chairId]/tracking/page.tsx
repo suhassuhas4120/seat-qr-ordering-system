@@ -168,10 +168,10 @@ export default function LiveOrderTrackingPage() {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
-    // Light 30-second fallback poll to preserve socket health without network flooding
+    // Light 5-second fallback poll to preserve socket health and guarantee live updates
     const fallbackInterval = setInterval(() => {
       syncLatestStages();
-    }, 30000);
+    }, 5000);
 
     const unsubscribe = realtimeBridge.subscribeKDS({
       onNewOrder: (data) => {
@@ -201,16 +201,28 @@ export default function LiveOrderTrackingPage() {
               nextStages[`${tNum}-${cleanId}`] = stage;
             }
           }
+          if (data.dishId) {
+            const cleanDish = String(data.dishId).replace(/^dish-/, '');
+            nextStages[data.dishId] = stage;
+            nextStages[`dish-${cleanDish}`] = stage;
+            nextStages[cleanDish] = stage;
+          }
           return nextStages;
         });
 
         // Update active session items stage immediately
         setSession((prev) => {
           if (!prev || !prev.items) return prev;
-          if (!data.itemId) return prev;
-          const cleanTargetId = data.itemId.replace(/-[0-9]+$/, '');
+          const cleanTargetId = data.itemId ? data.itemId.replace(/-[0-9]+$/, '') : '';
+          const targetDishClean = data.dishId ? String(data.dishId).replace(/^dish-/, '') : '';
           const updatedItems = prev.items.map((it) => {
-            if (it.id === data.itemId || it.id === cleanTargetId) {
+            const itCleanDish = (it.dish_id || '').replace(/^dish-/, '');
+            const matches =
+              Boolean(data.itemId && (it.id === data.itemId || it.id === cleanTargetId)) ||
+              Boolean(targetDishClean && (it.dish_id === data.dishId || itCleanDish === targetDishClean)) ||
+              Boolean(data.dishName && it.title?.toLowerCase().trim() === data.dishName.toLowerCase().trim());
+
+            if (matches) {
               const addons = Array.isArray(it.addons) ? [...it.addons] : [];
               if (data.stage === 'SERVED' && !addons.includes('SERVED')) {
                 addons.push('SERVED');
@@ -409,7 +421,7 @@ export default function LiveOrderTrackingPage() {
                   </h2>
                 </div>
                 <p className="text-xs text-[#5A6860] truncate">
-                  Ticket #{session?.ticketNumber} • {trackingDishes.length} {trackingDishes.length === 1 ? 'Dish' : 'Dishes'} in Kitchen Pass
+                  Ticket #{session?.ticketNumber} • {trackingDishes.reduce((acc, d) => acc + (d.quantity || 1), 0)} Items in Kitchen Pass
                 </p>
               </div>
 

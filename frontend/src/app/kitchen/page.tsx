@@ -1077,7 +1077,7 @@ export default function KitchenDisplaySystemPage() {
                             </span>
                             <span className="text-[10px] font-mono font-bold text-zinc-500">
                               {round.items.reduce((acc, it) => acc + it.quantity, 0)}{' '}
-                              {round.items.reduce((acc, it) => acc + it.quantity, 0) === 1 ? 'dish' : 'dishes'}
+                              {round.items.reduce((acc, it) => acc + it.quantity, 0) === 1 ? 'item' : 'items'}
                             </span>
                           </div>
 

@@ -392,11 +392,16 @@ export const TabletCockpitMaster: React.FC = () => {
       }
     });
 
-    // Background visibility listener for instant sync without aggressive polling
+    // Background visibility listener for instant sync
     const onVisibility = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         refreshSeats();
         refreshAlerts();
+        const curSeat = (activeSeatNameRef.current || '').split(':')[0].trim();
+        const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (cleanCurSeat) {
+          syncTicketForSeat(cleanCurSeat);
+        }
       }
     };
     if (typeof document !== 'undefined') {
@@ -406,7 +411,12 @@ export const TabletCockpitMaster: React.FC = () => {
     const pollInterval = setInterval(() => {
       refreshSeats();
       refreshAlerts();
-    }, 30000);
+      const curSeat = (activeSeatNameRef.current || '').split(':')[0].trim();
+      const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
+      if (cleanCurSeat) {
+        syncTicketForSeat(cleanCurSeat);
+      }
+    }, 3500);
 
     return () => {
       if (typeof document !== 'undefined') {
@@ -415,7 +425,7 @@ export const TabletCockpitMaster: React.FC = () => {
       clearInterval(pollInterval);
       unsub();
     };
-  }, [refreshSeats, refreshAlerts]);
+  }, [refreshSeats, refreshAlerts, syncTicketForSeat]);
 
   // Persist tablet navigation and seat state across browser reloads
   useEffect(() => {

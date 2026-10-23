@@ -112,25 +112,23 @@ export default function KitchenDisplayPage() {
     }
   };
 
-  // Bump individual dish stage sequentially
+  // Bump individual dish stage sequentially (Kitchen workflow: RECEIVED -> PREPARING -> READY)
   const handleBumpItem = async (itemId: string, currentStage: string) => {
     let nextStage: string = 'COOKING';
     if (currentStage === 'QUEUED') nextStage = 'COOKING';
     else if (currentStage === 'COOKING') nextStage = 'READY';
-    else if (currentStage === 'READY') nextStage = 'SERVED';
-    else if (currentStage === 'SERVED') nextStage = 'QUEUED';
+    else if (currentStage === 'READY') nextStage = 'READY';
 
     await handleSetItemStage(itemId, nextStage);
   };
 
   // Bump entire order
   const handleBumpAll = async (order: any) => {
-    const unservedItems = order.items.filter((i: any) => i.itemStage !== 'SERVED');
+    const unservedItems = order.items.filter((i: any) => i.itemStage !== 'READY' && i.itemStage !== 'SERVED');
     for (const item of unservedItems) {
       let next = 'COOKING';
       if (item.itemStage === 'QUEUED') next = 'COOKING';
       else if (item.itemStage === 'COOKING') next = 'READY';
-      else if (item.itemStage === 'READY') next = 'SERVED';
 
       await fetchApi(`/api/orders/items/${item.id}/stage`, {
         method: 'PATCH',
@@ -252,7 +250,7 @@ export default function KitchenDisplayPage() {
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black ${
                 viewMode === 'ITEMS' ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'
               }`}>
-                {allDishes.length}
+                {allDishes.reduce((acc, d: any) => acc + (d.quantity || 1), 0)} Items
               </span>
             </button>
             <button
@@ -296,12 +294,12 @@ export default function KitchenDisplayPage() {
       {/* VIEW 1: 3-COLUMN KANBAN */}
       {viewMode === 'KANBAN' && (
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 overflow-x-auto">
-          {/* COLUMN 1: INCOMING (PLACED) */}
+          {/* COLUMN 1: RECEIVED */}
           <div className="bg-slate-950/60 rounded-2xl border border-blue-500/30 p-3 flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-blue-500/20">
               <span className="text-xs font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="w-4 h-4" />
-                <span>1. Incoming / Placed ({incomingOrders.reduce((acc, o) => acc + o.items.length, 0)} dishes)</span>
+                <span>1. Received ({incomingOrders.reduce((acc, o) => acc + o.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0), 0)} Items)</span>
               </span>
             </div>
 
@@ -315,7 +313,7 @@ export default function KitchenDisplayPage() {
                     order={order}
                     borderColor="border-blue-500/40 hover:border-blue-500"
                     headerBg="bg-blue-500/10 text-blue-300"
-                    actionText="Start Cooking"
+                    actionText="Start Preparing"
                     actionColor="bg-blue-600 hover:bg-blue-500 text-white font-bold"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
@@ -326,12 +324,12 @@ export default function KitchenDisplayPage() {
             </div>
           </div>
 
-          {/* COLUMN 2: COOKING (IN PREP) */}
+          {/* COLUMN 2: PREPARING */}
           <div className="bg-slate-950/60 rounded-2xl border border-amber-500/30 p-3 flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
               <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <ChefHat className="w-4 h-4" />
-                <span>2. Cooking in Kitchen ({cookingOrders.reduce((acc, o) => acc + o.items.length, 0)} dishes)</span>
+                <span>2. Preparing ({cookingOrders.reduce((acc, o) => acc + o.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0), 0)} Items)</span>
               </span>
             </div>
 
@@ -356,12 +354,12 @@ export default function KitchenDisplayPage() {
             </div>
           </div>
 
-          {/* COLUMN 3: READY FOR PICKUP */}
+          {/* COLUMN 3: READY */}
           <div className="bg-slate-950/60 rounded-2xl border border-emerald-500/30 p-3 flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-emerald-500/20">
               <span className="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4" />
-                <span>3. Ready for Pickup ({readyOrders.reduce((acc, o) => acc + o.items.length, 0)} dishes)</span>
+                <span>3. Ready ({readyOrders.reduce((acc, o) => acc + o.items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0), 0)} Items)</span>
               </span>
             </div>
 
@@ -375,11 +373,11 @@ export default function KitchenDisplayPage() {
                     order={order}
                     borderColor="border-emerald-500/40 hover:border-emerald-500"
                     headerBg="bg-emerald-500/10 text-emerald-300"
-                    actionText="Deliver / Served"
-                    actionColor="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
+                    actionText="Ready for Pickup"
+                    actionColor="bg-emerald-500/80 text-slate-950 font-bold cursor-default"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
-                    onBumpAll={() => handleBumpAll(order)}
+                    onBumpAll={() => {}}
                   />
                 ))
               )}
@@ -403,24 +401,29 @@ export default function KitchenDisplayPage() {
               </p>
             </div>
 
-            {/* Filter Pills */}
+            {/* Filter Pills: Received, Preparing, Ready */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {(['ALL', 'QUEUED', 'COOKING', 'READY', 'SERVED'] as const).map((filter) => {
-                const count = filter === 'ALL'
-                  ? allDishes.length
-                  : allDishes.filter((d) => d.itemStage === filter).length;
-                const isSelected = itemFilter === filter;
+              {[
+                { key: 'ALL', label: 'ALL' },
+                { key: 'QUEUED', label: 'RECEIVED' },
+                { key: 'COOKING', label: 'PREPARING' },
+                { key: 'READY', label: 'READY' },
+              ].map((filter) => {
+                const count = filter.key === 'ALL'
+                  ? allDishes.reduce((acc, d: any) => acc + (d.quantity || 1), 0)
+                  : allDishes.filter((d: any) => d.itemStage === filter.key).reduce((acc, d: any) => acc + (d.quantity || 1), 0);
+                const isSelected = itemFilter === filter.key;
                 return (
                   <button
-                    key={filter}
-                    onClick={() => setItemFilter(filter)}
+                    key={filter.key}
+                    onClick={() => setItemFilter(filter.key as any)}
                     className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
                       isSelected
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow'
                         : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                     }`}
                   >
-                    {filter} ({count})
+                    {filter.label} ({count} Items)
                   </button>
                 );
               })}
@@ -595,14 +598,13 @@ function TicketCard({
                 }`}
                 title="Select dish status directly"
               >
-                <option value="QUEUED" className="bg-slate-900 text-blue-300">QUEUED</option>
-                <option value="COOKING" className="bg-slate-900 text-amber-300">COOKING</option>
+                <option value="QUEUED" className="bg-slate-900 text-blue-300">RECEIVED</option>
+                <option value="COOKING" className="bg-slate-900 text-amber-300">PREPARING</option>
                 <option value="READY" className="bg-slate-900 text-emerald-300">READY</option>
-                <option value="SERVED" className="bg-slate-900 text-purple-300">SERVED</option>
               </select>
 
               {/* 1-Tap Quick Advance Action */}
-              {item.itemStage !== 'SERVED' && (
+              {item.itemStage !== 'READY' && item.itemStage !== 'SERVED' && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -612,13 +614,11 @@ function TicketCard({
                   className={`px-2 py-1 rounded text-[10px] font-bold border transition-all active:scale-95 ${
                     item.itemStage === 'QUEUED'
                       ? 'bg-blue-600/30 text-blue-200 border-blue-500/50 hover:bg-blue-600/60'
-                      : item.itemStage === 'COOKING'
-                      ? 'bg-amber-500/30 text-amber-200 border-amber-400/50 hover:bg-amber-500/60'
-                      : 'bg-emerald-600/30 text-emerald-200 border-emerald-400/50 hover:bg-emerald-600/60'
+                      : 'bg-amber-500/30 text-amber-200 border-amber-400/50 hover:bg-amber-500/60'
                   }`}
-                  title="Advance dish stage"
+                  title="Advance item stage"
                 >
-                  {item.itemStage === 'QUEUED' ? '▶ Cook' : item.itemStage === 'COOKING' ? '✓ Ready' : '🍽 Serve'}
+                  {item.itemStage === 'QUEUED' ? '▶ Prepare' : '✓ Mark Ready'}
                 </button>
               )}
             </div>
@@ -631,7 +631,7 @@ function TicketCard({
         onClick={onBumpAll}
         className={`w-full py-2 rounded-lg text-xs tracking-wider uppercase transition-all ${actionColor}`}
       >
-        {actionText} ({order.items.length} {order.items.length === 1 ? 'Dish' : 'Dishes'}) →
+        {actionText} ({order.items.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0)} Items) →
       </button>
     </div>
   );
@@ -685,13 +685,17 @@ function SingleDishCard({
         )}
       </div>
 
-      {/* Explicit 4-Stage Single Item Selector */}
+      {/* Explicit 3-Stage Single Item Selector for Kitchen: RECEIVED, PREPARING, READY */}
       <div className="pt-2 border-t border-slate-800/80">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-          Select Dish Status:
+          Select Item Status:
         </span>
-        <div className="grid grid-cols-4 gap-1.5">
-          {(['QUEUED', 'COOKING', 'READY', 'SERVED'] as const).map((s) => {
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { key: 'QUEUED', label: 'RECEIVED' },
+            { key: 'COOKING', label: 'PREPARING' },
+            { key: 'READY', label: 'READY' },
+          ].map(({ key: s, label }) => {
             const isSelected = stage === s;
             return (
               <button
@@ -704,13 +708,11 @@ function SingleDishCard({
                       ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
                       : s === 'COOKING'
                       ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-sm'
-                      : s === 'READY'
-                      ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-sm'
-                      : 'bg-purple-600 text-white border-purple-400 shadow-sm'
+                      : 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-sm'
                     : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                 }`}
               >
-                {s}
+                {label}
               </button>
             );
           })}
