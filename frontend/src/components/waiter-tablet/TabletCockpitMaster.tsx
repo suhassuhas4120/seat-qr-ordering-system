@@ -291,13 +291,20 @@ export const TabletCockpitMaster: React.FC = () => {
           data.stage === 'SERVED' ? 'SERVED' : 'PLACED';
 
         setTicketItems(prev => {
-          if (!data.itemId) return prev;
-          const isSpecificUnit = /-[0-9]+$/.test(data.itemId);
           return prev.map(item => {
-            const matches = isSpecificUnit
-              ? String(item.orderItemId) === String(data.itemId)
-              : (String(item.orderItemId) === String(data.itemId) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId));
-            return matches ? { ...item, status: nextStatus } : item;
+            const targetDishId = data.dishId ? String(data.dishId).replace(/^dish-/, '') : '';
+            const itemDishId = String(item.id || '').replace(/^dish-/, '');
+            const targetName = (data.dishName || '').toLowerCase().trim();
+            const itemName = (item.name || '').toLowerCase().trim();
+
+            const isMatch = Boolean(
+              (data.itemId && (String(item.orderItemId) === String(data.itemId) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId))) ||
+              (data.originalKey && (String(item.orderItemId) === String(data.originalKey) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.originalKey))) ||
+              (targetDishId && itemDishId && targetDishId === itemDishId) ||
+              (targetName && itemName && (targetName === itemName || targetName.includes(itemName) || itemName.includes(targetName)))
+            );
+
+            return isMatch ? { ...item, status: nextStatus } : item;
           });
         });
       },

@@ -137,7 +137,7 @@ function setLocalOrdersList(list: { order: OrderRecord; items: OrderItemRecord[]
 
 export type KDSCallbacks = {
   onNewOrder?: (data: { order: OrderRecord; items: OrderItemRecord[] }) => void;
-  onStageChange?: (data: { key: string; stage: 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'; dishId?: string; chairId?: string; rawChairId?: string; normChairId?: string; paddedChairId?: string; ticketNumber?: string; dishName?: string; itemId?: string; itemIndex?: number }) => void;
+  onStageChange?: (data: { key: string; stage: 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'; dishId?: string; chairId?: string; rawChairId?: string; normChairId?: string; paddedChairId?: string; ticketNumber?: string; dishName?: string; itemId?: string; itemIndex?: number; originalKey?: string }) => void;
   onTicketDispatched?: (data: { ticketNumber: string; chairId?: string }) => void;
   onAvailabilityChange?: (data: { dishId: string; isAvailable: boolean }) => void;
   onSeatOccupancyChange?: (data: { chairId: string; isOccupied: boolean }) => void;
@@ -221,12 +221,49 @@ function initSocketBridge() {
       const stage = stageMap[payload.newStage] || 'PLACED';
       const chairId = String(payload.seatId);
 
+      // Instantly update in-memory orders list
+      try {
+        const orders = getLocalOrdersList();
+        const cleanChair = chairId.replace(/[^0-9]/g, '');
+        const strItemId = String(payload.itemId);
+        const strOrigKey = payload.originalKey ? String(payload.originalKey) : '';
+        const cleanItemId = strItemId.replace(/-[0-9]+$/, '');
+        const cleanOrigKey = strOrigKey.replace(/-[0-9]+$/, '');
+
+        orders.forEach((o) => {
+          const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
+          if (!cleanChair || oChair === cleanChair) {
+            o.items.forEach((it) => {
+              const matches =
+                it.id === strItemId ||
+                it.id === cleanItemId ||
+                it.id === strOrigKey ||
+                it.id === cleanOrigKey ||
+                (payload.dishId && (it.dish_id === payload.dishId || (it.dish_id || '').replace(/^dish-/, '') === payload.dishId.replace(/^dish-/, ''))) ||
+                (payload.dishName && it.dish_name?.toLowerCase().trim() === payload.dishName.toLowerCase().trim());
+              if (matches) {
+                it.stage = stage;
+                if (stage === 'SERVED') {
+                  const addons = Array.isArray(it.addons) ? [...it.addons] : [];
+                  if (!addons.includes('SERVED')) addons.push('SERVED');
+                  it.addons = addons;
+                }
+              }
+            });
+          }
+        });
+        setLocalOrdersList(orders);
+      } catch {}
+
       activeKdsSubscribers.forEach((cb) => {
         cb.onStageChange?.({
           key: payload.itemId,
           stage,
           chairId,
           itemId: payload.itemId,
+          dishId: payload.dishId,
+          dishName: payload.dishName,
+          originalKey: payload.originalKey,
         });
       });
     });
@@ -1064,12 +1101,14 @@ export const realtimeBridge = {
           READY: 'READY',
           SERVED: 'SERVED',
         };
+        const chairNum = meta?.chairId ? parseInt(meta.chairId.replace(/[^0-9]/g, ''), 10) : undefined;
         fetch(`${BACKEND_URL}/api/orders/items/${targetItemId || itemIdOrKey}/stage`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             newStage: stageToBackend[stage] || 'COOKING',
             staffId: 3,
+            seatId: chairNum && !isNaN(chairNum) ? chairNum : undefined,
           }),
         }).catch(() => {});
       } catch {}
@@ -1322,19 +1361,37 @@ export const realtimeBridge = {
         }
       }
 
-      // Live Cloud Backend Sync (Fetch authoritative orders from Fastify /api/kds/tickets)
+      // Live Cloud Backend Sync (Fetch authoritative floor orders or KDS tickets from Fastify)
       try {
-        const ticketsRes = await fetch(`${BACKEND_URL}/api/kds/tickets`).then((r) => r.json());
-        if (Array.isArray(ticketsRes) && ticketsRes.length > 0) {
-          const backendOrders = ticketsRes.map((t: any) => {
+        let backendSource: any[] = [];
+        try {
+          const activeRes = await fetch(`${BACKEND_URL}/api/orders/active`);
+          if (activeRes.ok) {
+            const data = await activeRes.json();
+            if (Array.isArray(data)) backendSource = data;
+          }
+        } catch {}
+
+        if (backendSource.length === 0) {
+          try {
+            const ticketsRes = await fetch(`${BACKEND_URL}/api/kds/tickets`);
+            if (ticketsRes.ok) {
+              const data = await ticketsRes.json();
+              if (Array.isArray(data)) backendSource = data;
+            }
+          } catch {}
+        }
+
+        if (backendSource.length > 0) {
+          const backendOrders = backendSource.map((t: any) => {
             const chairId = String(t.seatId || (t.seatNumber ? t.seatNumber.replace(/[^0-9]/g, '') : '14'));
             return {
               order: {
                 id: t.id,
                 ticket_number: t.orderNumber,
                 chair_id: chairId,
-                seat_label: `SEAT ${chairId}`,
-                status: t.overallStage === 'SERVED' ? 'completed' : 'pending',
+                seat_label: `SEAT ${chairId.padStart(2, '0')}`,
+                status: t.overallStage === 'PAID' ? 'completed' : 'pending',
                 total_amount: t.totalAmount || 0,
               } as OrderRecord,
               items: (t.items || []).map((it: any) => {
@@ -1343,13 +1400,13 @@ export const realtimeBridge = {
                 const localItem = localOrder?.items?.find((li) => li.id === it.id || (li.dish_id && `dish-${it.menuItemId}` === li.dish_id) || li.dish_name?.toLowerCase().trim() === it.nameSnapshot?.toLowerCase().trim());
                 const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
                 const effectiveStage = isLocallyServed ? 'SERVED' : initialStage;
-                const addonsList = isLocallyServed ? ['SERVED'] : (Array.isArray(it.addons) ? it.addons : []);
+                const addonsList = effectiveStage === 'SERVED' ? ['SERVED'] : (Array.isArray(it.addons) ? it.addons : []);
 
                 return {
                   id: it.id,
                   order_id: t.id,
                   chair_id: chairId,
-                  seat_label: `SEAT ${chairId}`,
+                  seat_label: `SEAT ${chairId.padStart(2, '0')}`,
                   dish_id: `dish-${it.menuItemId}`,
                   dish_name: it.nameSnapshot,
                   quantity: it.quantity,
@@ -1361,8 +1418,17 @@ export const realtimeBridge = {
               }) as OrderItemRecord[],
             };
           });
-          setLocalOrdersList(backendOrders);
-          return backendOrders;
+
+          // Merge backend orders with any local orders not yet on backend
+          const backendIds = new Set(backendOrders.map((bo) => bo.order.id));
+          const backendTickets = new Set(backendOrders.map((bo) => bo.order.ticket_number));
+          const pendingLocals = localOrders.filter(
+            (lo) => !backendIds.has(lo.order.id) && !backendTickets.has(lo.order.ticket_number) && lo.order.status !== 'completed' && lo.order.status !== 'cancelled'
+          );
+          const combined = [...backendOrders, ...pendingLocals];
+
+          setLocalOrdersList(combined);
+          return combined;
         }
       } catch {}
 
@@ -2013,6 +2079,63 @@ export const realtimeBridge = {
         items: allItems,
       };
     }
+
+    // 2. Authoritative Seat Tab Fallback (directly query active seat tab from backend)
+    try {
+      const tabRes = await fetch(`${BACKEND_URL}/api/seats/${cleanId || '1'}/tab`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+
+      if (
+        tabRes &&
+        tabRes.session?.status === 'ACTIVE' &&
+        Array.isArray(tabRes.orders) &&
+        tabRes.orders.length > 0
+      ) {
+        const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
+          QUEUED: 'PLACED',
+          COOKING: 'PREP',
+          READY: 'READY',
+          SERVED: 'SERVED',
+        };
+
+        const allItems: OrderItemRecord[] = (tabRes.allItems || []).map((it: any, idx: number) => {
+          const effStage = stageMap[it.itemStage] || 'PLACED';
+          return {
+            id: it.id || `dish-${it.menuItemId}-${idx}`,
+            order_id: it.orderId,
+            chair_id: padded,
+            seat_label: `SEAT ${padded}`,
+            dish_id: `dish-${it.menuItemId}`,
+            dish_name: it.nameSnapshot,
+            quantity: it.quantity || 1,
+            price: it.priceSnapshot || 0,
+            stage: effStage,
+            notes: it.notes || '',
+            addons: effStage === 'SERVED' ? ['SERVED'] : [],
+          };
+        });
+
+        const allTickets = Array.from(
+          new Set(tabRes.orders.map((o: any) => o.orderNumber).filter(Boolean))
+        ).join(' • ');
+
+        const latestOrder = tabRes.orders[tabRes.orders.length - 1];
+
+        return {
+          order: {
+            id: latestOrder?.id || `ord-${cleanId}`,
+            ticket_number: allTickets || latestOrder?.orderNumber || `ORD-${cleanId}`,
+            chair_id: padded,
+            seat_label: `SEAT ${padded}`,
+            status: tabRes.orders.every((o: any) => o.overallStage === 'PAID') ? 'completed' : 'pending',
+            total_amount: tabRes.total || 0,
+          } as OrderRecord,
+          items: allItems,
+        };
+      }
+    } catch {}
+
     return { order: null, items: [] };
   },
 

@@ -25,6 +25,7 @@ export const UpdateItemStageInputSchema = z.object({
   itemId: z.string().min(1),
   newStage: z.enum(['QUEUED', 'COOKING', 'READY', 'SERVED', 'PAID']),
   staffId: z.number().int().positive().optional(),
+  seatId: z.number().int().positive().optional(),
 });
 
 export const UpdateItemAvailabilityInputSchema = z.object({

@@ -381,13 +381,20 @@ export const MobileCockpitMaster: React.FC = () => {
         }
 
         setCartItems(prev => {
-          if (!data.itemId) return prev;
-          const isSpecificUnit = /-[0-9]+$/.test(data.itemId);
           return prev.map(item => {
-            const matches = isSpecificUnit
-              ? String(item.orderItemId) === String(data.itemId)
-              : (String(item.orderItemId) === String(data.itemId) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId));
-            return matches ? { ...item, stage: data.stage } : item;
+            const targetDishId = data.dishId ? String(data.dishId).replace(/^dish-/, '') : '';
+            const itemDishId = String(item.menuItem?.id || '').replace(/^dish-/, '');
+            const targetName = (data.dishName || '').toLowerCase().trim();
+            const itemName = (item.menuItem?.name || '').toLowerCase().trim();
+
+            const isMatch = Boolean(
+              (data.itemId && (String(item.orderItemId) === String(data.itemId) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId))) ||
+              (data.originalKey && (String(item.orderItemId) === String(data.originalKey) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.originalKey))) ||
+              (targetDishId && itemDishId && targetDishId === itemDishId) ||
+              (targetName && itemName && (targetName === itemName || targetName.includes(itemName) || itemName.includes(targetName)))
+            );
+
+            return isMatch ? { ...item, stage: data.stage } : item;
           });
         });
       },

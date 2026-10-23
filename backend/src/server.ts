@@ -129,10 +129,12 @@ app.patch('/api/orders/items/:itemId/stage', async (req, reply) => {
   }
 
   try {
+    const rawSeatId = parseResult.data.seatId || ((req.body as any)?.seatId ? Number((req.body as any).seatId) : undefined);
     const result = await orderService.updateItemStage(
       parseResult.data.itemId,
       parseResult.data.newStage,
-      parseResult.data.staffId
+      parseResult.data.staffId,
+      { seatId: rawSeatId }
     );
     return reply.send(result);
   } catch (error: any) {
@@ -140,12 +142,17 @@ app.patch('/api/orders/items/:itemId/stage', async (req, reply) => {
   }
 });
 
-// 7. Kitchen KDS Active Tickets
+// 7. Active Floor Dining Orders (All active tables with unsettled bills)
+app.get('/api/orders/active', async () => {
+  return orderService.getActiveFloorOrders();
+});
+
+// 8. Kitchen KDS Active Tickets
 app.get('/api/kds/tickets', async () => {
   return orderService.getKdsActiveTickets();
 });
 
-// 8. KDS 86 Out-of-Stock Toggle
+// 9. KDS 86 Out-of-Stock Toggle
 app.post('/api/menu/items/:itemId/availability', async (req, reply) => {
   const { itemId } = req.params as { itemId: string };
   const parseResult = UpdateItemAvailabilityInputSchema.safeParse({

@@ -209,27 +209,77 @@ export class OrderService {
    * Granular Item-Level Stage Transition.
    * Can bump an individual dish: QUEUED -> COOKING -> READY -> SERVED.
    */
-  async updateItemStage(itemId: string, newStage: ItemStage, staffId?: number) {
+  async updateItemStage(
+    itemId: string,
+    newStage: ItemStage,
+    staffId?: number,
+    options?: { seatId?: number; orderId?: string }
+  ) {
     let targetOrder: Order | undefined;
     let targetItem: OrderItem | undefined;
 
     const strId = String(itemId);
     const cleanItemId = strId.replace(/-[0-9]+$/, '');
+    const cleanNumeric = parseInt(cleanItemId.replace(/[^0-9]/g, ''), 10);
+    const cleanName = strId.replace(/^dish-/, '').replace(/[-_]/g, ' ').toLowerCase().trim();
 
+    // 1. Direct search by exact item ID
     for (const order of db.data.orders) {
-      const found = order.items.find((i) =>
-        i.id === strId ||
-        i.id === cleanItemId ||
-        String(i.menuItemId) === strId ||
-        String(i.menuItemId) === cleanItemId ||
-        `dish-${i.menuItemId}` === strId ||
-        `dish-${i.menuItemId}` === cleanItemId ||
-        (i.nameSnapshot && i.nameSnapshot.toLowerCase().trim() === strId.toLowerCase().trim())
-      );
+      if (options?.seatId && order.seatId !== options.seatId) continue;
+      if (options?.orderId && order.id !== options.orderId) continue;
+      const found = order.items.find((i) => i.id === strId);
       if (found) {
         targetOrder = order;
         targetItem = found;
         break;
+      }
+    }
+
+    // 2. If not found by exact ID, search matching item in candidate orders
+    if (!targetItem) {
+      let candidateOrders = db.data.orders;
+      if (options?.seatId) {
+        candidateOrders = candidateOrders.filter((o) => o.seatId === options.seatId);
+      }
+      if (options?.orderId) {
+        candidateOrders = candidateOrders.filter((o) => o.id === options.orderId);
+      }
+
+      const matchFn = (i: OrderItem) => (
+        i.id === strId ||
+        i.id === cleanItemId ||
+        String(i.menuItemId) === strId ||
+        String(i.menuItemId) === cleanItemId ||
+        (!isNaN(cleanNumeric) && i.menuItemId === cleanNumeric) ||
+        `dish-${i.menuItemId}` === strId ||
+        `dish-${i.menuItemId}` === cleanItemId ||
+        (i.nameSnapshot && (
+          i.nameSnapshot.toLowerCase().trim() === cleanName ||
+          i.nameSnapshot.toLowerCase().trim() === strId.toLowerCase().trim()
+        ))
+      );
+
+      // Search newest orders first so the latest active batch is addressed
+      for (let oIdx = candidateOrders.length - 1; oIdx >= 0; oIdx--) {
+        const order = candidateOrders[oIdx];
+
+        // CRITICAL: Look for an item that is NOT yet at newStage!
+        // E.g., if newStage is SERVED, find the item that is READY (or COOKING or QUEUED)
+        const pendingItem = order.items.find((i) => matchFn(i) && i.itemStage !== newStage);
+        if (pendingItem) {
+          targetOrder = order;
+          targetItem = pendingItem;
+          break;
+        }
+
+        // Fallback: any matching item in this order if nothing else found
+        if (!targetItem) {
+          const anyItem = order.items.find(matchFn);
+          if (anyItem) {
+            targetOrder = order;
+            targetItem = anyItem;
+          }
+        }
       }
     }
 
@@ -270,7 +320,10 @@ export class OrderService {
     });
 
     const payload = {
-      itemId,
+      itemId: targetItem.id,
+      originalKey: itemId,
+      dishId: `dish-${targetItem.menuItemId}`,
+      dishName: targetItem.nameSnapshot,
       orderId: targetOrder.id,
       seatId: targetOrder.seatId,
       newStage,
@@ -344,6 +397,30 @@ export class OrderService {
         qrUrl: `/seat/${s.id}?sig=${signature}`,
       };
     });
+  }
+
+  /**
+   * Returns all active dining table orders across the restaurant (not yet paid or vacated).
+   * Includes orders where items are served, ready, preparing, or queued.
+   */
+  async getActiveFloorOrders() {
+    const activeSessions = new Set(
+      db.data.seatSessions.filter((s) => s.status === 'ACTIVE').map((s) => s.id)
+    );
+
+    const activeOrders = db.data.orders.filter(
+      (o) =>
+        (activeSessions.has(o.sessionId) ||
+          db.data.seats.some((st) => st.id === o.seatId && st.currentStatus !== 'VACANT')) &&
+        o.overallStage !== 'PAID'
+    );
+
+    const seatMap = new Map(db.data.seats.map((s) => [s.id, s]));
+
+    return activeOrders.map((o) => ({
+      ...o,
+      seat: seatMap.get(o.seatId),
+    }));
   }
 
   /**
