@@ -263,16 +263,41 @@ export const TabletCockpitMaster: React.FC = () => {
       onStageChange: (data) => {
         if (data.stage === 'SERVED') {
           const normTarget = (data.chairId || data.normChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
-          setAlerts(prev => prev.filter(a => {
-            if (a.type !== 'kitchen') return true;
-            const aNorm = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
-            if (normTarget && aNorm && normTarget !== aNorm) return true;
-            if (data.itemId && (a.itemId === data.itemId || a.id === data.itemId)) return false;
-            if (data.dishId && a.dishId && String(a.dishId).replace(/^dish-/, '') === String(data.dishId).replace(/^dish-/, '')) return false;
-            if (data.dishName && a.dishName && a.dishName.toLowerCase().trim() === data.dishName.toLowerCase().trim()) return false;
-            if (data.dishName && a.title && a.title.toLowerCase().trim() === data.dishName.toLowerCase().trim()) return false;
-            return true;
-          }));
+          setAlerts(prev => {
+            const hasExactAlert = Boolean(
+              data.itemId && prev.some(a =>
+                a.type === 'kitchen' &&
+                (!normTarget || (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '') === normTarget) &&
+                (a.itemId === data.itemId || a.id === data.itemId)
+              )
+            );
+
+            let removedFallback = false;
+            return prev.filter(a => {
+              if (a.type !== 'kitchen') return true;
+              const aNorm = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+              if (normTarget && aNorm && normTarget !== aNorm) return true;
+
+              if (hasExactAlert) {
+                return !(a.itemId === data.itemId || a.id === data.itemId);
+              }
+
+              if (removedFallback) return true;
+
+              const matchFallback = Boolean(
+                (data.dishId && a.dishId && String(a.dishId).replace(/^dish-/, '') === String(data.dishId).replace(/^dish-/, '')) ||
+                (data.dishName && a.dishName && a.dishName.toLowerCase().trim() === data.dishName.toLowerCase().trim()) ||
+                (data.dishName && a.title && a.title.toLowerCase().trim() === data.dishName.toLowerCase().trim())
+              );
+
+              if (matchFallback) {
+                removedFallback = true;
+                return false;
+              }
+
+              return true;
+            });
+          });
         }
         refreshAlerts();
         const curSeat = (activeSeatNameRef.current || '').split(':')[0].trim();
@@ -291,20 +316,43 @@ export const TabletCockpitMaster: React.FC = () => {
           data.stage === 'SERVED' ? 'SERVED' : 'PLACED';
 
         setTicketItems(prev => {
+          const hasExactIdMatch = Boolean(
+            data.itemId && prev.some(item =>
+              String(item.orderItemId) === String(data.itemId) ||
+              String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId) ||
+              (data.originalKey && String(item.orderItemId) === String(data.originalKey))
+            )
+          );
+
+          let updatedFallback = false;
           return prev.map(item => {
+            if (hasExactIdMatch) {
+              const isExact = Boolean(
+                (data.itemId && (String(item.orderItemId) === String(data.itemId) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId))) ||
+                (data.originalKey && (String(item.orderItemId) === String(data.originalKey) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.originalKey)))
+              );
+              return isExact ? { ...item, status: nextStatus } : item;
+            }
+
+            // Fallback only if no item had the exact ID and only update the FIRST un-updated matching item
+            if (updatedFallback) return item;
+
             const targetDishId = data.dishId ? String(data.dishId).replace(/^dish-/, '') : '';
             const itemDishId = String(item.id || '').replace(/^dish-/, '');
             const targetName = (data.dishName || '').toLowerCase().trim();
             const itemName = (item.name || '').toLowerCase().trim();
 
-            const isMatch = Boolean(
-              (data.itemId && (String(item.orderItemId) === String(data.itemId) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.itemId))) ||
-              (data.originalKey && (String(item.orderItemId) === String(data.originalKey) || String(item.orderItemId || '').replace(/-[0-9]+$/, '') === String(data.originalKey))) ||
+            const isFallbackMatch = Boolean(
               (targetDishId && itemDishId && targetDishId === itemDishId) ||
               (targetName && itemName && (targetName === itemName || targetName.includes(itemName) || itemName.includes(targetName)))
-            );
+            ) && item.status !== nextStatus;
 
-            return isMatch ? { ...item, status: nextStatus } : item;
+            if (isFallbackMatch) {
+              updatedFallback = true;
+              return { ...item, status: nextStatus };
+            }
+
+            return item;
           });
         });
       },
@@ -646,12 +694,15 @@ export const TabletCockpitMaster: React.FC = () => {
     const targetDishName = dish?.name || String(itemIdentifier);
     const targetDishId = String(dish?.id || itemIdentifier);
 
-    // Mark the specific dish line item as served
+    // Mark strictly the specific dish line item as served (never other duplicate items)
+    let markedLocally = false;
     setTicketItems(prev => prev.map(item => {
+      if (markedLocally) return item;
       const match = Boolean(dish?.orderItemId && item.orderItemId === dish.orderItemId) ||
-        item.orderItemId === itemIdentifier ||
+        (item.orderItemId && item.orderItemId === itemIdentifier) ||
         (!dish?.orderItemId && (String(item.id) === targetDishId || item.name === targetDishName));
       if (match) {
+        markedLocally = true;
         return { ...item, status: 'SERVED' };
       }
       return item;
@@ -668,31 +719,52 @@ export const TabletCockpitMaster: React.FC = () => {
     });
 
     const normChair = cleanChair.replace(/^0+/, '');
+    const hasExactAlert = Boolean(
+      dish?.orderItemId && alerts.some(a => {
+        const aNorm = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        if (normChair && aNorm && normChair !== aNorm) return false;
+        if ((a.type as string) !== 'kitchen' && (a.type as string) !== 'kitchen_ready') return false;
+        return a.itemId === dish.orderItemId || a.id === dish.orderItemId ||
+          (a.itemId && dish.orderItemId.startsWith(`${a.itemId}-`));
+      })
+    );
+
+    let resolvedFallback = false;
     const matchingAlerts = alerts.filter(a => {
       const aNorm = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
       if (normChair && aNorm && normChair !== aNorm) return false;
       if ((a.type as string) !== 'kitchen' && (a.type as string) !== 'kitchen_ready') return false;
-      if (dish?.orderItemId && (
-        a.itemId === dish.orderItemId ||
-        (a.itemId && dish.orderItemId.startsWith(`${a.itemId}-`)) ||
-        (a.itemId && a.itemId.startsWith(`${dish.orderItemId}-`))
-      )) return true;
-      if (targetDishId && a.dishId && (
-        String(a.dishId).replace(/^dish-/, '') === targetDishId.replace(/^dish-/, '') ||
-        a.dishId === targetDishId
-      )) return true;
-      if (targetDishName && (
-        (a.dishName && (
-          a.dishName.toLowerCase().trim() === targetDishName.toLowerCase().trim() ||
-          a.dishName.toLowerCase().includes(targetDishName.toLowerCase()) ||
-          targetDishName.toLowerCase().includes(a.dishName.toLowerCase())
+
+      if (hasExactAlert) {
+        return a.itemId === dish?.orderItemId || a.id === dish?.orderItemId ||
+          (a.itemId && Boolean(dish?.orderItemId && dish.orderItemId.startsWith(`${a.itemId}-`)));
+      }
+
+      if (resolvedFallback) return false;
+
+      const isFallback = Boolean(
+        (targetDishId && a.dishId && (
+          String(a.dishId).replace(/^dish-/, '') === targetDishId.replace(/^dish-/, '') ||
+          a.dishId === targetDishId
         )) ||
-        (a.title && (
-          a.title.toLowerCase().trim() === targetDishName.toLowerCase().trim() ||
-          a.title.toLowerCase().includes(targetDishName.toLowerCase()) ||
-          targetDishName.toLowerCase().includes(a.title.toLowerCase())
+        (targetDishName && (
+          (a.dishName && (
+            a.dishName.toLowerCase().trim() === targetDishName.toLowerCase().trim() ||
+            a.dishName.toLowerCase().includes(targetDishName.toLowerCase()) ||
+            targetDishName.toLowerCase().includes(a.dishName.toLowerCase())
+          )) ||
+          (a.title && (
+            a.title.toLowerCase().trim() === targetDishName.toLowerCase().trim() ||
+            a.title.toLowerCase().includes(targetDishName.toLowerCase()) ||
+            targetDishName.toLowerCase().includes(a.title.toLowerCase())
+          ))
         ))
-      )) return true;
+      );
+
+      if (isFallback) {
+        resolvedFallback = true;
+        return true;
+      }
       return false;
     });
 
@@ -892,13 +964,19 @@ export const TabletCockpitMaster: React.FC = () => {
     const curSeatClean = activeSeatName.replace(/[^0-9]/g, '').replace(/^0+/, '');
     const targetSeatClean = cleanChair.replace(/^0+/, '');
     if (targetSeatClean && curSeatClean && targetSeatClean === curSeatClean) {
+      let markedLocally = false;
       setTicketItems(prev =>
         prev.map(it => {
+          if (markedLocally) return it;
           const isMatch = alert?.itemId
             ? (it.orderItemId === alert.itemId || Boolean(it.orderItemId && it.orderItemId.startsWith(`${alert.itemId}-`)))
             : (Boolean(alert?.dishId && (String(it.id) === String(alert.dishId).replace(/^dish-/, '') || String(it.id) === alert.dishId)) ||
                Boolean(it.name.toLowerCase().trim() === dishName.toLowerCase().trim()));
-          return isMatch ? { ...it, status: 'SERVED' } : it;
+          if (isMatch) {
+            markedLocally = true;
+            return { ...it, status: 'SERVED' };
+          }
+          return it;
         })
       );
     }

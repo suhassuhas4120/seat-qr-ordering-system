@@ -203,21 +203,42 @@ export default function LiveOrderTrackingPage() {
         setSession((prev) => {
           if (!prev || !prev.items) return prev;
           const cleanTargetId = data.itemId ? data.itemId.replace(/-[0-9]+$/, '') : '';
-          const targetDishClean = data.dishId ? String(data.dishId).replace(/^dish-/, '') : '';
-          const updatedItems = prev.items.map((it) => {
-            const itCleanDish = (it.dish_id || '').replace(/^dish-/, '');
-            const matches =
-              Boolean(data.itemId && (it.id === data.itemId || it.id === cleanTargetId)) ||
-              Boolean(targetDishClean && (it.dish_id === data.dishId || itCleanDish === targetDishClean)) ||
-              Boolean(data.dishName && it.title?.toLowerCase().trim() === data.dishName.toLowerCase().trim());
+          const hasExactIdMatch = Boolean(
+            data.itemId && prev.items.some((it) => it.id === data.itemId || (cleanTargetId && it.id === cleanTargetId))
+          );
 
-            if (matches) {
+          let updatedFallback = false;
+          const updatedItems = prev.items.map((it) => {
+            if (hasExactIdMatch) {
+              const isExact = Boolean(data.itemId && (it.id === data.itemId || (cleanTargetId && it.id === cleanTargetId)));
+              if (isExact) {
+                const addons = Array.isArray(it.addons) ? [...it.addons] : [];
+                if (data.stage === 'SERVED' && !addons.includes('SERVED')) {
+                  addons.push('SERVED');
+                }
+                return { ...it, stage: data.stage, addons };
+              }
+              return it;
+            }
+
+            if (updatedFallback) return it;
+
+            const targetDishClean = data.dishId ? String(data.dishId).replace(/^dish-/, '') : '';
+            const itCleanDish = (it.dish_id || '').replace(/^dish-/, '');
+            const isFallback = Boolean(
+              Boolean(targetDishClean && (it.dish_id === data.dishId || itCleanDish === targetDishClean)) ||
+              Boolean(data.dishName && it.title?.toLowerCase().trim() === data.dishName.toLowerCase().trim())
+            ) && it.stage !== data.stage;
+
+            if (isFallback) {
+              updatedFallback = true;
               const addons = Array.isArray(it.addons) ? [...it.addons] : [];
               if (data.stage === 'SERVED' && !addons.includes('SERVED')) {
                 addons.push('SERVED');
               }
               return { ...it, stage: data.stage, addons };
             }
+
             return it;
           });
           return { ...prev, items: updatedItems };

@@ -1150,26 +1150,49 @@ export const realtimeBridge = {
         const targetDishId = meta?.dishId ? String(meta.dishId).replace(/^dish-/, '') : '';
 
         const alerts = getLocalAlertsList();
+        const hasExactAlert = Boolean(
+          targetItemId && alerts.some((a) =>
+            !a.isResolved &&
+            ((a.type as string) === 'kitchen_ready' || (a.type as string) === 'kitchen') &&
+            (!normChair || (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '') === normChair) &&
+            (a.itemId === targetItemId || a.id === targetItemId || (a.itemId && targetItemId.startsWith(`${a.itemId}-`)))
+          )
+        );
+
+        let resolvedFallback = false;
         const alertsToResolve = alerts.filter((a) => {
           if (a.isResolved) return false;
           if ((a.type as string) !== 'kitchen_ready' && (a.type as string) !== 'kitchen') return false;
           const aNormChair = (a.chairId || a.seatNumber || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
           if (normChair && aNormChair && normChair !== aNormChair) return false;
-          if (targetItemId && (a.itemId === targetItemId || a.id === targetItemId || (a.itemId && targetItemId.startsWith(`${a.itemId}-`)))) return true;
-          if (targetDishId && a.dishId && (String(a.dishId).replace(/^dish-/, '') === targetDishId || a.dishId === targetDishId)) return true;
-          if (targetDishName && (
-            (a.dishName && (
-              a.dishName.toLowerCase().trim() === targetDishName ||
-              a.dishName.toLowerCase().includes(targetDishName) ||
-              targetDishName.includes(a.dishName.toLowerCase())
-            )) ||
-            (a.title && (
-              a.title.toLowerCase().trim() === targetDishName ||
-              a.title.toLowerCase().includes(targetDishName) ||
-              targetDishName.includes(a.title.toLowerCase())
+
+          if (hasExactAlert) {
+            return targetItemId && (a.itemId === targetItemId || a.id === targetItemId || (a.itemId && targetItemId.startsWith(`${a.itemId}-`)));
+          }
+
+          if (resolvedFallback) return false;
+
+          const isMatch = Boolean(
+            (targetDishId && a.dishId && (String(a.dishId).replace(/^dish-/, '') === targetDishId || a.dishId === targetDishId)) ||
+            (targetDishName && (
+              (a.dishName && (
+                a.dishName.toLowerCase().trim() === targetDishName ||
+                a.dishName.toLowerCase().includes(targetDishName) ||
+                targetDishName.includes(a.dishName.toLowerCase())
+              )) ||
+              (a.title && (
+                a.title.toLowerCase().trim() === targetDishName ||
+                a.title.toLowerCase().includes(targetDishName) ||
+                targetDishName.includes(a.title.toLowerCase())
+              ))
             ))
-          )) return true;
-          if (normChair && aNormChair === normChair && !a.dishId && !a.itemId) return true;
+          );
+
+          if (isMatch) {
+            resolvedFallback = true;
+            return true;
+          }
+
           return false;
         });
 
