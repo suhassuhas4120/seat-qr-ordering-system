@@ -399,8 +399,9 @@ export const TabletCockpitMaster: React.FC = () => {
             kotId: alert.kotNumber,
             isResolved: false
           };
-          return [mapped, ...prev];
+          return [mapped, ...prev.filter(a => !(a.chairId === alert.chairId && a.type === mapped.type))];
         });
+        showToast(`🔔 ${alert.title || `Service Alert for ${alert.seatNumber}`}`);
       },
       onResolveAlert: (alertId) => {
         setAlerts(prev => prev.filter(a => a.id !== alertId));
@@ -410,7 +411,28 @@ export const TabletCockpitMaster: React.FC = () => {
         refreshAlerts();
         if (data?.chairId) {
           const clean = data.chairId.replace(/[^0-9]/g, '');
-          setVerifiedBillSeats(prev => ({ ...prev, [clean]: true, [data.chairId]: true }));
+          const norm = clean.replace(/^0+/, '') || '0';
+          const padded = norm.padStart(2, '0');
+          setVerifiedBillSeats(prev => ({ ...prev, [clean]: true, [data.chairId]: true, [norm]: true, [padded]: true }));
+
+          setAlerts(prev => {
+            const alertId = `bill-${norm}-${Date.now()}`;
+            if (prev.some(a => (a.chairId === norm || a.chairId === clean) && a.type === 'customer')) return prev;
+            const billAlert: ServiceAlert = {
+              id: alertId,
+              type: 'customer',
+              seatNumber: `Seat ${padded}`,
+              chairId: norm,
+              guestName: 'Guest',
+              title: `Bill Requested (₹${data.amount || 0})`,
+              description: `Guest at Seat ${norm} requested bill payment via waiter`,
+              timeAgo: 'Just now',
+              amount: data.amount,
+              isResolved: false,
+            };
+            return [billAlert, ...prev];
+          });
+          showToast(`🔔 Seat #${norm} requested bill: ₹${data.amount || 0}`);
         }
       },
       onCustomerPaidUpi: (data) => {

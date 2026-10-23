@@ -174,11 +174,17 @@ function initSocketBridge() {
   try {
     const socket = getSocket();
 
-    // Join all operational rooms for broadcast reception
-    socket.emit(SOCKET_EVENTS.JOIN_KDS);
-    socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'mobile' });
-    socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'tablet' });
-    socket.emit(SOCKET_EVENTS.JOIN_MANAGER);
+    const registerRooms = () => {
+      socket.emit(SOCKET_EVENTS.JOIN_KDS);
+      socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'mobile' });
+      socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'tablet' });
+      socket.emit(SOCKET_EVENTS.JOIN_MANAGER);
+    };
+
+    if (socket.connected) {
+      registerRooms();
+    }
+    socket.on('connect', registerRooms);
 
     socket.on(SOCKET_EVENTS.ORDER_PLACED, (payload: any) => {
       const order = payload.order;
@@ -396,20 +402,94 @@ function initSocketBridge() {
     });
 
     socket.on(SOCKET_EVENTS.WAITER_CALLED, (payload: any) => {
-      const alert: ServiceAlertRecord = {
-        id: `call-${Date.now()}`,
+      const isBill = payload.reason === 'BILL' || payload.alert?.type === 'customer_call' || String(payload.alert?.title || '').toLowerCase().includes('bill');
+      const amt = payload.amount || payload.alert?.billAmount;
+      const numSeat = Number(payload.seatId) || 0;
+      const cleanChair = String(numSeat);
+      const normChair = cleanChair.replace(/^0+/, '') || '0';
+
+      const alert: ServiceAlertRecord = payload.alert || {
+        id: `call-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         type: 'customer_call',
-        seatNumber: payload.seatNumber || `Seat ${payload.seatId}`,
-        chairId: String(payload.seatId),
-        title: `Seat ${payload.seatNumber || payload.seatId} Assistance`,
-        message: `Guest requested ${payload.reason || 'assistance'}`,
+        seatNumber: payload.seatNumber || `Seat ${numSeat}`,
+        chairId: normChair,
+        dishId: undefined,
+        dishName: undefined,
+        itemId: undefined,
+        guestName: 'Guest',
+        title: isBill ? `Bill Requested (${amt ? `₹${amt}` : ''})` : `Seat ${payload.seatNumber || numSeat} Assistance`,
+        message: isBill ? `Bill settlement requested for Seat ${numSeat}: ₹${amt || ''}` : `Guest requested ${payload.reason || 'assistance'}`,
         timeAgo: 'Just now',
+        billAmount: amt,
+        kotNumber: undefined,
         isUrgent: true,
         isResolved: false,
         createdAt: Date.now(),
       };
+
+      // Ensure alert is persistently registered in local list so refreshAlerts doesn't wipe it
+      const currentAlerts = getLocalAlertsList();
+      const nextAlerts = [alert, ...currentAlerts.filter(a => a.id !== alert.id && (a.chairId !== normChair || a.type !== alert.type))];
+      setLocalAlertsList(nextAlerts);
+
+      // If bill was requested, also mark seat status as billing and populate bill request record
+      if (isBill) {
+        const requests = getLocalBillRequests();
+        const billPayload: BillVerificationPayload = {
+          chairId: cleanChair,
+          seatNumber: payload.seatNumber || `Seat ${cleanChair}`,
+          orderId: payload.orderId || '',
+          ticketNumber: payload.ticketNumber || '',
+          amount: amt || 0,
+          items: payload.items || [],
+          requestedAt: Date.now(),
+        };
+        requests[cleanChair] = billPayload;
+        requests[normChair] = billPayload;
+        setLocalBillRequests(requests);
+
+        const occMap = getLocalOccupancyMap();
+        if (occMap[cleanChair]) occMap[cleanChair].status = 'billing';
+        if (occMap[normChair]) occMap[normChair].status = 'billing';
+        setLocalOccupancyMap(occMap);
+
+        activeKdsSubscribers.forEach((cb) => {
+          cb.onBillRequested?.({
+            chairId: cleanChair,
+            rawChairId: String(payload.seatId),
+            normChairId: normChair,
+            amount: amt,
+            verification: billPayload,
+          });
+          cb.onSeatOccupancyChange?.({ chairId: cleanChair, isOccupied: true });
+        });
+      }
+
       activeKdsSubscribers.forEach((cb) => {
         cb.onNewAlert?.(alert);
+      });
+    });
+
+    socket.on('bill:requested', (payload: any) => {
+      const numSeat = Number(payload.seatId) || 0;
+      const cleanChair = String(numSeat);
+      const normChair = cleanChair.replace(/^0+/, '') || '0';
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onBillRequested?.({
+          chairId: cleanChair,
+          rawChairId: String(payload.seatId),
+          normChairId: normChair,
+          amount: payload.amount,
+          verification: payload.verification || payload,
+        });
+      });
+    });
+
+    socket.on('alert:resolved', ({ alertId }: { alertId: string }) => {
+      const currentAlerts = getLocalAlertsList();
+      setLocalAlertsList(currentAlerts.filter(a => a.id !== alertId));
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onResolveAlert?.(alertId);
       });
     });
   } catch (err) {
@@ -1701,6 +1781,7 @@ export const realtimeBridge = {
     const rawSeat = alert.seatNumber || '';
     const cleanChair = alert.chairId || rawSeat.replace(/[^0-9]/g, '');
     const normChair = cleanChair.replace(/^0+/, '') || '1';
+    const isBill = alert.type === 'customer_call' || String(alert.title || '').toLowerCase().includes('bill') || Boolean(alert.billAmount);
 
     const newAlert: ServiceAlertRecord = {
       id: alert.id || `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1727,7 +1808,23 @@ export const realtimeBridge = {
 
     broadcastRealtime('NEW_ALERT', { alert: newAlert, ...newAlert });
 
-    // Realtime Socket.io broadcast to all waiter and manager devices
+    // 1. Post to Fastify backend REST endpoint
+    fetch(`${getBackendUrl()}/api/service-alerts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newAlert.id,
+        seatId: Number(normChair) || 0,
+        seatNumber: alert.seatNumber || `Seat ${normChair}`,
+        type: newAlert.type,
+        title: newAlert.title,
+        message: newAlert.message,
+        billAmount: newAlert.billAmount,
+        isUrgent: newAlert.isUrgent,
+      }),
+    }).catch(() => {});
+
+    // 2. Realtime Socket.io broadcast to all waiter and manager devices
     try {
       const socket = getSocket();
       const numSeat = Number(normChair) || 1;
@@ -1735,7 +1832,9 @@ export const realtimeBridge = {
         seatId: numSeat,
         seatNumber: alert.seatNumber || `Seat ${normChair}`,
         zone: 'COUNTER_A',
-        reason: alert.type === 'kitchen_ready' ? 'ASSISTANCE' : 'WATER',
+        reason: isBill ? 'BILL' : (alert.type === 'kitchen_ready' ? 'ASSISTANCE' : 'WATER'),
+        amount: newAlert.billAmount,
+        alert: newAlert,
         timestamp: new Date().toISOString(),
       });
     } catch {}
@@ -1745,6 +1844,21 @@ export const realtimeBridge = {
 
   // Get active floor alerts
   async getServiceAlerts(): Promise<ServiceAlertRecord[]> {
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/service-alerts`);
+      if (res.ok) {
+        const backendAlerts = await res.json();
+        if (Array.isArray(backendAlerts) && backendAlerts.length > 0) {
+          const local = getLocalAlertsList();
+          const mergedMap = new Map<string, ServiceAlertRecord>();
+          backendAlerts.forEach((a: any) => { if (!a.isResolved) mergedMap.set(a.id, a); });
+          local.forEach((a) => { if (!a.isResolved && !mergedMap.has(a.id)) mergedMap.set(a.id, a); });
+          const merged = Array.from(mergedMap.values());
+          setLocalAlertsList(merged);
+          return merged;
+        }
+      }
+    } catch {}
     return getLocalAlertsList().filter((a) => !a.isResolved);
   },
 
@@ -1753,6 +1867,10 @@ export const realtimeBridge = {
     const alerts = getLocalAlertsList();
     const updated = alerts.filter((a) => a.id !== alertId);
     setLocalAlertsList(updated);
+
+    fetch(`${getBackendUrl()}/api/service-alerts/${alertId}/resolve`, {
+      method: 'POST',
+    }).catch(() => {});
 
     broadcastRealtime('RESOLVE_ALERT', { alertId });
 
@@ -1794,6 +1912,38 @@ export const realtimeBridge = {
     setLocalBillRequests(requests);
 
     broadcastRealtime('BILL_REQUESTED', { chairId: cleanChair, rawChairId: chairId, normChairId: norm, amount, payload });
+
+    // Send backend REST alert
+    fetch(`${getBackendUrl()}/api/service-alerts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        seatId: Number(norm) || 0,
+        seatNumber: verification?.seatNumber || `Seat ${padded}`,
+        type: 'customer_call',
+        title: `Bill Requested (₹${amount || 0})`,
+        message: `Bill settlement requested for Seat ${norm}: ₹${amount || 0}`,
+        billAmount: amount || 0,
+        isUrgent: true,
+      }),
+    }).catch(() => {});
+
+    // Realtime Socket.io broadcast to all waiter and manager devices
+    try {
+      const socket = getSocket();
+      const numSeat = Number(norm) || 0;
+      socket.emit(SOCKET_EVENTS.WAITER_CALLED, {
+        seatId: numSeat,
+        seatNumber: verification?.seatNumber || `Seat ${padded}`,
+        zone: 'COUNTER_A',
+        reason: 'BILL',
+        amount: amount || verification?.amount || 0,
+        orderId: payload.orderId,
+        ticketNumber: payload.ticketNumber,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {}
+
     return true;
   },
 

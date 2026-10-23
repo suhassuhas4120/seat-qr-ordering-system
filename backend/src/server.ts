@@ -6,13 +6,14 @@ import crypto from 'crypto';
 import { db } from './db/index.js';
 import { orderService } from './services/orderService.js';
 import { paymentService } from './services/paymentService.js';
-import { setupWebSockets } from './sockets/index.js';
+import { setupWebSockets, io } from './sockets/index.js';
 import {
   ClaimSeatInputSchema,
   PlaceOrderInputSchema,
   UpdateItemStageInputSchema,
   UpdateItemAvailabilityInputSchema,
   StaffLoginSchema,
+  SOCKET_EVENTS,
 } from './shared/index.js';
 
 const app = fastify({ logger: true });
@@ -172,6 +173,90 @@ app.post('/api/menu/items/:itemId/availability', async (req, reply) => {
     parseResult.data.isAvailable
   );
   return reply.send(result);
+});
+
+// 8B. Floor Service Alerts & Customer Calls
+app.get('/api/service-alerts', async () => {
+  return (db.data.serviceAlerts || []).filter((a: any) => !a.isResolved);
+});
+
+app.post('/api/service-alerts', async (req, reply) => {
+  const body = req.body as any;
+  const numSeat = Number(body.seatId) || 0;
+  const seatNumStr = body.seatNumber || `Seat ${numSeat}`;
+  const isBill = body.type === 'customer_call' || String(body.title || '').toLowerCase().includes('bill');
+
+  const alertRecord = {
+    id: body.id || `alert-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    type: body.type || 'customer_call',
+    seatNumber: seatNumStr,
+    chairId: String(numSeat),
+    title: body.title || (isBill ? `Bill Requested` : `${seatNumStr} Assistance`),
+    message: body.message || (isBill ? `Bill requested for ${seatNumStr}` : `Guest requested assistance`),
+    timeAgo: 'Just now',
+    billAmount: body.billAmount || 0,
+    isUrgent: true,
+    isResolved: false,
+    createdAt: Date.now(),
+  };
+
+  if (!db.data.serviceAlerts) db.data.serviceAlerts = [];
+  const existingIdx = db.data.serviceAlerts.findIndex(
+    (a: any) => !a.isResolved && a.chairId === String(numSeat) && a.type === alertRecord.type
+  );
+  if (existingIdx >= 0) {
+    db.data.serviceAlerts[existingIdx] = alertRecord;
+  } else {
+    db.data.serviceAlerts.unshift(alertRecord);
+  }
+
+  if (isBill) {
+    const seat = db.data.seats.find((s) => s.id === numSeat);
+    if (seat) {
+      seat.currentStatus = 'BILL_REQUESTED';
+      seat.updatedAt = new Date().toISOString();
+    }
+  }
+
+  const fullPayload = {
+    seatId: numSeat,
+    seatNumber: seatNumStr,
+    reason: isBill ? 'BILL' : 'ASSISTANCE',
+    amount: alertRecord.billAmount,
+    alert: alertRecord,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (io) {
+    io.emit(SOCKET_EVENTS.WAITER_CALLED, fullPayload);
+    io.to('staff:mobile').emit(SOCKET_EVENTS.WAITER_CALLED, fullPayload);
+    io.to('staff:tablet').emit(SOCKET_EVENTS.WAITER_CALLED, fullPayload);
+    io.to('manager').emit(SOCKET_EVENTS.WAITER_CALLED, fullPayload);
+
+    if (isBill) {
+      io.emit(SOCKET_EVENTS.SEAT_STATUS_UPDATED, {
+        seatId: numSeat,
+        status: 'BILL_REQUESTED',
+      });
+      io.emit('bill:requested', fullPayload);
+    }
+  }
+
+  return reply.send({ success: true, alert: alertRecord });
+});
+
+app.post('/api/service-alerts/:alertId/resolve', async (req, reply) => {
+  const { alertId } = req.params as { alertId: string };
+  if (db.data.serviceAlerts) {
+    const target = db.data.serviceAlerts.find((a: any) => a.id === alertId);
+    if (target) {
+      target.isResolved = true;
+    }
+  }
+  if (io) {
+    io.emit('alert:resolved', { alertId });
+  }
+  return reply.send({ success: true, alertId });
 });
 
 // 9. Payment Settlement & Instant Real-Time Auto-Vacate

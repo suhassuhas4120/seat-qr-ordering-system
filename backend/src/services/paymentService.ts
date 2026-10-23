@@ -131,6 +131,15 @@ export class PaymentService {
       seat.activeItemCount = 0;
       seat.updatedAt = now;
 
+      // Automatically resolve any pending floor service alerts for this settled seat
+      if (db.data.serviceAlerts) {
+        for (const a of db.data.serviceAlerts) {
+          if (a.chairId === String(seatId)) {
+            a.isResolved = true;
+          }
+        }
+      }
+
       db.saveState();
       db.logTransaction('PAYMENT_SETTLED', {
         seatId,

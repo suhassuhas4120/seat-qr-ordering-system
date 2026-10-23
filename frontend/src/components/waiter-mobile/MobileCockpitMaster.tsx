@@ -485,8 +485,9 @@ export const MobileCockpitMaster: React.FC = () => {
             billAmount: alert.billAmount,
             kotNumber: alert.kotNumber,
             isUrgent: alert.isUrgent
-          }, ...prev];
+          }, ...prev.filter(a => !(a.chairId === alert.chairId && a.type === alert.type))];
         });
+        showToast(`🔔 ${alert.title || `Service Alert for ${alert.seatNumber}`}`);
       },
       onResolveAlert: (alertId) => { setAlerts(prev => prev.filter(a => a.id !== alertId)); },
       onBillRequested: (data) => {
@@ -494,7 +495,28 @@ export const MobileCockpitMaster: React.FC = () => {
         refreshAlerts();
         if (data?.chairId) {
           const clean = data.chairId.replace(/[^0-9]/g, '');
-          setVerifiedBillSeats(prev => ({ ...prev, [clean]: true, [data.chairId]: true }));
+          const norm = clean.replace(/^0+/, '') || '0';
+          const padded = norm.padStart(2, '0');
+          setVerifiedBillSeats(prev => ({ ...prev, [clean]: true, [data.chairId]: true, [norm]: true, [padded]: true }));
+
+          setAlerts(prev => {
+            const alertId = `bill-${norm}-${Date.now()}`;
+            if (prev.some(a => (a.chairId === norm || a.chairId === clean) && a.type === 'customer_call')) return prev;
+            return [{
+              id: alertId,
+              type: 'customer_call',
+              seatNumber: `Seat ${padded}`,
+              chairId: norm,
+              guestName: 'Guest',
+              title: `Bill Requested (₹${data.amount || 0})`,
+              message: `Guest at Seat ${norm} requested bill payment via waiter`,
+              timeAgo: 'Just now',
+              billAmount: data.amount,
+              isUrgent: true,
+              isResolved: false,
+            }, ...prev];
+          });
+          showToast(`🔔 Seat #${norm} requested bill: ₹${data.amount || 0}`);
         }
       },
       onCustomerPaidUpi: (data) => {
