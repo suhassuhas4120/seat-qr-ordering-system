@@ -13,7 +13,7 @@ import {
   UpdateItemStageInputSchema,
   UpdateItemAvailabilityInputSchema,
   StaffLoginSchema,
-} from '@seat-order/shared';
+} from './shared/index.js';
 
 const app = fastify({ logger: true });
 

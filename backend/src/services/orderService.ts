@@ -2,9 +2,9 @@ import { db } from '../db/index.js';
 import { mutexService } from './mutex.js';
 import { generateSessionToken, verifySeatSignature, generateSeatSignature } from './crypto.js';
 import { io } from '../sockets/index.js';
-import { SOCKET_EVENTS } from '@seat-order/shared';
+import { SOCKET_EVENTS } from '../shared/index.js';
 import crypto from 'crypto';
-import type { ItemStage, CreatedByRole, OrderStage, SeatTabSummary, Order, OrderItem, Seat } from '@seat-order/shared';
+import type { ItemStage, CreatedByRole, OrderStage, SeatTabSummary, Order, OrderItem, Seat } from '../shared/index.js';
 
 export class OrderService {
   /**

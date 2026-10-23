@@ -13,7 +13,7 @@ import type {
   OrderItem,
   Payment,
   StaffUser,
-} from '@seat-order/shared';
+} from '../shared/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

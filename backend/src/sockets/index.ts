@@ -1,6 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { Server as HTTPServer } from 'http';
-import { SOCKET_EVENTS } from '@seat-order/shared';
+import { SOCKET_EVENTS } from '../shared/index.js';
 
 export let io: SocketIOServer | null = null;
 
