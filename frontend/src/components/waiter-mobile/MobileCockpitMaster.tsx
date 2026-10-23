@@ -97,25 +97,24 @@ function expandOrderItemsToCart(items: any[], ticketNumber?: string, chairId?: s
       (Array.isArray(it.addons) && it.addons.includes('SERVED'))
     );
 
-    for (let q = 0; q < qty; q++) {
-      const unitId = it.id ? `${it.id}-${q}` : `${ticketNumber || 'TKT'}-${it.dish_id}-${idx}-${q}`;
-      const effectiveStage = isItemServed
-        ? 'SERVED'
-        : (it.stage || 'PLACED');
-      result.push({
-        menuItem: {
-          ...foundMenu,
-          id: it.dish_id || foundMenu.id,
-          name: it.dish_name || foundMenu.name,
-        },
-        quantity: 1,
-        lineTotal: it.price,
-        stage: effectiveStage,
-        orderItemId: unitId,
-        ticketNumber: ticketNumber,
-        isFired: true,
-      });
-    }
+    const unitId = it.id ? String(it.id) : `${ticketNumber || 'TKT'}-${it.dish_id}-${idx}`;
+    const effectiveStage = isItemServed
+      ? 'SERVED'
+      : (it.stage || 'PLACED');
+
+    result.push({
+      menuItem: {
+        ...foundMenu,
+        id: it.dish_id || foundMenu.id,
+        name: it.dish_name || foundMenu.name,
+      },
+      quantity: qty,
+      lineTotal: it.price * qty,
+      stage: effectiveStage,
+      orderItemId: unitId,
+      ticketNumber: ticketNumber,
+      isFired: true,
+    });
   });
   return result;
 }
@@ -898,15 +897,12 @@ export const MobileCockpitMaster: React.FC = () => {
     const targetDishName = targetDish?.menuItem?.name || identifier;
     const targetDishId = String(targetDish?.menuItem?.id || identifier);
 
-    // Mark ONLY the specific single dish line item as served
-    let servedOne = false;
+    // Mark the specific dish line item as served
     setCartItems(prev => prev.map(i => {
-      if (servedOne) return i;
       const isMatch = Boolean(targetDish?.orderItemId && i.orderItemId === targetDish.orderItemId) ||
         i.orderItemId === identifier ||
         (!targetDish?.orderItemId && (String(i.menuItem.id) === targetDishId || i.menuItem.name === targetDishName));
-      if (isMatch && i.stage !== 'SERVED') {
-        servedOne = true;
+      if (isMatch) {
         return { ...i, stage: 'SERVED' };
       }
       return i;

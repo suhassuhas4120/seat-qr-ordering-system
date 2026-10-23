@@ -221,20 +221,18 @@ export const TabletCockpitMaster: React.FC = () => {
             itStage === 'REC' ? 'RECEIVED' : 'PLACED';
 
           const qty = it.quantity || 1;
-          for (let q = 0; q < qty; q++) {
-            qtyMap[numId] = (qtyMap[numId] || 0) + 1;
-            const unitKey = it.id ? `${it.id}-${q}` : `${details.order?.ticket_number}-${numId}-${idx}-${q}`;
-            items.push({
-              id: numId,
-              orderItemId: unitKey,
-              ticketNumber: details.order?.ticket_number,
-              name: it.dish_name,
-              quantity: 1,
-              price: it.price,
-              imageUrl: dish?.imageUrl || '/logo.jpg',
-              status: currentItemStage
-            });
-          }
+          qtyMap[numId] = (qtyMap[numId] || 0) + qty;
+          const unitKey = it.id ? String(it.id) : `${details.order?.ticket_number}-${numId}-${idx}`;
+          items.push({
+            id: numId,
+            orderItemId: unitKey,
+            ticketNumber: details.order?.ticket_number,
+            name: it.dish_name,
+            quantity: qty,
+            price: it.price,
+            imageUrl: dish?.imageUrl || '/logo.jpg',
+            status: currentItemStage
+          });
         });
         const serverPunchedItems = items.map(it => ({ ...it, isPunched: true }));
         setTicketItems(prev => {
@@ -641,15 +639,12 @@ export const TabletCockpitMaster: React.FC = () => {
     const targetDishName = dish?.name || String(itemIdentifier);
     const targetDishId = String(dish?.id || itemIdentifier);
 
-    // Mark ONLY the specific single dish line item as served
-    let servedOne = false;
+    // Mark the specific dish line item as served
     setTicketItems(prev => prev.map(item => {
-      if (servedOne) return item;
       const match = Boolean(dish?.orderItemId && item.orderItemId === dish.orderItemId) ||
         item.orderItemId === itemIdentifier ||
         (!dish?.orderItemId && (String(item.id) === targetDishId || item.name === targetDishName));
-      if (match && item.status !== 'SERVED') {
-        servedOne = true;
+      if (match) {
         return { ...item, status: 'SERVED' };
       }
       return item;

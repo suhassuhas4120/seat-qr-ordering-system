@@ -173,30 +173,32 @@ export default function KitchenDisplayPage() {
   };
 
   // Separate active tickets into 3 stage columns based on individual item stages
+  const isItemActiveInKitchen = (it: any) => it.itemStage !== 'SERVED' && !it.addons?.includes('SERVED');
+
   const incomingOrders = orders
     .map((o) => ({
       ...o,
-      items: (o.items || []).filter((it: any) => it.itemStage === 'QUEUED'),
+      items: (o.items || []).filter((it: any) => it.itemStage === 'QUEUED' && isItemActiveInKitchen(it)),
     }))
     .filter((o) => o.items.length > 0);
 
   const cookingOrders = orders
     .map((o) => ({
       ...o,
-      items: (o.items || []).filter((it: any) => it.itemStage === 'COOKING'),
+      items: (o.items || []).filter((it: any) => it.itemStage === 'COOKING' && isItemActiveInKitchen(it)),
     }))
     .filter((o) => o.items.length > 0);
 
   const readyOrders = orders
     .map((o) => ({
       ...o,
-      items: (o.items || []).filter((it: any) => it.itemStage === 'READY'),
+      items: (o.items || []).filter((it: any) => it.itemStage === 'READY' && isItemActiveInKitchen(it)),
     }))
     .filter((o) => o.items.length > 0);
 
-  // Aggregated single dish items across all active tickets
+  // Aggregated single dish items across all active tickets (excluding served items)
   const allDishes = orders.flatMap((o) =>
-    (o.items || []).map((item: any) => ({
+    (o.items || []).filter(isItemActiveInKitchen).map((item: any) => ({
       ...item,
       orderId: o.id,
       orderNumber: o.orderNumber,

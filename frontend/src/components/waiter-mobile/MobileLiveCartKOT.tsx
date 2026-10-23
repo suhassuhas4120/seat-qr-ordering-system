@@ -115,14 +115,16 @@ export const MobileLiveCartKOT: React.FC<MobileLiveCartKOTProps> = ({
     return cartItems.filter(c => !c.orderItemId && !c.isFired);
   }, [cartItems]);
 
-  // List committed items individually without 3x/4x grouping to avoid confusion
+  // List committed items keeping exact ordered quantities (e.g. 2x, 3x)
   const committedItems = useMemo(() => {
     const committed = cartItems.filter(c => Boolean(c.orderItemId || c.isFired));
     const list: Array<{
       item: CartItem;
       unitKey: string;
       orderItemId: string;
+      quantity: number;
       unitPrice: number;
+      lineTotal: number;
       stage: 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED';
     }> = [];
 
@@ -136,17 +138,17 @@ export const MobileLiveCartKOT: React.FC<MobileLiveCartKOTProps> = ({
         (stage === 'REC' || stage === 'RECEIVED') ? 'REC' : 'PLACED';
 
       const unitP = c.menuItem.price || Math.round(c.lineTotal / qty) || 0;
+      const uKey = c.orderItemId ? String(c.orderItemId) : `cart-${c.menuItem.id}-${cIdx}`;
 
-      for (let q = 0; q < qty; q++) {
-        const uKey = c.orderItemId ? String(c.orderItemId) : `cart-${c.menuItem.id}-${cIdx}-${q}`;
-        list.push({
-          item: c,
-          unitKey: uKey,
-          orderItemId: c.orderItemId ? String(c.orderItemId) : String(c.menuItem.id),
-          unitPrice: unitP,
-          stage: effStage,
-        });
-      }
+      list.push({
+        item: c,
+        unitKey: uKey,
+        orderItemId: c.orderItemId ? String(c.orderItemId) : String(c.menuItem.id),
+        quantity: qty,
+        unitPrice: unitP,
+        lineTotal: c.lineTotal || (unitP * qty),
+        stage: effStage,
+      });
     });
 
     return list;
@@ -366,6 +368,9 @@ export const MobileLiveCartKOT: React.FC<MobileLiveCartKOTProps> = ({
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
+                            <span className="w-5 h-5 rounded-md bg-amber-500 text-slate-950 text-[11px] font-black flex items-center justify-center shrink-0 shadow-2xs">
+                              {unit.quantity}x
+                            </span>
                             <span className={`w-2 h-2 rounded-full shrink-0 ${isNonVeg ? 'bg-rose-500' : 'bg-emerald-500'}`} />
                             <span className={`text-xs sm:text-sm block truncate ${
                               isServed ? 'font-bold text-slate-400 line-through decoration-2' : 'font-black text-slate-900'
@@ -374,7 +379,10 @@ export const MobileLiveCartKOT: React.FC<MobileLiveCartKOTProps> = ({
                             </span>
                           </div>
                           <span className="text-[11px] text-slate-500 font-bold block mt-0.5">
-                            <span className="text-amber-800 font-black">₹{unit.unitPrice}</span>
+                            <span className="text-amber-800 font-black">₹{unit.lineTotal}</span>
+                            {unit.quantity > 1 && (
+                              <span className="text-slate-400 font-normal ml-1">({unit.quantity} × ₹{unit.unitPrice})</span>
+                            )}
                           </span>
                         </div>
                       </div>

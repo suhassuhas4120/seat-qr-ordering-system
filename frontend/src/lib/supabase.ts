@@ -891,7 +891,11 @@ export const realtimeBridge = {
       orders.forEach((o) => {
         const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
         const isTargetChair = !cleanChair || oChair === cleanChair || o.order.chair_id === meta?.chairId;
-        const isTargetTicket = !tNum || o.order.ticket_number === tNum || tNum.includes(o.order.ticket_number || '');
+        const isTargetTicket =
+          !tNum ||
+          o.order.ticket_number === tNum ||
+          tNum.includes(o.order.ticket_number || '') ||
+          (o.order.ticket_number && tNum.split('•').some((part) => part.trim() === o.order.ticket_number));
         if (isTargetChair && isTargetTicket) {
           o.items.forEach((it) => {
             const matches =
@@ -1265,9 +1269,15 @@ export const realtimeBridge = {
 
           const remoteOrders = orders.map((o) => {
             const rawItems = (items || []).filter((it) => it.order_id === o.id).map((it) => {
-              const addons = Array.isArray(it.addons) ? it.addons : [];
+              const localOrder = localOrders.find((lo) => lo.order.id === o.id || lo.order.ticket_number === o.ticket_number);
+              const localItem = localOrder?.items?.find((li) => li.id === it.id || li.dish_id === it.dish_id || li.dish_name?.toLowerCase().trim() === it.dish_name?.toLowerCase().trim());
+              const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
+
+              const addons = Array.isArray(it.addons) ? [...it.addons] : [];
+              if (isLocallyServed && !addons.includes('SERVED')) addons.push('SERVED');
+
               let effStage: 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED' = 'PLACED';
-              if (addons.includes('SERVED') || it.stage === 'SERVED') {
+              if (addons.includes('SERVED') || it.stage === 'SERVED' || isLocallyServed) {
                 effStage = 'SERVED';
               } else if (it.stage === 'READY') {
                 effStage = 'READY';
@@ -1281,6 +1291,7 @@ export const realtimeBridge = {
               return {
                 ...it,
                 stage: effStage,
+                addons,
               };
             });
             const hydrated = this.hydrateOrderItemStages(o, rawItems);
@@ -1326,18 +1337,28 @@ export const realtimeBridge = {
                 status: t.overallStage === 'SERVED' ? 'completed' : 'pending',
                 total_amount: t.totalAmount || 0,
               } as OrderRecord,
-              items: (t.items || []).map((it: any) => ({
-                id: it.id,
-                order_id: t.id,
-                chair_id: chairId,
-                seat_label: `SEAT ${chairId}`,
-                dish_id: `dish-${it.menuItemId}`,
-                dish_name: it.nameSnapshot,
-                quantity: it.quantity,
-                price: it.priceSnapshot,
-                stage: it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED',
-                notes: it.notes || '',
-              })) as OrderItemRecord[],
+              items: (t.items || []).map((it: any) => {
+                const initialStage = it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED';
+                const localOrder = localOrders.find((lo) => lo.order.id === t.id || lo.order.ticket_number === t.orderNumber);
+                const localItem = localOrder?.items?.find((li) => li.id === it.id || (li.dish_id && `dish-${it.menuItemId}` === li.dish_id) || li.dish_name?.toLowerCase().trim() === it.nameSnapshot?.toLowerCase().trim());
+                const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
+                const effectiveStage = isLocallyServed ? 'SERVED' : initialStage;
+                const addonsList = isLocallyServed ? ['SERVED'] : (Array.isArray(it.addons) ? it.addons : []);
+
+                return {
+                  id: it.id,
+                  order_id: t.id,
+                  chair_id: chairId,
+                  seat_label: `SEAT ${chairId}`,
+                  dish_id: `dish-${it.menuItemId}`,
+                  dish_name: it.nameSnapshot,
+                  quantity: it.quantity,
+                  price: it.priceSnapshot,
+                  stage: effectiveStage,
+                  notes: it.notes || '',
+                  addons: addonsList,
+                };
+              }) as OrderItemRecord[],
             };
           });
           setLocalOrdersList(backendOrders);

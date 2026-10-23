@@ -123,30 +123,32 @@ export const TabletLiveTicket: React.FC<TabletLiveTicketProps> = ({
     return ticketItems.filter(item => !item.orderItemId && !item.isPunched);
   }, [ticketItems]);
 
-  // List committed items individually without 3x/4x grouping to avoid confusion
+  // List committed items keeping exact ordered quantities (e.g. 2x, 3x)
   const committedItems = useMemo(() => {
     const committed = ticketItems.filter(item => Boolean(item.orderItemId || item.isPunched));
     const list: Array<{
       item: TicketItem;
       unitKey: string;
       orderItemId: string | number;
+      quantity: number;
       price: number;
+      lineTotal: number;
       status: KitchenStatus;
     }> = [];
 
     committed.forEach((item, itemIdx) => {
       const qty = item.quantity || 1;
       const status = item.status || 'PLACED';
-      for (let q = 0; q < qty; q++) {
-        const uKey = item.orderItemId ? String(item.orderItemId) : `ticket-${item.id}-${itemIdx}-${q}`;
-        list.push({
-          item,
-          unitKey: uKey,
-          orderItemId: item.orderItemId || item.id,
-          price: item.price,
-          status,
-        });
-      }
+      const uKey = item.orderItemId ? String(item.orderItemId) : `ticket-${item.id}-${itemIdx}`;
+      list.push({
+        item,
+        unitKey: uKey,
+        orderItemId: item.orderItemId || item.id,
+        quantity: qty,
+        price: item.price,
+        lineTotal: item.price * qty,
+        status,
+      });
     });
 
     return list;
@@ -258,11 +260,19 @@ export const TabletLiveTicket: React.FC<TabletLiveTicketProps> = ({
                       >
                         <div className="flex items-center justify-between gap-2.5">
                           <div className="min-w-0 flex-1">
-                            <span className={`font-black block truncate text-xs sm:text-sm ${isServed ? 'text-slate-400 line-through decoration-2' : 'text-slate-900'}`}>
-                              {unit.item.name}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-md bg-amber-500 text-slate-950 text-[11px] font-black flex items-center justify-center shrink-0 shadow-2xs">
+                                {unit.quantity}x
+                              </span>
+                              <span className={`font-black block truncate text-xs sm:text-sm ${isServed ? 'text-slate-400 line-through decoration-2' : 'text-slate-900'}`}>
+                                {unit.item.name}
+                              </span>
+                            </div>
                             <span className="text-xs text-slate-500 font-bold block mt-0.5">
-                              ₹{unit.price}
+                              ₹{unit.lineTotal}
+                              {unit.quantity > 1 && (
+                                <span className="text-slate-400 font-normal ml-1">({unit.quantity} × ₹{unit.price})</span>
+                              )}
                             </span>
                           </div>
 

@@ -213,8 +213,19 @@ export class OrderService {
     let targetOrder: Order | undefined;
     let targetItem: OrderItem | undefined;
 
+    const strId = String(itemId);
+    const cleanItemId = strId.replace(/-[0-9]+$/, '');
+
     for (const order of db.data.orders) {
-      const found = order.items.find((i) => i.id === itemId);
+      const found = order.items.find((i) =>
+        i.id === strId ||
+        i.id === cleanItemId ||
+        String(i.menuItemId) === strId ||
+        String(i.menuItemId) === cleanItemId ||
+        `dish-${i.menuItemId}` === strId ||
+        `dish-${i.menuItemId}` === cleanItemId ||
+        (i.nameSnapshot && i.nameSnapshot.toLowerCase().trim() === strId.toLowerCase().trim())
+      );
       if (found) {
         targetOrder = order;
         targetItem = found;
@@ -223,7 +234,7 @@ export class OrderService {
     }
 
     if (!targetOrder || !targetItem) {
-      throw new Error('Order item not found');
+      throw new Error(`Order item not found for identifier: ${itemId}`);
     }
 
     const now = new Date().toISOString();
