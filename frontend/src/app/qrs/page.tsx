@@ -24,8 +24,10 @@ interface SeatQR {
   qrDataUrl: string;
 }
 
+const CANONICAL_PRODUCTION_URL = 'https://thoogudeepa-frontend.vercel.app';
+
 export default function SeatQRsPage() {
-  const [hostPreset, setHostPreset] = useState<'current' | 'cloud' | 'wifi' | 'local' | 'custom'>('current');
+  const [hostPreset, setHostPreset] = useState<'production' | 'current' | 'wifi' | 'local' | 'custom'>('production');
   const [currentOrigin, setCurrentOrigin] = useState<string>('');
   const [customOrigin, setCustomOrigin] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -41,12 +43,19 @@ export default function SeatQRsPage() {
   }, []);
 
   const effectiveBaseUrl = useMemo(() => {
-    if (hostPreset === 'current') return currentOrigin || 'https://amenities-mods-point-diving.trycloudflare.com';
-    if (hostPreset === 'cloud') return 'https://thoogudeepa-v2.netlify.app';
+    if (hostPreset === 'production') return CANONICAL_PRODUCTION_URL;
+    if (hostPreset === 'current') {
+      if (currentOrigin && currentOrigin.includes('.vercel.app')) {
+        // If viewing from a preview domain (e.g. thoogudeepa-frontend-xxxx-suhasss.vercel.app),
+        // route QR codes to public production so mobile cameras never hit the Vercel SSO login screen
+        return CANONICAL_PRODUCTION_URL;
+      }
+      return currentOrigin || CANONICAL_PRODUCTION_URL;
+    }
     if (hostPreset === 'wifi') return 'http://192.168.0.4:3005';
     if (hostPreset === 'local') return 'http://localhost:3005';
     if (hostPreset === 'custom' && customOrigin.trim()) return customOrigin.trim().replace(/\/$/, '');
-    return currentOrigin || 'http://localhost:3005';
+    return CANONICAL_PRODUCTION_URL;
   }, [hostPreset, currentOrigin, customOrigin]);
 
   // Generate 100 QR codes
@@ -183,6 +192,18 @@ export default function SeatQRsPage() {
             <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
               <button
                 type="button"
+                onClick={() => setHostPreset('production')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  hostPreset === 'production'
+                    ? 'bg-zinc-950 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-950'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Production (Public No-Login)</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setHostPreset('current')}
                 className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   hostPreset === 'current'
@@ -191,19 +212,7 @@ export default function SeatQRsPage() {
                 }`}
               >
                 <QrCode className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Live Tunnel / Current</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setHostPreset('cloud')}
-                className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  hostPreset === 'cloud'
-                    ? 'bg-zinc-950 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-zinc-950'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Netlify Cloud</span>
+                <span>Current Host</span>
               </button>
               <button
                 type="button"

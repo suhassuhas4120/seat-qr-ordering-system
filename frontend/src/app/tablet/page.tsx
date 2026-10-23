@@ -271,7 +271,7 @@ export default function WaiterTabletPage() {
               {/* Direct QR Link */}
               <div className="pt-2">
                 <a
-                  href={activeSeat.qrUrl}
+                  href={activeSeat.qrUrl || `https://thoogudeepa-frontend.vercel.app/seat/${String(activeSeat.seatNumber).padStart(2, '0')}/`}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2"
