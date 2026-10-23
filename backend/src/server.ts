@@ -178,14 +178,15 @@ app.post('/api/menu/items/:itemId/availability', async (req, reply) => {
 app.post('/api/payments/process', async (req, reply) => {
   const { seatId, gateway, settledByRole, staffId, gatewayPaymentId } = req.body as any;
 
-  if (!seatId || !gateway) {
-    return reply.status(400).send({ error: 'Missing seatId or gateway.' });
+  if (!seatId) {
+    return reply.status(400).send({ error: 'Missing seatId.' });
   }
 
   try {
+    const effectiveGateway = (gateway || (settledByRole === 'WAITER' || settledByRole === 'MANAGER' ? 'CASH' : 'RAZORPAY')).toUpperCase();
     const result = await paymentService.processPayment({
       seatId: Number(seatId),
-      gateway: gateway || 'RAZORPAY',
+      gateway: effectiveGateway as any,
       settledByRole: settledByRole || 'CUSTOMER_SELF',
       staffId: staffId ? Number(staffId) : undefined,
       gatewayPaymentId,

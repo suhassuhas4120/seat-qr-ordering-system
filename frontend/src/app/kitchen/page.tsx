@@ -294,17 +294,19 @@ export default function KitchenDisplaySystemPage() {
         setStockStatus((prev) => ({ ...prev, [data.dishId]: data.isAvailable }));
       },
       onBillSettled: (data) => {
-        const chair = data.chairId ? data.chairId.replace(/[^0-9]/g, '') : '';
-        setActiveOrders((prev) =>
-          prev.filter((o) => {
-            const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
-            return oChair !== chair && o.order.chair_id !== data.chairId;
-          })
-        );
+        const chair = (data.chairId || data.normChairId || data.rawChairId || '').replace(/[^0-9]/g, '');
+        if (chair) {
+          setActiveOrders((prev) =>
+            prev.filter((o) => {
+              const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';
+              return oChair !== chair && o.order.chair_id !== data.chairId;
+            })
+          );
+        }
       },
       onSeatOccupancyChange: (data) => {
         if (!data.isOccupied) {
-          const chair = data.chairId ? data.chairId.replace(/[^0-9]/g, '') : '';
+          const chair = (data.chairId || '').replace(/[^0-9]/g, '');
           setActiveOrders((prev) =>
             prev.filter((o) => {
               const oChair = o.order.chair_id ? o.order.chair_id.replace(/[^0-9]/g, '') : '';

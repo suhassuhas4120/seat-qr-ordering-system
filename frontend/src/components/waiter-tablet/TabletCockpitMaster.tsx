@@ -418,7 +418,7 @@ export const TabletCockpitMaster: React.FC = () => {
         refreshAlerts();
         const curSeat = (activeSeatNameRef.current || '').split(':')[0].trim();
         const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
-        const targetChair = (data?.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        const targetChair = (data?.chairId || data?.normChairId || data?.rawChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
         if (targetChair && cleanCurSeat && targetChair === cleanCurSeat) {
           setTicketItems([]);
           setDishQuantities({});

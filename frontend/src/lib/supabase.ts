@@ -288,6 +288,53 @@ function initSocketBridge() {
       });
     });
 
+    const handleRemoteSeatVacated = (seatIdentifier: string | number, amount?: number, paymentId?: string) => {
+      const cleanChair = String(seatIdentifier || '').replace(/[^0-9]/g, '');
+      if (!cleanChair) return;
+      const unpadded = cleanChair.replace(/^0+/, '');
+      const padded = cleanChair.padStart(2, '0');
+      const possibleChairs = [cleanChair, unpadded, padded, `Seat ${cleanChair}`, `Seat ${padded}`];
+
+      // 1. Purge from local occupancy map
+      const map = getLocalOccupancyMap();
+      for (const k of possibleChairs) {
+        delete map[k];
+      }
+      setLocalOccupancyMap(map);
+
+      // 2. Purge from local orders list
+      const orders = getLocalOrdersList();
+      const updated = orders.filter((o) => {
+        const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
+        return oChair !== cleanChair && !possibleChairs.includes(o.order.chair_id);
+      });
+      setLocalOrdersList(updated);
+
+      // 3. Clear localStorage / sessionStorage caches
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(`thoogudeepa_item_stages_${cleanChair}`);
+          localStorage.removeItem(`thoogudeepa_item_stages_${padded}`);
+          localStorage.removeItem(`thoogudeepa_item_stages_${unpadded}`);
+          localStorage.removeItem(`thoogudeepa_dining_session_${cleanChair}`);
+          localStorage.removeItem(`thoogudeepa_dining_session_${padded}`);
+          localStorage.removeItem(`thoogudeepa_active_ticket_${cleanChair}`);
+          sessionStorage.removeItem(`thoogudeepa_cart_items_${cleanChair}`);
+        } catch {}
+      }
+
+      // 4. Clear active bill requests
+      for (const k of possibleChairs) {
+        realtimeBridge.clearActiveBillRequest(k);
+      }
+
+      // 5. Instantly notify all subscribers across components
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onSeatOccupancyChange?.({ chairId: cleanChair, isOccupied: false });
+        cb.onBillSettled?.({ chairId: cleanChair, amount, ticketNumber: paymentId });
+      });
+    };
+
     socket.on(SOCKET_EVENTS.SEAT_CLAIMED, (payload: any) => {
       activeKdsSubscribers.forEach((cb) => {
         cb.onSeatOccupancyChange?.({ chairId: String(payload.seatId), isOccupied: true });
@@ -295,17 +342,22 @@ function initSocketBridge() {
     });
 
     socket.on(SOCKET_EVENTS.SEAT_VACATED, (payload: any) => {
-      activeKdsSubscribers.forEach((cb) => {
-        cb.onSeatOccupancyChange?.({ chairId: String(payload.seatId), isOccupied: false });
-        cb.onBillSettled?.({ chairId: String(payload.seatId) });
-      });
+      handleRemoteSeatVacated(payload.seatId || payload.chairId);
     });
 
     socket.on(SOCKET_EVENTS.PAYMENT_SUCCESS, (payload: any) => {
-      activeKdsSubscribers.forEach((cb) => {
-        cb.onBillSettled?.({ chairId: String(payload.seatId), amount: payload.amount, ticketNumber: payload.paymentId });
-        cb.onSeatOccupancyChange?.({ chairId: String(payload.seatId), isOccupied: false });
-      });
+      handleRemoteSeatVacated(payload.seatId || payload.chairId, payload.amount, payload.paymentId);
+    });
+
+    socket.on(SOCKET_EVENTS.SEAT_STATUS_UPDATED, (payload: any) => {
+      if (payload.status === 'VACANT') {
+        handleRemoteSeatVacated(payload.seatId);
+      } else if (payload.status === 'OCCUPIED') {
+        const chairStr = String(payload.seatId);
+        activeKdsSubscribers.forEach((cb) => {
+          cb.onSeatOccupancyChange?.({ chairId: chairStr, isOccupied: true });
+        });
+      }
     });
 
     socket.on(SOCKET_EVENTS.MENU_ITEM_AVAILABILITY_CHANGED, (payload: any) => {
@@ -1796,13 +1848,14 @@ export const realtimeBridge = {
     // Notify Fastify backend of payment settlement
     try {
       const cleanSeatId = Number(cleanChair) || 1;
+      const gw = (paymentMethod ? String(paymentMethod).toUpperCase() : 'CASH');
       fetch(`${getBackendUrl()}/api/payments/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           seatId: cleanSeatId,
-          gateway: paymentMethod || 'RAZORPAY',
-          settledByRole: 'CUSTOMER_SELF',
+          gateway: gw,
+          settledByRole: 'WAITER',
         }),
       }).catch(() => {});
     } catch {}
@@ -1982,7 +2035,7 @@ export const realtimeBridge = {
       const uncompletedOrders = seatOrders.filter(
         (o) => o.order.status !== 'completed' && o.order.status !== 'cancelled'
       );
-      const currentTicketOrders = uncompletedOrders.length > 0 ? uncompletedOrders : seatOrders;
+      const currentTicketOrders = uncompletedOrders;
 
       const allSeatItems: OrderItemRecord[] = [];
       const seenFloorItemIds = new Set<string>();
@@ -2145,7 +2198,10 @@ export const realtimeBridge = {
       const uncompletedOrders = matchingOrders.filter(
         (o) => o.order.status !== 'completed' && o.order.status !== 'cancelled'
       );
-      const sessionOrders = uncompletedOrders.length > 0 ? uncompletedOrders : matchingOrders;
+      if (uncompletedOrders.length === 0) {
+        return { order: null, items: [] };
+      }
+      const sessionOrders = uncompletedOrders;
 
       const hasAuthoritative = sessionOrders.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
       const effectiveOrders = hasAuthoritative

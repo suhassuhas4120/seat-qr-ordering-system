@@ -46,6 +46,9 @@ export default function LiveOrderTrackingPage() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Synchronize latest dish stages and order items from server
+  const sessionRef = React.useRef(session);
+  sessionRef.current = session;
+
   const syncLatestStages = useCallback(async () => {
     try {
       setIsSyncing(true);
@@ -274,14 +277,47 @@ export default function LiveOrderTrackingPage() {
         if (!data.isOccupied) {
           const cleanTarget = (data.chairId || '').replace(/[^0-9]/g, '');
           if (cleanTarget === cleanCurrentChair) {
-            router.replace(`/seat/${chairId}`);
+            const amtVal = sessionRef.current?.totalAmount || 0;
+            try {
+              localStorage.setItem(
+                `thoogudeepa_settled_receipt_${chairId}`,
+                JSON.stringify({
+                  ticketNumber: sessionRef.current?.ticketNumber,
+                  seatId: chairId,
+                  items: sessionRef.current?.items || [],
+                  subtotal: sessionRef.current?.items?.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amtVal / 1.05),
+                  tip: 0,
+                  totalAmount: amtVal,
+                  mode: 'Cash',
+                  settledAt: Date.now(),
+                })
+              );
+            } catch {}
+            window.location.replace(`/seat/${chairId}/payment-success?mode=Cash&amount=${amtVal}`);
           }
         }
       },
       onBillSettled: (data) => {
-        const cleanTarget = (data.chairId || '').replace(/[^0-9]/g, '');
+        const cleanTarget = (data.chairId || data.rawChairId || data.normChairId || '').replace(/[^0-9]/g, '');
         if (cleanTarget === cleanCurrentChair) {
-          router.replace(`/seat/${chairId}/receipt`);
+          const modeVal = data.paymentMethod || 'Paid via Counter / Waiter';
+          const amtVal = data.amount || sessionRef.current?.totalAmount || 0;
+          try {
+            localStorage.setItem(
+              `thoogudeepa_settled_receipt_${chairId}`,
+              JSON.stringify({
+                ticketNumber: sessionRef.current?.ticketNumber || data.ticketNumber,
+                seatId: chairId,
+                items: sessionRef.current?.items || [],
+                subtotal: sessionRef.current?.items?.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amtVal / 1.05),
+                tip: 0,
+                totalAmount: amtVal,
+                mode: modeVal,
+                settledAt: Date.now(),
+              })
+            );
+          } catch {}
+          window.location.replace(`/seat/${chairId}/payment-success?mode=${encodeURIComponent(modeVal)}&amount=${amtVal}`);
         }
       },
       onClearAll: () => {

@@ -16,7 +16,9 @@ export class PaymentService {
     staffId?: number;
     gatewayPaymentId?: string;
   }) {
-    const { seatId, gateway, settledByRole, staffId, gatewayPaymentId } = params;
+    const { seatId, settledByRole, staffId, gatewayPaymentId } = params;
+    const rawGw = (params.gateway ? String(params.gateway).toUpperCase() : 'RAZORPAY');
+    const gateway: PaymentGateway = (['RAZORPAY', 'STRIPE', 'CASH', 'UPI'].includes(rawGw) ? rawGw : 'RAZORPAY') as PaymentGateway;
 
     // 1. Concurrency lock to prevent double-charging or simultaneous payments
     const lockAcquired = await mutexService.acquireLock(`payment:seat:${seatId}`, 'payment_engine', 15);
@@ -28,16 +30,31 @@ export class PaymentService {
       const seat = db.data.seats.find((s) => s.id === seatId);
       if (!seat) throw new Error('Seat not found');
 
-      const session = db.data.seatSessions.find(
+      let session = db.data.seatSessions.find(
         (s) => s.seatId === seatId && s.status === 'ACTIVE'
       );
 
       if (!session) {
-        throw new Error('No active order session found for this seat to settle.');
+        session = db.data.seatSessions.filter((s) => s.seatId === seatId).slice(-1)[0];
+      }
+
+      const now = new Date().toISOString();
+
+      if (!session) {
+        session = {
+          id: `sess-${seatId}-${Date.now()}`,
+          seatId,
+          sessionToken: `token-${Date.now()}`,
+          status: 'ACTIVE',
+          startedAt: now,
+        };
+        db.data.seatSessions.push(session);
       }
 
       // Fetch active orders to calculate exact bill
-      const seatOrders = db.data.orders.filter((o) => o.sessionId === session.id);
+      const seatOrders = db.data.orders.filter(
+        (o) => (o.sessionId === session!.id || o.seatId === seatId) && o.overallStage !== 'PAID'
+      );
       const allItems = seatOrders.flatMap((o) => o.items);
 
       const subtotal = allItems.reduce((acc, curr) => acc + curr.priceSnapshot * curr.quantity, 0);
@@ -46,7 +63,6 @@ export class PaymentService {
 
       const paymentId = crypto.randomUUID();
       const txId = gatewayPaymentId || `PAY_${Date.now()}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-      const now = new Date().toISOString();
       const newEpochHash = crypto.randomBytes(8).toString('hex'); // Rotates dynamic QR code!
 
       // 2. Atomic settlement & Microsecond Auto-Unlock
@@ -110,10 +126,17 @@ export class PaymentService {
       // 3. Multi-device real-time broadcast in < 50ms
       if (io) {
         io.to(`seat:${seatId}`).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, payload);
+        io.emit(SOCKET_EVENTS.PAYMENT_SUCCESS, payload);
         io.emit(SOCKET_EVENTS.SEAT_VACATED, {
           seatId,
           seatNumber: seat.seatNumber,
           vacatedAt: now,
+        });
+        io.emit(SOCKET_EVENTS.SEAT_STATUS_UPDATED, {
+          seatId,
+          status: 'VACANT',
+          activeOrderTotal: 0,
+          activeItemCount: 0,
         });
       }
 

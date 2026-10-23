@@ -502,7 +502,7 @@ export const MobileCockpitMaster: React.FC = () => {
         refreshAlerts();
         const curSeat = selectedSeatRef.current || '';
         const cleanCurSeat = curSeat.replace(/[^0-9]/g, '').replace(/^0+/, '');
-        const targetChair = (data?.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+        const targetChair = (data?.chairId || data?.normChairId || data?.rawChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
         if (targetChair) {
           setVerifiedBillSeats(prev => {
             const next = { ...prev };
