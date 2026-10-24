@@ -10,7 +10,10 @@ import {
   Gift,
   Clock,
   ArrowDownToLine,
+  CreditCard,
+  Plus,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { realtimeBridge, OrderRecord, OrderItemRecord } from '@/lib/supabase';
 import { StaffRosterMember } from './types';
 
@@ -27,6 +30,18 @@ interface HandoverReceipt {
   receivedBy: string;
 }
 
+interface TipPayoutRecord {
+  id: string;
+  captainName: string;
+  amount: number;
+  timestamp: string;
+}
+
+interface EnhancedStaffMember extends StaffRosterMember {
+  digitalCollected: number;
+  totalSales: number;
+}
+
 export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps) {
   const [settledBills, setSettledBills] = useState<any[]>(() => {
     return realtimeBridge.getSettledBills ? realtimeBridge.getSettledBills() : [];
@@ -36,6 +51,15 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
   });
   const [captainTips, setCaptainTips] = useState<Record<string, number>>(() => {
     return realtimeBridge.getCaptainTips ? realtimeBridge.getCaptainTips() : {};
+  });
+  const [tipPayouts, setTipPayouts] = useState<TipPayoutRecord[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('thoogudeepa_v2_tip_payouts');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
   });
   const [handoverAmounts, setHandoverAmounts] = useState<Record<string, string>>({});
 
@@ -49,6 +73,12 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
     }
     if (realtimeBridge.getCaptainTips) {
       setCaptainTips(realtimeBridge.getCaptainTips());
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('thoogudeepa_v2_tip_payouts');
+        setTipPayouts(raw ? JSON.parse(raw) : []);
+      } catch {}
     }
   }, []);
 
@@ -105,23 +135,24 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
       id: 'st-tk',
       name: 'Takeaway Counter',
       role: 'Parcel Desk',
-      assignedSection: 'Takeaway (TK-01)',
+      assignedSection: 'Takeaway (Seat 0 / Parcel)',
       zoneMin: 0,
       zoneMax: 0,
       isTakeaway: true,
     },
   ], []);
 
-  // Compute live cash collected, handovers, and active table counts per captain
-  const staffList: StaffRosterMember[] = useMemo(() => {
+  // Compute live cash collected, digital sales, handovers, and active table counts per captain
+  const staffList: EnhancedStaffMember[] = useMemo(() => {
     return STAFF_CONFIG.map((conf) => {
-      // Find all cash-settled bills matching this captain's zone
-      const cashBills = settledBills.filter((b) => {
-        const isCash = (b.method || '').toUpperCase() === 'CASH';
-        if (!isCash) return false;
+      // Find all bills matching this captain's zone
+      const zoneBills = settledBills.filter((b) => {
         if (conf.isTakeaway) {
           return (
+            b.tableName === 'Seat 0 (Parcel)' ||
             b.tableName === 'TK-01' ||
+            (b.tableName || '').toLowerCase().includes('parcel') ||
+            (b.tableName || '').toLowerCase().includes('takeaway') ||
             b.seatNumber === 0 ||
             (b.seatLabel || '').toLowerCase().includes('takeaway') ||
             (b.seatLabel || '').toLowerCase().includes('parcel')
@@ -131,10 +162,19 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
         return sNum >= conf.zoneMin && sNum <= conf.zoneMax;
       });
 
+      // Split into Cash vs Digital
+      const cashBills = zoneBills.filter((b) => (b.method || '').toUpperCase() === 'CASH');
+      const digitalBills = zoneBills.filter((b) => (b.method || '').toUpperCase() !== 'CASH');
+
       const cashCollected = cashBills.reduce(
         (sum, b) => sum + (Number(b.grandTotal) || 0),
         0
       );
+      const digitalCollected = digitalBills.reduce(
+        (sum, b) => sum + (Number(b.grandTotal) || 0),
+        0
+      );
+      const totalSales = cashCollected + digitalCollected;
 
       // Find total cash handed over to safe by this staff member
       const staffHandovers = handovers.filter(
@@ -145,18 +185,30 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
         0
       );
 
-      // Count active tables currently placed/seated in this zone from liveOrders
-      const activeTablesCount = (liveOrders || []).filter((lo) => {
+      // Count distinct active tables currently placed/seated in this zone from liveOrders
+      const activeTablesSet = new Set<string>();
+      (liveOrders || []).forEach((lo) => {
         const chairRaw = (lo.order.chair_id || '').trim();
         const isTk =
+          chairRaw === '0' ||
+          chairRaw === '00' ||
+          chairRaw === 'TK-00' ||
           chairRaw === 'TK-01' ||
           chairRaw.toLowerCase().includes('takeaway') ||
-          chairRaw.toLowerCase().includes('parcel');
-        if (conf.isTakeaway) return isTk;
-        if (isTk) return false;
-        const chairNum = parseInt(chairRaw.replace(/[^0-9]/g, ''), 10) || 1;
-        return chairNum >= conf.zoneMin && chairNum <= conf.zoneMax;
-      }).length;
+          chairRaw.toLowerCase().includes('parcel') ||
+          (lo.order as any).seat_id === 0;
+
+        if (conf.isTakeaway && isTk) {
+          activeTablesSet.add('Seat 0 (Parcel)');
+        } else if (!conf.isTakeaway && !isTk) {
+          const chairNum = parseInt(chairRaw.replace(/[^0-9]/g, ''), 10) || 1;
+          if (chairNum >= conf.zoneMin && chairNum <= conf.zoneMax) {
+            const tableNum = Math.ceil(chairNum / 4);
+            activeTablesSet.add(`T-${String(tableNum).padStart(2, '0')}`);
+          }
+        }
+      });
+      const activeTablesCount = activeTablesSet.size;
 
       return {
         id: conf.id,
@@ -168,6 +220,8 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
         phone: '',
         cashCollected,
         cashHandedOver,
+        digitalCollected,
+        totalSales,
       };
     });
   }, [STAFF_CONFIG, settledBills, handovers, liveOrders]);
@@ -175,6 +229,8 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
   // Aggregate statistics
   const totalCashCollected = staffList.reduce((sum, s) => sum + s.cashCollected, 0);
   const totalCashHandedOver = staffList.reduce((sum, s) => sum + s.cashHandedOver, 0);
+  const totalDigitalCollected = staffList.reduce((sum, s) => sum + s.digitalCollected, 0);
+  const totalSalesAll = staffList.reduce((sum, s) => sum + s.totalSales, 0);
   const totalCashDue = Math.max(0, totalCashCollected - totalCashHandedOver);
 
   // Tips per staff
@@ -196,13 +252,14 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
     staffId: string,
     staffName: string,
     cashCollected: number,
-    cashHandedOver: number
+    cashHandedOver: number,
+    directAmount?: number
   ) => {
     const amountDue = Math.max(0, cashCollected - cashHandedOver);
-    const amount = Number(handoverAmounts[staffId] ?? '');
+    const amount = typeof directAmount === 'number' ? directAmount : Number(handoverAmounts[staffId] ?? '');
 
     if (!Number.isFinite(amount) || amount <= 0 || amount > amountDue) {
-      alert(`Enter an amount between ₹1 and ₹${amountDue.toLocaleString('en-IN')} for ${staffName}.`);
+      toast.error(`Please enter an amount between ₹1 and ₹${amountDue.toLocaleString('en-IN')} for ${staffName}.`);
       return;
     }
 
@@ -211,7 +268,7 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
     }
     setHandoverAmounts((cur) => ({ ...cur, [staffId]: '' }));
     reloadData();
-    alert(`₹${amount.toLocaleString('en-IN')} received from ${staffName} into Till Safe.`);
+    toast.success(`₹${amount.toLocaleString('en-IN')} received from ${staffName} into Manager Till Safe.`);
   };
 
   // Handle tip payout
@@ -221,7 +278,22 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
       realtimeBridge.recordTipPayout(captainName, amount);
     }
     reloadData();
-    alert(`₹${amount.toLocaleString('en-IN')} tip paid to ${captainName}!`);
+    toast.success(`₹${amount.toLocaleString('en-IN')} tip paid out to ${captainName}!`);
+  };
+
+  // Handle manual tip credit (e.g. cash tip handed to manager)
+  const handleAddTip = (captainName: string, amount: number) => {
+    if (amount <= 0) return;
+    try {
+      const tipsRaw = localStorage.getItem('thoogudeepa_v2_captain_tips');
+      const tips = tipsRaw ? JSON.parse(tipsRaw) : {};
+      tips[captainName] = (tips[captainName] || 0) + amount;
+      localStorage.setItem('thoogudeepa_v2_captain_tips', JSON.stringify(tips));
+      reloadData();
+      toast.success(`+₹${amount.toLocaleString('en-IN')} tip credited to ${captainName}.`);
+    } catch {
+      toast.error('Failed to credit tip.');
+    }
   };
 
   return (
@@ -237,7 +309,7 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
               WAITER CASH &amp; TIPS
             </span>
             <h1 className="text-base sm:text-lg font-black font-mono text-slate-900 mt-1">
-              Waiter Cash &amp; Tips
+              Waiter Cash Handover &amp; Shift Tips
             </h1>
           </div>
         </div>
@@ -245,12 +317,20 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
         {/* Global Cash Status Overview */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="text-xs font-bold text-slate-700 bg-[#FAF8F5] border border-slate-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
-            <Banknote className="h-4 w-4 text-emerald-600" />
-            <span>Handed Over: <strong className="text-emerald-700">₹{totalCashHandedOver.toLocaleString('en-IN')}</strong></span>
+            <Banknote className="h-4 w-4 text-slate-700" />
+            <span>Cash Sales: <strong className="text-slate-900">₹{totalCashCollected.toLocaleString('en-IN')}</strong></span>
+          </div>
+          <div className="text-xs font-bold text-slate-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+            <Check className="h-4 w-4 text-emerald-600" />
+            <span>In Safe: <strong className="text-emerald-700">₹{totalCashHandedOver.toLocaleString('en-IN')}</strong></span>
           </div>
           <div className="text-xs font-bold text-slate-700 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
             <Clock className="h-4 w-4 text-orange-600" />
-            <span>Due: <strong className="text-[#9C3D1E]">₹{totalCashDue.toLocaleString('en-IN')}</strong></span>
+            <span>Pending Due: <strong className="text-[#9C3D1E]">₹{totalCashDue.toLocaleString('en-IN')}</strong></span>
+          </div>
+          <div className="text-xs font-bold text-slate-700 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+            <Gift className="h-4 w-4 text-purple-600" />
+            <span>Tips Pool: <strong className="text-purple-700">₹{totalTipsToday.toLocaleString('en-IN')}</strong></span>
           </div>
         </div>
       </div>
@@ -267,7 +347,7 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
               </h3>
             </div>
             <span className="text-[10px] text-slate-500 font-bold">
-              Total Collected: ₹{totalCashCollected.toLocaleString('en-IN')}
+              Total Shift Sales: ₹{totalSalesAll.toLocaleString('en-IN')}
             </span>
           </div>
 
@@ -289,7 +369,7 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
                         </span>
                       </div>
                       <span className="text-[11px] text-slate-500 block mt-0.5">
-                        {st.assignedSection} • {st.tablesCount} Active Tables
+                        {st.assignedSection} • {st.tablesCount} Active {st.role === 'Parcel Desk' ? 'Queue' : 'Tables'}
                       </span>
                     </div>
                     <span
@@ -303,39 +383,56 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs border-t border-slate-200 pt-2 text-slate-600">
+                  {/* 4-Item Breakdown Row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs border-t border-slate-200 pt-2 text-slate-600">
                     <div>
-                      Collected: <span className="font-black text-slate-900">₹{st.cashCollected.toLocaleString('en-IN')}</span>
+                      Cash Sales: <span className="font-black text-slate-900">₹{st.cashCollected.toLocaleString('en-IN')}</span>
                     </div>
                     <div>
-                      Handed Over: <span className="font-black text-emerald-700">₹{st.cashHandedOver.toLocaleString('en-IN')}</span>
+                      UPI/Card: <span className="font-bold text-slate-500">₹{st.digitalCollected.toLocaleString('en-IN')}</span>
                     </div>
                     <div>
-                      Due: <span className="font-black text-[#9C3D1E]">₹{amountDue.toLocaleString('en-IN')}</span>
+                      In Safe: <span className="font-black text-emerald-700">₹{st.cashHandedOver.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div>
+                      Pending Due: <span className="font-black text-[#9C3D1E]">₹{amountDue.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
 
+                  {/* Handover Action Controls */}
                   {amountDue > 0 && (
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        type="number"
-                        min="1"
-                        max={amountDue}
-                        placeholder={`Enter amount (up to ₹${amountDue})`}
-                        value={handoverAmounts[st.id] || ''}
-                        onChange={(e) =>
-                          setHandoverAmounts({ ...handoverAmounts, [st.id]: e.target.value })
-                        }
-                        className="flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-900 font-mono focus:outline-none focus:ring-1 focus:ring-orange-400"
-                      />
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-slate-200/50">
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <input
+                          type="number"
+                          min="1"
+                          max={amountDue}
+                          placeholder={`Enter amount (up to ₹${amountDue})`}
+                          value={handoverAmounts[st.id] || ''}
+                          onChange={(e) =>
+                            setHandoverAmounts({ ...handoverAmounts, [st.id]: e.target.value })
+                          }
+                          className="flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-900 font-mono focus:outline-none focus:ring-1 focus:ring-orange-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleHandoverSubmit(st.id, st.name, st.cashCollected, st.cashHandedOver)
+                          }
+                          className="px-3 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-900 transition cursor-pointer shrink-0"
+                        >
+                          Receive
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
-                          handleHandoverSubmit(st.id, st.name, st.cashCollected, st.cashHandedOver)
+                          handleHandoverSubmit(st.id, st.name, st.cashCollected, st.cashHandedOver, amountDue)
                         }
-                        className="px-3 py-1 bg-[#9C3D1E] text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition cursor-pointer shrink-0"
+                        className="px-3 py-1 bg-[#9C3D1E] text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition cursor-pointer shrink-0 whitespace-nowrap flex items-center justify-center gap-1"
                       >
-                        Receive to Safe
+                        <Check className="h-3 w-3" />
+                        <span>Receive Full (₹{amountDue.toLocaleString('en-IN')})</span>
                       </button>
                     </div>
                   )}
@@ -346,9 +443,12 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
 
           {/* Recent Handover Audit Ledger */}
           <div className="border-t border-slate-200 pt-4 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-              <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Handover Log</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Handover Safe Log</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-bold">{handovers.length} receipts</span>
             </div>
 
             {handovers.length > 0 ? (
@@ -356,11 +456,11 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
                 {handovers.map((h) => (
                   <div
                     key={h.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-[#FAF8F5] border border-slate-200 text-xs"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-[#FAF8F5] border border-slate-200 text-xs"
                   >
                     <div>
                       <span className="font-bold text-slate-900 block">{h.staffName}</span>
-                      <span className="text-[10px] text-slate-400">{h.timestamp}</span>
+                      <span className="text-[10px] text-slate-400">{h.timestamp} • Received into safe</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="font-black text-emerald-700 text-xs">
@@ -387,39 +487,98 @@ export function ScreenM9WaiterCash({ liveOrders = [] }: ScreenM9WaiterCashProps)
             <div className="flex items-center gap-2">
               <Gift className="h-4 w-4 text-[#9C3D1E]" />
               <h3 className="font-mono text-xs font-black uppercase text-slate-900">
-                Captain Tips
+                Captain Tips Pool
               </h3>
             </div>
             <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              Total Tips: ₹{totalTipsToday.toLocaleString('en-IN')}
+              Available: ₹{totalTipsToday.toLocaleString('en-IN')}
             </span>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {staffTipsList.map((st) => (
               <div
                 key={st.name}
-                className="flex items-center justify-between p-3 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs"
+                className="p-3 bg-[#FAF8F5] border border-slate-200 rounded-xl text-xs space-y-2"
               >
-                <div>
-                  <span className="font-bold text-slate-900 block">{st.name}</span>
-                  <span className="text-[10px] text-slate-500">{st.section}</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-900 block">{st.name}</span>
+                    <span className="text-[10px] text-slate-500">{st.section}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 font-bold block">Available Tip</span>
+                    <span className="font-black font-mono text-emerald-700 text-sm">
+                      ₹{st.tipAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-black font-mono text-slate-900 text-sm">
-                    ₹{st.tipAmount.toLocaleString('en-IN')}
-                  </span>
+
+                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9.5px] font-bold text-slate-400 mr-0.5">Add:</span>
+                    {[50, 100, 200].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => handleAddTip(st.name, amt)}
+                        className="px-1.5 py-0.5 rounded bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        +₹{amt}
+                      </button>
+                    ))}
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => handlePayTip(st.name, st.tipAmount)}
                     disabled={st.tipAmount === 0}
-                    className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-bold disabled:opacity-40 hover:bg-emerald-700 transition cursor-pointer"
+                    className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 hover:bg-emerald-700 transition cursor-pointer shrink-0"
                   >
-                    Pay Tip
+                    Pay Tip (₹{st.tipAmount})
                   </button>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Recent Tip Payouts Ledger */}
+          <div className="border-t border-slate-200 pt-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Tip Payouts Log</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-bold">{tipPayouts.length} payouts</span>
+            </div>
+
+            {tipPayouts.length > 0 ? (
+              <div className="max-h-[220px] overflow-y-auto space-y-1.5 pr-1">
+                {tipPayouts.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-[#FAF8F5] border border-slate-200 text-xs"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-900 block">{t.captainName}</span>
+                      <span className="text-[10px] text-slate-400">{t.timestamp}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-emerald-700 text-xs">
+                        -₹{Number(t.amount).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        PAID OUT
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-slate-400 bg-[#FAF8F5] rounded-lg border border-dashed border-slate-200 text-xs">
+                No tip payouts recorded yet.
+              </div>
+            )}
           </div>
         </div>
       </div>
