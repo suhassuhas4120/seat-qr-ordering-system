@@ -492,6 +492,26 @@ function initSocketBridge() {
         cb.onResolveAlert?.(alertId);
       });
     });
+
+    socket.on('bill:settled', (payload: any) => {
+      handleRemoteSeatVacated(payload.seatId || payload.chairId, payload.amount, payload.paymentId);
+      const cleanChair = String(payload.seatId || payload.chairId || '').replace(/[^0-9]/g, '');
+      const normChair = cleanChair.replace(/^0+/, '') || cleanChair;
+      const paddedChair = cleanChair.padStart(2, '0');
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onBillSettled?.({
+          chairId: cleanChair,
+          rawChairId: String(payload.chairId || payload.seatId),
+          normChairId: normChair,
+          amount: payload.amount,
+          paymentMethod: payload.paymentMethod,
+          ticketNumber: payload.paymentId,
+        });
+        cb.onSeatOccupancyChange?.({ chairId: cleanChair, isOccupied: false });
+        cb.onSeatOccupancyChange?.({ chairId: normChair, isOccupied: false });
+        cb.onSeatOccupancyChange?.({ chairId: paddedChair, isOccupied: false });
+      });
+    });
   } catch (err) {
     console.warn('Socket bridge initialization:', err);
   }
@@ -789,6 +809,18 @@ function broadcastRealtime(event: string, payload: any) {
       sharedSupabaseChannel.send({ type: 'broadcast', event, payload }).catch(() => {});
     }
   }
+
+  // 4. Cross-device WebSocket broadcast engine (<5ms latency)
+  try {
+    const sock = getSocket();
+    if (sock && sock.connected) {
+      if (event === 'BILL_SETTLED') {
+        sock.emit('bill:settled', payload);
+      } else if (event === 'SEAT_RELEASED') {
+        sock.emit('seat:released', payload);
+      }
+    }
+  } catch {}
 }
 
 export const realtimeBridge = {

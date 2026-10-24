@@ -34,6 +34,18 @@ interface BillItem {
   isDraft?: boolean;
 }
 
+interface SettledReceiptSnapshot {
+  items: BillItem[];
+  subtotal: number;
+  gst: number;
+  grandTotal: number;
+  paymentMethod: string;
+  isTakeaway: boolean;
+  activeSeat: string;
+  seatDisplayTitle: string;
+  dateStr: string;
+}
+
 const ALL_100_SEATS = Array.from({ length: 100 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 
 interface ScreenM4BillingPOSProps {
@@ -71,6 +83,7 @@ export function ScreenM4BillingPOS({
   const [menuSearch, setMenuSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [printThermalOpen, setPrintThermalOpen] = useState<boolean>(false);
+  const [lastSettledReceiptSnapshot, setLastSettledReceiptSnapshot] = useState<SettledReceiptSnapshot | null>(null);
 
   const isTakeaway = activeSeat === 'TK-01' || activeSeat.toLowerCase().includes('takeaway');
   const seatDisplayTitle = isTakeaway ? 'Takeaway Parcel #01' : `Seat #${activeSeat}`;
@@ -259,13 +272,33 @@ export function ScreenM4BillingPOS({
   };
 
   // Pricing math
-  const subtotal = allCurrentBillItems.reduce((sum, it) => sum + it.price * it.qty, 0);
-  const gst = Math.round(subtotal * 0.05);
-  const grandTotal = complimentary ? 0 : subtotal + gst;
+  const subtotal = (settledSuccess && lastSettledReceiptSnapshot)
+    ? lastSettledReceiptSnapshot.subtotal
+    : allCurrentBillItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const gst = (settledSuccess && lastSettledReceiptSnapshot)
+    ? lastSettledReceiptSnapshot.gst
+    : Math.round(subtotal * 0.05);
+  const grandTotal = (settledSuccess && lastSettledReceiptSnapshot)
+    ? lastSettledReceiptSnapshot.grandTotal
+    : (complimentary ? 0 : subtotal + gst);
 
   // Settle & Close Seat or Parcel
   const handleSettle = async () => {
     if (allCurrentBillItems.length === 0) return;
+
+    // 1. Capture immutable bill snapshot before purging state
+    const snapshot: SettledReceiptSnapshot = {
+      items: allCurrentBillItems.map((it) => ({ ...it })),
+      subtotal,
+      gst,
+      grandTotal,
+      paymentMethod,
+      isTakeaway,
+      activeSeat,
+      seatDisplayTitle,
+      dateStr: new Date().toLocaleDateString('en-IN'),
+    };
+    setLastSettledReceiptSnapshot(snapshot);
     setSettledSuccess(true);
 
     // If there were any unpunched draft items, complete their order record
@@ -441,13 +474,13 @@ export function ScreenM4BillingPOS({
               )}
               <span className="font-black text-sm text-slate-900">Current: {seatDisplayTitle}</span>
               <span className="text-xs text-slate-500 font-mono">
-                ({allCurrentBillItems.length} total items)
+                ({(settledSuccess && lastSettledReceiptSnapshot ? lastSettledReceiptSnapshot.items.length : allCurrentBillItems.length)} total items)
               </span>
             </div>
             <button
               type="button"
               onClick={() => setPrintThermalOpen(true)}
-              disabled={allCurrentBillItems.length === 0}
+              disabled={(settledSuccess && lastSettledReceiptSnapshot ? lastSettledReceiptSnapshot.items.length : allCurrentBillItems.length) === 0}
               className="flex items-center gap-1 px-2.5 py-1 bg-[#FAF8F5] border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition disabled:opacity-40 cursor-pointer"
             >
               <Printer className="h-3.5 w-3.5" />
@@ -455,8 +488,46 @@ export function ScreenM4BillingPOS({
             </button>
           </div>
 
+          {/* Settled Bill Display during confirmation */}
+          {settledSuccess && lastSettledReceiptSnapshot && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Settled Items ({lastSettledReceiptSnapshot.items.length})
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold">Paid &amp; Vacated</span>
+              </div>
+
+              <div className="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar">
+                {lastSettledReceiptSnapshot.items.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs"
+                  >
+                    <div className="flex-1 pr-2 truncate">
+                      <div className="font-bold text-slate-900 truncate">
+                        {it.qty}x {it.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500">₹{it.price} each</div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                        PAID
+                      </span>
+                      <span className="w-14 text-right font-black font-mono text-slate-900">
+                        ₹{it.price * it.qty}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Section 1: Active Placed Orders in Kitchen */}
-          {placedOrders.length > 0 && (
+          {!settledSuccess && placedOrders.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase text-slate-700 flex items-center gap-1.5">
@@ -504,7 +575,7 @@ export function ScreenM4BillingPOS({
           )}
 
           {/* Section 2: Newly Added Items (Draft - Pending Punch) */}
-          {draftItems.length > 0 && (
+          {!settledSuccess && draftItems.length > 0 && (
             <div className="space-y-2 border-t border-dashed border-slate-300 pt-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase text-amber-900 flex items-center gap-1.5">
@@ -576,7 +647,7 @@ export function ScreenM4BillingPOS({
           )}
 
           {/* Empty State When Neither Placed Nor Draft Items Exist */}
-          {allCurrentBillItems.length === 0 && (
+          {!settledSuccess && allCurrentBillItems.length === 0 && (
             <div className="text-center py-12 text-slate-400 text-xs font-mono bg-[#FAF8F5] rounded-xl border border-dashed border-slate-300 space-y-1">
               <div>No active orders for {seatDisplayTitle}.</div>
               <div className="text-[11px] text-slate-400">
@@ -781,11 +852,11 @@ export function ScreenM4BillingPOS({
               <p className="text-[10px]">GSTIN: 29AABCT1234F1Z0</p>
             </div>
             <div className="text-xs flex justify-between">
-              <span>{isTakeaway ? 'Type: TAKEAWAY / PARCEL' : `Seat: #${activeSeat}`}</span>
-              <span>Date: {new Date().toLocaleDateString('en-IN')}</span>
+              <span>{(lastSettledReceiptSnapshot?.isTakeaway ?? isTakeaway) ? 'Type: TAKEAWAY / PARCEL' : `Seat: #${lastSettledReceiptSnapshot?.activeSeat ?? activeSeat}`}</span>
+              <span>Date: {lastSettledReceiptSnapshot?.dateStr ?? new Date().toLocaleDateString('en-IN')}</span>
             </div>
-            <div className="border-t border-b border-black/20 py-2 space-y-1 text-xs">
-              {allCurrentBillItems.map((it, idx) => (
+            <div className="border-t border-b border-black/20 py-2 space-y-1 text-xs max-h-60 overflow-y-auto">
+              {(lastSettledReceiptSnapshot?.items ?? allCurrentBillItems).map((it, idx) => (
                 <div key={idx} className="flex justify-between">
                   <span>
                     {it.qty}x {it.name}
@@ -797,21 +868,24 @@ export function ScreenM4BillingPOS({
             <div className="text-xs space-y-1 pt-1">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>₹{subtotal}</span>
+                <span>₹{lastSettledReceiptSnapshot?.subtotal ?? subtotal}</span>
               </div>
               <div className="flex justify-between">
                 <span>GST (5%):</span>
-                <span>₹{gst}</span>
+                <span>₹{lastSettledReceiptSnapshot?.gst ?? gst}</span>
               </div>
               <div className="text-xs flex justify-between font-bold border-t border-black/20 pt-1">
-                <span>Grand Total ({paymentMethod}):</span>
-                <span>₹{grandTotal}</span>
+                <span>Grand Total ({lastSettledReceiptSnapshot?.paymentMethod ?? paymentMethod}):</span>
+                <span>₹{lastSettledReceiptSnapshot?.grandTotal ?? grandTotal}</span>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => setPrintThermalOpen(false)}
-              className="w-full py-2 bg-black text-white text-xs font-bold rounded cursor-pointer mt-2"
+              onClick={() => {
+                setPrintThermalOpen(false);
+                setLastSettledReceiptSnapshot(null);
+              }}
+              className="w-full py-2 bg-black text-white text-xs font-bold rounded cursor-pointer mt-2 hover:bg-slate-800 transition"
             >
               Close Receipt
             </button>

@@ -23,6 +23,8 @@ import { getActiveDiningSession,
   ActiveDiningSession, getDeviceToken } from '../../../../lib/session/diningSession';
 import { realtimeBridge } from '../../../../lib/supabase';
 import { getMenuItemById } from '../../../../lib/data/menuData';
+import { getSocket } from '../../../../lib/socket';
+import { SOCKET_EVENTS } from '@seat-order/shared';
 
 export default function LiveOrderTrackingPage() {
   const params = useParams();
@@ -57,8 +59,32 @@ export default function LiveOrderTrackingPage() {
       if (res.order?.status === 'completed' || (!res.order && (!res.items || res.items.length === 0))) {
         const hasReceipt = typeof window !== 'undefined' && localStorage.getItem(`thoogudeepa_settled_receipt_${chairId}`);
         const currentSession = getActiveDiningSession();
-        if (hasReceipt || (currentSession && currentSession.paymentStatus === 'paid')) {
-          router.replace(`/seat/${chairId}/payment-success?mode=Paid&amount=${currentSession?.totalAmount || 0}`);
+        const activeItems = (currentSession?.items && currentSession.items.length > 0)
+          ? currentSession.items
+          : (sessionRef.current?.items && sessionRef.current.items.length > 0)
+          ? sessionRef.current.items
+          : [];
+
+        if (hasReceipt || (currentSession && currentSession.paymentStatus === 'paid') || activeItems.length > 0) {
+          const amt = currentSession?.totalAmount || sessionRef.current?.totalAmount || 0;
+          const tNum = currentSession?.ticketNumber || sessionRef.current?.ticketNumber || '';
+          try {
+            localStorage.setItem(
+              `thoogudeepa_settled_receipt_${chairId}`,
+              JSON.stringify({
+                ticketNumber: tNum,
+                seatId: chairId,
+                items: activeItems,
+                subtotal: activeItems.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amt / 1.05),
+                tip: 0,
+                totalAmount: amt,
+                mode: 'Counter / Staff',
+                settledAt: Date.now(),
+              })
+            );
+          } catch {}
+          clearActiveDiningSession();
+          router.replace(`/seat/${chairId}/payment-success?mode=${encodeURIComponent('Counter / Staff')}&amount=${amt}`);
           return;
         }
       }
@@ -150,6 +176,14 @@ export default function LiveOrderTrackingPage() {
     checkAccess();
 
     setIsLoaded(true);
+
+    // Join dedicated seat room for real-time socket events
+    try {
+      const socket = getSocket();
+      if (socket) {
+        socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: cleanCurrentChair || chairId });
+      }
+    } catch {}
 
     // Initial server and realtime sync
     syncLatestStages();
@@ -281,16 +315,28 @@ export default function LiveOrderTrackingPage() {
         if (!data.isOccupied) {
           const targetNum = (data.chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
           const currentNum = (cleanCurrentChair || chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
-          if (targetNum && currentNum && targetNum === currentNum) {
-            const amtVal = sessionRef.current?.totalAmount || 0;
+          const isMatch = Boolean(
+            (targetNum && currentNum && targetNum === currentNum) ||
+            data.chairId === chairId ||
+            data.chairId === cleanCurrentChair
+          );
+          if (isMatch) {
+            const currentSession = getActiveDiningSession();
+            const activeItems = (currentSession?.items && currentSession.items.length > 0)
+              ? currentSession.items
+              : (sessionRef.current?.items && sessionRef.current.items.length > 0)
+              ? sessionRef.current.items
+              : [];
+            const amtVal = currentSession?.totalAmount || sessionRef.current?.totalAmount || 0;
+            const tNum = currentSession?.ticketNumber || sessionRef.current?.ticketNumber || '';
             try {
               localStorage.setItem(
                 `thoogudeepa_settled_receipt_${chairId}`,
                 JSON.stringify({
-                  ticketNumber: sessionRef.current?.ticketNumber,
+                  ticketNumber: tNum,
                   seatId: chairId,
-                  items: sessionRef.current?.items || [],
-                  subtotal: sessionRef.current?.items?.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amtVal / 1.05),
+                  items: activeItems,
+                  subtotal: activeItems.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amtVal / 1.05),
                   tip: 0,
                   totalAmount: amtVal,
                   mode: 'Cash',
@@ -298,6 +344,7 @@ export default function LiveOrderTrackingPage() {
                 })
               );
             } catch {}
+            clearActiveDiningSession();
             window.location.replace(`/seat/${chairId}/payment-success?mode=Cash&amount=${amtVal}`);
           }
         }
@@ -305,17 +352,30 @@ export default function LiveOrderTrackingPage() {
       onBillSettled: (data) => {
         const targetNum = (data.chairId || data.rawChairId || data.normChairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
         const currentNum = (cleanCurrentChair || chairId || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
-        if (targetNum && currentNum && targetNum === currentNum) {
+        const isMatch = Boolean(
+          (targetNum && currentNum && targetNum === currentNum) ||
+          data.chairId === chairId ||
+          data.rawChairId === chairId ||
+          data.normChairId === cleanCurrentChair
+        );
+        if (isMatch) {
+          const currentSession = getActiveDiningSession();
+          const activeItems = (currentSession?.items && currentSession.items.length > 0)
+            ? currentSession.items
+            : (sessionRef.current?.items && sessionRef.current.items.length > 0)
+            ? sessionRef.current.items
+            : [];
           const modeVal = data.paymentMethod || 'Paid via Counter / Waiter';
-          const amtVal = data.amount || sessionRef.current?.totalAmount || 0;
+          const amtVal = data.amount || currentSession?.totalAmount || sessionRef.current?.totalAmount || 0;
+          const tNum = currentSession?.ticketNumber || sessionRef.current?.ticketNumber || data.ticketNumber || '';
           try {
             localStorage.setItem(
               `thoogudeepa_settled_receipt_${chairId}`,
               JSON.stringify({
-                ticketNumber: sessionRef.current?.ticketNumber || data.ticketNumber,
+                ticketNumber: tNum,
                 seatId: chairId,
-                items: sessionRef.current?.items || [],
-                subtotal: sessionRef.current?.items?.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amtVal / 1.05),
+                items: activeItems,
+                subtotal: activeItems.reduce((acc, it) => acc + it.price * it.quantity, 0) || Math.round(amtVal / 1.05),
                 tip: 0,
                 totalAmount: amtVal,
                 mode: modeVal,
@@ -323,6 +383,7 @@ export default function LiveOrderTrackingPage() {
               })
             );
           } catch {}
+          clearActiveDiningSession();
           window.location.replace(`/seat/${chairId}/payment-success?mode=${encodeURIComponent(modeVal)}&amount=${amtVal}`);
         }
       },

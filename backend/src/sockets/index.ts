@@ -105,6 +105,58 @@ export function setupWebSockets(httpServer: HTTPServer) {
       }
     });
 
+    // 6. Direct staff / manager bill settlement broadcast across all devices
+    socket.on('bill:settled', (payload: any) => {
+      const numSeat = Number(payload.chairId || payload.seatId || payload.normChairId) || 0;
+      const amt = payload.amount || 0;
+      const now = new Date().toISOString();
+
+      if (numSeat > 0) {
+        const seat = db.data.seats.find((s) => s.id === numSeat);
+        if (seat) {
+          seat.currentStatus = 'VACANT';
+          seat.activeSessionId = null;
+          seat.activeOrderTotal = 0;
+          seat.activeItemCount = 0;
+          seat.updatedAt = now;
+        }
+
+        // Auto-resolve any pending alerts for this seat
+        if (db.data.serviceAlerts) {
+          for (const a of db.data.serviceAlerts) {
+            if (a.chairId === String(numSeat)) {
+              a.isResolved = true;
+            }
+          }
+        }
+        db.saveState();
+      }
+
+      const broadcastData = {
+        seatId: numSeat,
+        chairId: String(numSeat),
+        normChairId: String(numSeat),
+        amount: amt,
+        paymentMethod: payload.paymentMethod || 'UPI',
+        paymentId: payload.ticketNumber || `SETTLE_${Date.now()}`,
+        completedAt: now,
+      };
+
+      io?.emit(SOCKET_EVENTS.PAYMENT_SUCCESS, broadcastData);
+      io?.emit(SOCKET_EVENTS.SEAT_VACATED, {
+        seatId: numSeat,
+        chairId: String(numSeat),
+        vacatedAt: now,
+      });
+      io?.emit(SOCKET_EVENTS.SEAT_STATUS_UPDATED, {
+        seatId: numSeat,
+        status: 'VACANT',
+        activeOrderTotal: 0,
+        activeItemCount: 0,
+      });
+      io?.emit('bill:settled', broadcastData);
+    });
+
     socket.on('disconnect', () => {
       // Clean up connection without leaks
     });
