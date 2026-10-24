@@ -328,7 +328,13 @@ export default function CustomerCartPage() {
       clearCart();
       realtimeBridge.clearActiveBillRequest(chairId);
 
-      router.push(`/seat/${chairId}/tracking`);
+      try {
+        router.push(`/seat/${chairId}/tracking`);
+      } catch {
+        if (typeof window !== 'undefined') {
+          window.location.href = `/seat/${chairId}/tracking`;
+        }
+      }
     } catch (err: any) {
       console.error('Order dispatch error:', err);
       if (err?.message?.includes('SEAT_ALREADY_OCCUPIED') || err?.message?.includes('occupied')) {
@@ -341,7 +347,13 @@ export default function CustomerCartPage() {
         router.replace(`/seat/${chairId}`);
         return;
       }
-      router.push(`/seat/${chairId}/tracking`);
+      try {
+        router.push(`/seat/${chairId}/tracking`);
+      } catch {
+        if (typeof window !== 'undefined') {
+          window.location.href = `/seat/${chairId}/tracking`;
+        }
+      }
     } finally {
       setIsSubmitting(false);
     }

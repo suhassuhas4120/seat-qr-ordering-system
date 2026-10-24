@@ -117,13 +117,14 @@ export default function OrderSummaryBillPage() {
               return;
             }
             const percent = Number(matched.discountPercent) || 0;
-            const disc = Math.round((itemsSubtotal * percent) / 100);
+            const disc = itemsSubtotal > 0 ? Math.round((itemsSubtotal * percent) / 100) : (saved.discount || 0);
             setDiscountAmount(disc);
             setPromoMessage({
               text: `Code ${matched.code} applied! ${percent}% off (saved ₹${disc})`,
               isError: false,
             });
-          } else {
+          } else if (managerPromos && managerPromos.length > 0) {
+            // Only invalidate if manager promos are fully loaded and this code is definitely invalid/inactive
             setDiscountAmount(0);
             localStorage.removeItem(storageKey);
             sessionStorage.removeItem(storageKey);
@@ -429,7 +430,7 @@ export default function OrderSummaryBillPage() {
       }
     });
 
-    // Supplementary check: if seat is already in billing mode from waiter actions
+    // Supplementary check: if seat is actively in billing mode with waiter
     realtimeBridge.getFloorSeats().then((floorSeats) => {
       const currentSeat = floorSeats.find((s) => {
         const c1 = normalizeSeatId(s.seatNumber);
@@ -437,9 +438,9 @@ export default function OrderSummaryBillPage() {
         return c1 === normChair || c2 === normChair || s.id === chairId;
       });
       if (currentSeat && currentSeat.status === 'billing') {
-        setWaiterCalled(true);
         realtimeBridge.getSeatBillMode(cleanChair || normChair || chairId).then((bm) => {
           if (bm.active && bm.mode) {
+            setWaiterCalled(true);
             setWaiterSelectedMode(bm.mode);
           }
         });

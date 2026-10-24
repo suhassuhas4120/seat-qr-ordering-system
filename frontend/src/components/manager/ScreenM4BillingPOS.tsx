@@ -126,13 +126,14 @@ export function ScreenM4BillingPOS({
     const num = parseInt(unpadded, 10);
 
     const matchingLive = liveOrders.filter((o) => {
-      if (o.order.status === 'completed' || o.order.status === 'cancelled') return false;
+      if (o.order.status === 'completed' || o.order.status === 'cancelled' || (o.order.status as string) === 'PAID') return false;
       const chairRaw = (o.order.chair_id || '').trim();
       if (isTk) {
-        return chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel');
+        return chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel') || (o.order as any).seat_id === 0;
       }
       const oChair = chairRaw.replace(/[^0-9]/g, '');
-      return oChair === activeSeat || oChair === unpadded || Number(oChair) === num;
+      const oSeatId = (o.order as any).seat_id;
+      return oChair === activeSeat || oChair === unpadded || Number(oChair) === num || oSeatId === num;
     });
 
     const hasAuth = matchingLive.some((o) => String(o.order.ticket_number).startsWith('ORD-'));

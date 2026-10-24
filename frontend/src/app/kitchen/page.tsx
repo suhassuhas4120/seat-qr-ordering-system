@@ -161,7 +161,10 @@ export default function KitchenDisplaySystemPage() {
 
             // B. Filter incoming items to truly new items not yet tracked
             const currentItemIds = new Set(current.items.map((it) => String(it.id)));
-            const trulyNewItems = newOrder.items.filter((it) => it.id && !currentItemIds.has(String(it.id)));
+            const trulyNewItems = newOrder.items.filter((it, idx) => {
+              const effId = String(it.id || `${newOrder.order.id || newOrder.order.ticket_number}-${it.dish_id}-${idx}`);
+              return !currentItemIds.has(effId);
+            });
 
             if (trulyNewItems.length === 0) {
               // If all item IDs exist, simply register the order ID to avoid reprocessing

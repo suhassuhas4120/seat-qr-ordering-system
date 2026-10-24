@@ -6,6 +6,13 @@ import { SOCKET_EVENTS, normalizeSeatIdentity } from '@seat-order/shared';
 export function getBackendUrl(): string {
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const host = window.location.hostname;
+    // On Vercel or public deployments, do NOT connect to port 4000
+    if (host.includes('vercel.app')) {
+      if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith('https://')) {
+        return process.env.NEXT_PUBLIC_API_URL;
+      }
+      return '';
+    }
     if (host !== 'localhost' && host !== '127.0.0.1') {
       const proto = window.location.protocol || 'http:';
       return `${proto}//${host}:4000`;
@@ -13,6 +20,39 @@ export function getBackendUrl(): string {
   }
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   return 'http://localhost:4000';
+}
+
+export async function safeFetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 1800
+): Promise<Response> {
+  if (!url || !url.startsWith('http')) {
+    throw new Error('No valid backend URL configured');
+  }
+  if (typeof window !== 'undefined') {
+    if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+      throw new Error('Blocked mixed-content HTTP call from HTTPS page');
+    }
+    if (url.includes('.vercel.app:4000')) {
+      throw new Error('Port 4000 not available on Vercel');
+    }
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return res;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
 }
 
 export interface OrderItemRecord {
@@ -910,33 +950,36 @@ export const realtimeBridge = {
           quantity: it.quantity,
           notes: it.notes || undefined,
         }));
-        const res = await fetch(`${getBackendUrl()}/api/orders`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-device-token': deviceToken,
-          },
-          body: JSON.stringify({
-            seatId: cleanSeatId,
-            deviceToken: role === 'CUSTOMER' ? deviceToken : undefined,
-            items: apiItems,
-            createdByRole: role,
-            waiterId,
-          }),
-        });
+        const backendUrl = getBackendUrl();
+        if (backendUrl) {
+          const res = await safeFetchWithTimeout(`${backendUrl}/api/orders`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-device-token': deviceToken,
+            },
+            body: JSON.stringify({
+              seatId: cleanSeatId,
+              deviceToken: role === 'CUSTOMER' ? deviceToken : undefined,
+              items: apiItems,
+              createdByRole: role,
+              waiterId,
+            }),
+          }, 2000);
 
-        if (res.status === 409 && role === 'CUSTOMER') {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'SEAT_ALREADY_OCCUPIED: Seat is currently occupied by another customer.');
-        }
+          if (res.status === 409 && role === 'CUSTOMER') {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'SEAT_ALREADY_OCCUPIED: Seat is currently occupied by another customer.');
+          }
 
-        if (res.ok) {
-          const resData = await res.json();
-          if (resData?.order) {
-            backendOrderId = resData.order.id;
-            backendTicketNumber = resData.order.orderNumber;
-            processedOrderIds.add(backendOrderId);
-            if (backendTicketNumber) processedOrderIds.add(backendTicketNumber);
+          if (res.ok) {
+            const resData = await res.json();
+            if (resData?.order) {
+              backendOrderId = resData.order.id;
+              backendTicketNumber = resData.order.orderNumber;
+              processedOrderIds.add(backendOrderId);
+              if (backendTicketNumber) processedOrderIds.add(backendTicketNumber);
+            }
           }
         }
         processedOrderIds.add(generatedId);
@@ -976,20 +1019,43 @@ export const realtimeBridge = {
       // 4. Remote Supabase insertion if connected (strictly matching authoritative backend data)
       if (supabase) {
         try {
+          const activeSessionId = `sess-${cleanSeatId}-${Date.now()}`;
+          // Ensure seat session exists in Supabase to satisfy foreign key
+          await supabase
+            .from('seat_sessions')
+            .upsert({
+              id: activeSessionId,
+              seat_id: cleanSeatId,
+              session_token: deviceToken || `token-${cleanSeatId}`,
+              status: 'ACTIVE',
+              started_at: new Date().toISOString(),
+            }, { onConflict: 'id' });
+
           const { error: orderErr } = await supabase
             .from('orders')
             .upsert({
               id: backendOrderId,
               seat_id: cleanSeatId,
+              session_id: activeSessionId,
               ticket_number: backendTicketNumber,
               status: 'PLACED',
               total_amount: order.total_amount,
               currency: 'INR',
               items_payload: confirmedItems,
+              updated_at: new Date().toISOString(),
             }, { onConflict: 'id' });
 
           if (!orderErr) {
             processedOrderIds.add(backendOrderId);
+            // Update seat table status to OCCUPIED
+            await supabase
+              .from('seats')
+              .update({
+                current_status: 'OCCUPIED',
+                active_order_total: order.total_amount,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', cleanSeatId);
           } else {
             console.warn('Supabase sync warning:', orderErr);
           }
@@ -1055,18 +1121,21 @@ export const realtimeBridge = {
 
       // 1. Authoritative Backend Check (PRIMARY SOURCE OF TRUTH)
       try {
-        const res = await fetch(`${getBackendUrl()}/api/seats/${cleanSeatId}/occupancy?deviceToken=${encodeURIComponent(currentDeviceToken)}`, {
-          headers: { 'x-device-token': currentDeviceToken },
-        });
-        if (res.ok) {
-          const occ = await res.json();
-          return {
-            isOccupied: Boolean(occ.isOccupied),
-            isOwner: Boolean(occ.isOwner),
-            ticketNumber: occ.ticketNumber,
-            orderStatus: occ.orderStatus,
-            activeSeatIdForDevice: occ.activeSeatIdForDevice,
-          };
+        const backendUrl = getBackendUrl();
+        if (backendUrl) {
+          const res = await safeFetchWithTimeout(`${backendUrl}/api/seats/${cleanSeatId}/occupancy?deviceToken=${encodeURIComponent(currentDeviceToken)}`, {
+            headers: { 'x-device-token': currentDeviceToken },
+          }, 1500);
+          if (res.ok) {
+            const occ = await res.json();
+            return {
+              isOccupied: Boolean(occ.isOccupied),
+              isOwner: Boolean(occ.isOwner),
+              ticketNumber: occ.ticketNumber,
+              orderStatus: occ.orderStatus,
+              activeSeatIdForDevice: occ.activeSeatIdForDevice,
+            };
+          }
         }
       } catch {
         // Backend temporarily unreachable, fall back to Supabase/local
@@ -1077,29 +1146,31 @@ export const realtimeBridge = {
 
       // 2. Check remote database if online
       if (supabase) {
-        const { data: activeOrder, error } = await supabase
-          .from('orders')
-          .select('*')
-          .in('chair_id', [chairId, paddedChair, unpaddedChair, cleanChair])
-          .in('status', ['pending', 'in_progress', 'ready'])
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        try {
+          const { data: activeOrder, error } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('seat_id', cleanSeatId)
+            .in('status', ['pending', 'in_progress', 'ready', 'PLACED', 'PREPARING', 'READY'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        if (!error && activeOrder) {
-          const orderDeviceToken = (activeOrder as any).device_token;
-          const isOwner = Boolean(
-            currentDeviceToken &&
-            orderDeviceToken &&
-            orderDeviceToken === currentDeviceToken
-          );
-          return {
-            isOccupied: true,
-            isOwner,
-            ticketNumber: activeOrder.ticket_number,
-            orderStatus: activeOrder.status,
-          };
-        }
+          if (!error && activeOrder) {
+            const orderDeviceToken = (activeOrder as any).device_token;
+            const isOwner = Boolean(
+              currentDeviceToken &&
+              orderDeviceToken &&
+              orderDeviceToken === currentDeviceToken
+            );
+            return {
+              isOccupied: true,
+              isOwner,
+              ticketNumber: activeOrder.ticket_number,
+              orderStatus: activeOrder.status,
+            };
+          }
+        } catch {}
       }
 
       // 3. Check in-memory occupancy registry
@@ -1211,11 +1282,16 @@ export const realtimeBridge = {
       // Mark orders completed in Supabase database so seat returns as vacant on all devices
       if (supabase) {
         try {
+          const seatNum = Number(numStr) || 1;
           await supabase
             .from('orders')
             .update({ status: 'completed', updated_at: new Date().toISOString() })
-            .in('chair_id', possibleChairs)
-            .in('status', ['pending', 'in_progress', 'ready']);
+            .eq('seat_id', seatNum)
+            .in('status', ['pending', 'in_progress', 'ready', 'PLACED', 'PREPARING', 'READY']);
+          await supabase
+            .from('seats')
+            .update({ current_status: 'VACANT', active_order_total: 0, updated_at: new Date().toISOString() })
+            .eq('id', seatNum);
         } catch (dbErr) {
           console.warn('Database release seat update notice:', dbErr);
         }
@@ -1646,7 +1722,7 @@ export const realtimeBridge = {
     }
   },
 
-  // Fetch active orders (pending, in_progress, ready) with fallback and local hydration
+  // Fetch active orders (pending, in_progress, ready, PLACED, PREPARING, READY) with fallback and local hydration
   async getActiveOrders(): Promise<{ order: OrderRecord; items: OrderItemRecord[] }[]> {
     const localOrders = getLocalOrdersList();
     try {
@@ -1654,22 +1730,51 @@ export const realtimeBridge = {
         const { data: orders, error: oErr } = await supabase
           .from('orders')
           .select('*')
-          .in('status', ['pending', 'in_progress', 'ready'])
+          .in('status', ['pending', 'in_progress', 'ready', 'PLACED', 'PREPARING', 'READY'])
           .order('created_at', { ascending: false });
 
         if (!oErr && orders && orders.length > 0) {
-          const orderIds = orders.map((o) => o.id);
-          const { data: items } = await supabase
-            .from('order_items')
-            .select('*')
-            .in('order_id', orderIds);
-
           const remoteOrders = orders.map((o) => {
-            const rawItems = (items || []).filter((it) => it.order_id === o.id).map((it) => {
-              const localOrder = localOrders.find((lo) => lo.order.id === o.id || lo.order.ticket_number === o.ticket_number);
-              const localItem = localOrder?.items?.find((li) => li.id === it.id || li.dish_id === it.dish_id || li.dish_name?.toLowerCase().trim() === it.dish_name?.toLowerCase().trim());
-              const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
+            const chairIdPadded = String(o.seat_id ?? 1).padStart(2, '0');
+            const normalizedOrder: OrderRecord = {
+              ...o,
+              chair_id: o.chair_id || chairIdPadded,
+              seat_label: o.seat_label || `Seat ${chairIdPadded}`,
+              status: o.status,
+            };
 
+            // Read items from items_payload JSONB column
+            let rawItems: any[] = [];
+            if (Array.isArray(o.items_payload) && o.items_payload.length > 0) {
+              rawItems = o.items_payload.map((it: any, idx: number) => ({
+                id: it.id || `${o.id}-${it.dish_id || it.menuItemId || idx}`,
+                order_id: o.id,
+                chair_id: normalizedOrder.chair_id,
+                seat_label: normalizedOrder.seat_label,
+                dish_id: it.dish_id ? (String(it.dish_id).startsWith('dish-') ? String(it.dish_id) : `dish-${it.dish_id}`) : `dish-${it.menuItemId || 1}`,
+                dish_name: it.dish_name || it.nameSnapshot || it.name || 'Dish',
+                quantity: it.quantity || 1,
+                price: it.price || it.priceSnapshot || 0,
+                stage: it.stage || 'PLACED',
+                notes: it.notes || '',
+                addons: Array.isArray(it.addons) ? it.addons : [],
+              }));
+            }
+
+            const localOrder = localOrders.find(
+              (lo) => lo.order.id === o.id || lo.order.ticket_number === o.ticket_number
+            );
+
+            // Merge local stages / items if any
+            if (rawItems.length === 0 && localOrder?.items && localOrder.items.length > 0) {
+              rawItems = localOrder.items;
+            }
+
+            const processedItems = rawItems.map((it) => {
+              const localItem = localOrder?.items?.find(
+                (li) => li.id === it.id || li.dish_id === it.dish_id || li.dish_name?.toLowerCase().trim() === it.dish_name?.toLowerCase().trim()
+              );
+              const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
               const addons = Array.isArray(it.addons) ? [...it.addons] : [];
               if (isLocallyServed && !addons.includes('SERVED')) addons.push('SERVED');
 
@@ -1691,9 +1796,10 @@ export const realtimeBridge = {
                 addons,
               };
             });
-            const hydrated = this.hydrateOrderItemStages(o, rawItems);
+
+            const hydrated = this.hydrateOrderItemStages(normalizedOrder, processedItems);
             return {
-              order: o,
+              order: normalizedOrder,
               items: hydrated,
             };
           });
@@ -1718,7 +1824,7 @@ export const realtimeBridge = {
           const remoteOrderIds = new Set(dedupedRemoteOrders.map((ro) => ro.order.id));
           const validLocalOrders = localOrders.filter((lo) => {
             if (!lo.order?.id || !lo.order?.ticket_number) return false;
-            if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
+            if (lo.order.status === 'completed' || lo.order.status === 'cancelled' || (lo.order.status as string) === 'PAID') return false;
             if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
             if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
             return true;
@@ -1739,22 +1845,25 @@ export const realtimeBridge = {
       // Live Cloud Backend Sync (Fetch authoritative floor orders or KDS tickets from Fastify)
       try {
         let backendSource: any[] = [];
-        try {
-          const activeRes = await fetch(`${getBackendUrl()}/api/orders/active`);
-          if (activeRes.ok) {
-            const data = await activeRes.json();
-            if (Array.isArray(data)) backendSource = data;
-          }
-        } catch {}
-
-        if (backendSource.length === 0) {
+        const backendUrl = getBackendUrl();
+        if (backendUrl) {
           try {
-            const ticketsRes = await fetch(`${getBackendUrl()}/api/kds/tickets`);
-            if (ticketsRes.ok) {
-              const data = await ticketsRes.json();
+            const activeRes = await safeFetchWithTimeout(`${backendUrl}/api/orders/active`, {}, 1500);
+            if (activeRes.ok) {
+              const data = await activeRes.json();
               if (Array.isArray(data)) backendSource = data;
             }
           } catch {}
+
+          if (backendSource.length === 0) {
+            try {
+              const ticketsRes = await safeFetchWithTimeout(`${backendUrl}/api/kds/tickets`, {}, 1500);
+              if (ticketsRes.ok) {
+                const data = await ticketsRes.json();
+                if (Array.isArray(data)) backendSource = data;
+              }
+            } catch {}
+          }
         }
 
         if (backendSource.length > 0) {
@@ -1997,17 +2106,20 @@ export const realtimeBridge = {
   // Get active floor alerts
   async getServiceAlerts(): Promise<ServiceAlertRecord[]> {
     try {
-      const res = await fetch(`${getBackendUrl()}/api/service-alerts`);
-      if (res.ok) {
-        const backendAlerts = await res.json();
-        if (Array.isArray(backendAlerts) && backendAlerts.length > 0) {
-          const local = getLocalAlertsList();
-          const mergedMap = new Map<string, ServiceAlertRecord>();
-          backendAlerts.forEach((a: any) => { if (!a.isResolved) mergedMap.set(a.id, a); });
-          local.forEach((a) => { if (!a.isResolved && !mergedMap.has(a.id)) mergedMap.set(a.id, a); });
-          const merged = Array.from(mergedMap.values());
-          setLocalAlertsList(merged);
-          return merged;
+      const backendUrl = getBackendUrl();
+      if (backendUrl) {
+        const res = await safeFetchWithTimeout(`${backendUrl}/api/service-alerts`, {}, 1500);
+        if (res.ok) {
+          const backendAlerts = await res.json();
+          if (Array.isArray(backendAlerts) && backendAlerts.length > 0) {
+            const local = getLocalAlertsList();
+            const mergedMap = new Map<string, ServiceAlertRecord>();
+            backendAlerts.forEach((a: any) => { if (!a.isResolved) mergedMap.set(a.id, a); });
+            local.forEach((a) => { if (!a.isResolved && !mergedMap.has(a.id)) mergedMap.set(a.id, a); });
+            const merged = Array.from(mergedMap.values());
+            setLocalAlertsList(merged);
+            return merged;
+          }
         }
       }
     } catch {}
@@ -2179,11 +2291,14 @@ export const realtimeBridge = {
 
     // 1. Check Fastify backend REST
     try {
-      const res = await fetch(`${getBackendUrl()}/api/seats/${cleanChair}/bill-mode`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && (data.active || data.mode)) {
-          return { active: true, mode: data.mode, amount: data.amount };
+      const backendUrl = getBackendUrl();
+      if (backendUrl) {
+        const res = await safeFetchWithTimeout(`${backendUrl}/api/seats/${cleanChair}/bill-mode`, {}, 1500);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && (data.active || data.mode)) {
+            return { active: true, mode: data.mode, amount: data.amount };
+          }
         }
       }
     } catch {}
@@ -2254,11 +2369,21 @@ export const realtimeBridge = {
     // 2. Mark order completed in Supabase
     if (supabase) {
       try {
+        const seatNum = Number(cleanNum) || 1;
         await supabase
           .from('orders')
-          .update({ status: 'completed', updated_at: new Date().toISOString() })
-          .in('chair_id', possibleChairs)
-          .in('status', ['pending', 'in_progress', 'ready']);
+          .update({ status: 'PAID', updated_at: new Date().toISOString() })
+          .eq('seat_id', seatNum)
+          .in('status', ['pending', 'in_progress', 'ready', 'PLACED', 'PREPARING', 'READY', 'SERVED']);
+        await supabase
+          .from('seats')
+          .update({ current_status: 'VACANT', active_order_total: 0, updated_at: new Date().toISOString() })
+          .eq('id', seatNum);
+        await supabase
+          .from('seat_sessions')
+          .update({ status: 'COMPLETED', ended_at: new Date().toISOString() })
+          .eq('seat_id', seatNum)
+          .eq('status', 'ACTIVE');
       } catch (err) {
         console.warn('Remote settle bill update notice:', err);
       }
@@ -2464,16 +2589,38 @@ export const realtimeBridge = {
     }
   },
 
-  // Get promotional campaigns asynchronously with backend REST sync
+  // Get promotional campaigns asynchronously with Supabase cloud & backend sync
   async getPromosAsync(): Promise<any[]> {
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('service_alerts')
+          .select('message')
+          .eq('id', 'global-promos')
+          .maybeSingle();
+        if (data?.message) {
+          const parsed = JSON.parse(data.message);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('thoogudeepa_v2_promos', JSON.stringify(parsed));
+            }
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+
     if (typeof window !== 'undefined') {
       try {
-        const res = await fetch(`${getBackendUrl()}/api/promos`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            localStorage.setItem('thoogudeepa_v2_promos', JSON.stringify(data));
-            return data;
+        const backendUrl = getBackendUrl();
+        if (backendUrl) {
+          const res = await safeFetchWithTimeout(`${backendUrl}/api/promos`, {}, 1500);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              localStorage.setItem('thoogudeepa_v2_promos', JSON.stringify(data));
+              return data;
+            }
           }
         }
       } catch {}
@@ -2482,21 +2629,43 @@ export const realtimeBridge = {
   },
 
   // Save promotional campaigns
-  savePromos(rules: any[]) {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem('thoogudeepa_v2_promos', JSON.stringify(rules));
-      if (localChannel) {
-        localChannel.postMessage({
-          type: 'PROMOS_UPDATED',
-          rules,
-        });
+  async savePromos(rules: any[]) {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('thoogudeepa_v2_promos', JSON.stringify(rules));
+      } catch {}
+    }
+    if (localChannel) {
+      localChannel.postMessage({
+        type: 'PROMOS_UPDATED',
+        rules,
+      });
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('service_alerts').upsert({
+          id: 'global-promos',
+          seat_id: 0,
+          alert_type: 'promo_config',
+          title: 'PROMO_RULES',
+          message: JSON.stringify(rules),
+          is_resolved: true,
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Supabase savePromos warning:', err);
       }
-      fetch(`${getBackendUrl()}/api/promos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rules),
-      }).catch(() => {});
+    }
+
+    try {
+      const backendUrl = getBackendUrl();
+      if (backendUrl) {
+        safeFetchWithTimeout(`${backendUrl}/api/promos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rules),
+        }, 1500).catch(() => {});
+      }
     } catch {}
   },
 
@@ -2573,7 +2742,7 @@ export const realtimeBridge = {
 
       const freshOcc = occupancyMap[chairId] || occupancyMap[unpadded] || occupancyMap[`Seat ${chairId}`] || occupancyMap[`Seat ${unpadded}`];
       const isBilling = Boolean(activeBillReq) || freshOcc?.status === 'billing' || seatAlert?.title?.toLowerCase().includes('bill');
-      const isOccupied = Boolean(currentTicketOrders.length > 0 || (freshOcc && activeBillReq));
+      const isOccupied = Boolean(currentTicketOrders.length > 0 || freshOcc);
 
       let calculatedTotal = 0;
       if (allSeatItems.length > 0) {
@@ -2634,57 +2803,60 @@ export const realtimeBridge = {
 
     // 1. Authoritative Seat Tab directly from Fastify backend (Single Source of Truth)
     try {
-      const tabRes = await fetch(`${getBackendUrl()}/api/seats/${cleanId || '1'}/tab`)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null);
+      const backendUrl = getBackendUrl();
+      if (backendUrl) {
+        const tabRes = await safeFetchWithTimeout(`${backendUrl}/api/seats/${cleanId || '1'}/tab`, {}, 1500)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
 
-      if (
-        tabRes &&
-        tabRes.session?.status === 'ACTIVE' &&
-        Array.isArray(tabRes.orders) &&
-        tabRes.orders.length > 0
-      ) {
-        const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
-          QUEUED: 'PLACED',
-          COOKING: 'PREP',
-          READY: 'READY',
-          SERVED: 'SERVED',
-        };
-
-        const allItems: OrderItemRecord[] = (tabRes.allItems || []).map((it: any, idx: number) => {
-          const effStage = stageMap[it.itemStage] || 'PLACED';
-          return {
-            id: it.id || `dish-${it.menuItemId}-${idx}`,
-            order_id: it.orderId,
-            chair_id: padded,
-            seat_label: `SEAT ${padded}`,
-            dish_id: `dish-${it.menuItemId}`,
-            dish_name: it.nameSnapshot,
-            quantity: it.quantity || 1,
-            price: it.priceSnapshot || 0,
-            stage: effStage,
-            notes: it.notes || '',
-            addons: effStage === 'SERVED' ? ['SERVED'] : [],
+        if (
+          tabRes &&
+          tabRes.session?.status === 'ACTIVE' &&
+          Array.isArray(tabRes.orders) &&
+          tabRes.orders.length > 0
+        ) {
+          const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
+            QUEUED: 'PLACED',
+            COOKING: 'PREP',
+            READY: 'READY',
+            SERVED: 'SERVED',
           };
-        });
 
-        const allTickets = Array.from(
-          new Set(tabRes.orders.map((o: any) => o.orderNumber).filter(Boolean))
-        ).join(' • ');
+          const allItems: OrderItemRecord[] = (tabRes.allItems || []).map((it: any, idx: number) => {
+            const effStage = stageMap[it.itemStage] || 'PLACED';
+            return {
+              id: it.id || `dish-${it.menuItemId}-${idx}`,
+              order_id: it.orderId,
+              chair_id: padded,
+              seat_label: `SEAT ${padded}`,
+              dish_id: `dish-${it.menuItemId}`,
+              dish_name: it.nameSnapshot,
+              quantity: it.quantity || 1,
+              price: it.priceSnapshot || 0,
+              stage: effStage,
+              notes: it.notes || '',
+              addons: effStage === 'SERVED' ? ['SERVED'] : [],
+            };
+          });
 
-        const latestOrder = tabRes.orders[tabRes.orders.length - 1];
+          const allTickets = Array.from(
+            new Set(tabRes.orders.map((o: any) => o.orderNumber).filter(Boolean))
+          ).join(' • ');
 
-        return {
-          order: {
-            id: latestOrder?.id || `ord-${cleanId}`,
-            ticket_number: allTickets || latestOrder?.orderNumber || `ORD-${cleanId}`,
-            chair_id: padded,
-            seat_label: `SEAT ${padded}`,
-            status: tabRes.orders.every((o: any) => o.overallStage === 'PAID') ? 'completed' : 'pending',
-            total_amount: tabRes.total || 0,
-          } as OrderRecord,
-          items: allItems,
-        };
+          const latestOrder = tabRes.orders[tabRes.orders.length - 1];
+
+          return {
+            order: {
+              id: latestOrder?.id || `ord-${cleanId}`,
+              ticket_number: allTickets || latestOrder?.orderNumber || `ORD-${cleanId}`,
+              chair_id: padded,
+              seat_label: `SEAT ${padded}`,
+              status: tabRes.orders.every((o: any) => o.overallStage === 'PAID') ? 'completed' : 'pending',
+              total_amount: tabRes.total || 0,
+            } as OrderRecord,
+            items: allItems,
+          };
+        }
       }
     } catch {}
 
