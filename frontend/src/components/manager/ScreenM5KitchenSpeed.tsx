@@ -75,16 +75,24 @@ export function ScreenM5KitchenSpeed({
   const liveTickets: SharedKDSTicket[] = useMemo(() => {
     return (liveOrders || []).map((lo, oIdx) => {
       const chairRaw = (lo.order.chair_id || '').trim();
-      const isTk = chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel');
-      const chairNum = parseInt(chairRaw.replace(/[^0-9]/g, ''), 10) || 1;
+      const isTk =
+        chairRaw === '0' ||
+        chairRaw === '00' ||
+        chairRaw === 'TK-00' ||
+        chairRaw === 'TK-01' ||
+        chairRaw.toLowerCase().includes('takeaway') ||
+        chairRaw.toLowerCase().includes('parcel') ||
+        (lo.order as any).seat_id === 0;
+
+      const chairNum = isTk ? 0 : (parseInt(chairRaw.replace(/[^0-9]/g, ''), 10) || 1);
       const tableNum = isTk ? 0 : Math.ceil(chairNum / 4);
-      const tNum = isTk ? 'TK-01' : `T-${String(tableNum).padStart(2, '0')}`;
+      const tNum = isTk ? 'Seat 0 (Parcel)' : `T-${String(tableNum).padStart(2, '0')}`;
       const orderIdPart = lo.order.id ? lo.order.id.slice(0, 4) : `${oIdx + 1}`;
       const elapsedMinutes = lo.order.created_at
         ? Math.max(1, Math.round((Date.now() - new Date(lo.order.created_at).getTime()) / 60000))
         : 1;
       return {
-        id: lo.order.ticket_number || `KOT-${tNum}-${orderIdPart}`,
+        id: lo.order.ticket_number || (isTk ? `TK-${orderIdPart}` : `KOT-${tNum}-${orderIdPart}`),
         tableNumber: tNum,
         serverName: isTk ? 'Takeaway Desk' : 'Floor Captain',
         timestamp: lo.order.created_at
@@ -120,12 +128,20 @@ export function ScreenM5KitchenSpeed({
   const combinedCustomerPings: SharedPing[] = useMemo(() => {
     return (alerts || []).map((al) => {
       const chairRaw = (al.chairId || al.seatNumber || '').trim();
-      const isTk = chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway');
-      const chairNum = parseInt(chairRaw.replace(/[^0-9]/g, ''), 10) || 1;
+      const isTk =
+        chairRaw === '0' ||
+        chairRaw === '00' ||
+        chairRaw === 'TK-00' ||
+        chairRaw === 'TK-01' ||
+        chairRaw.toLowerCase().includes('takeaway') ||
+        chairRaw.toLowerCase().includes('parcel') ||
+        (al as any).seatId === 0;
+
+      const chairNum = isTk ? 0 : (parseInt(chairRaw.replace(/[^0-9]/g, ''), 10) || 1);
       const tableNum = isTk ? 0 : Math.ceil(chairNum / 4);
       return {
         id: al.id,
-        tableNumber: isTk ? 'TK-01' : `T-${String(tableNum).padStart(2, '0')}`,
+        tableNumber: isTk ? 'Seat 0 (Parcel)' : `T-${String(tableNum).padStart(2, '0')}`,
         seatNumber: isTk ? 0 : chairNum,
         type: al.type || 'WAITER',
         message: al.message || al.title || al.type,
@@ -168,9 +184,13 @@ export function ScreenM5KitchenSpeed({
       tk.items.some((it) => it.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (!matchesSearch) return false;
-    if (placedFilter === 'READY') return tk.status === 'READY';
-    if (placedFilter === 'PREP') return tk.status === 'PREP';
-    if (placedFilter === 'PLACED') return tk.status === 'NEW';
+    const hasReady = tk.items.some((it) => it.stage === 'READY' || it.stage === 'PLATED');
+    const hasPrep = tk.items.some((it) => it.stage === 'PREP' || it.stage === 'COOKING');
+    const isPlaced = tk.items.some((it) => it.stage === 'PLACED' || it.stage === 'QUEUED');
+
+    if (placedFilter === 'READY') return tk.status === 'READY' || hasReady;
+    if (placedFilter === 'PREP') return tk.status === 'PREP' || (tk.status as string) === 'in_progress' || hasPrep;
+    if (placedFilter === 'PLACED') return tk.status === 'NEW' || (tk.status as string) === 'pending' || isPlaced;
     return true;
   });
 
@@ -365,10 +385,10 @@ export function ScreenM5KitchenSpeed({
                     {st === 'ALL'
                       ? `All (${combinedPlacedOrders.length})`
                       : st === 'READY'
-                      ? `Ready (${combinedPlacedOrders.filter((t) => t.status === 'READY').length})`
+                      ? `Ready (${combinedPlacedOrders.filter((t) => t.status === 'READY' || t.items?.some((i) => i.stage === 'READY' || i.stage === 'PLATED')).length})`
                       : st === 'PREP'
-                      ? `Prep (${combinedPlacedOrders.filter((t) => t.status === 'PREP').length})`
-                      : `Placed (${combinedPlacedOrders.filter((t) => t.status === 'NEW').length})`}
+                      ? `Prep (${combinedPlacedOrders.filter((t) => t.status === 'PREP' || (t.status as string) === 'in_progress' || t.items?.some((i) => i.stage === 'PREP' || i.stage === 'COOKING')).length})`
+                      : `Placed (${combinedPlacedOrders.filter((t) => t.status === 'NEW' || (t.status as string) === 'pending' || t.items?.some((i) => i.stage === 'PLACED' || i.stage === 'QUEUED')).length})`}
                   </button>
                 ))}
               </div>
@@ -390,6 +410,12 @@ export function ScreenM5KitchenSpeed({
                   {filteredPlaced.map((tk) => {
                     const chairNum = tk.seatNumber || tk.items[0]?.seatNumber || 1;
                     const overallStage = getStageBadge(undefined, tk.status);
+                    const isParcelTk =
+                      tk.tableNumber === 'Seat 0 (Parcel)' ||
+                      tk.tableNumber === 'TK-01' ||
+                      tk.tableNumber.toLowerCase().includes('parcel') ||
+                      tk.tableNumber.toLowerCase().includes('takeaway') ||
+                      String(chairNum) === '0';
 
                     return (
                       <div
@@ -402,10 +428,10 @@ export function ScreenM5KitchenSpeed({
                             <div>
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-black text-slate-900 text-xs sm:text-sm">
-                                  Table {tk.tableNumber}
+                                  {isParcelTk ? 'Seat 0 (Parcel)' : tk.tableNumber.startsWith('Table') ? tk.tableNumber : `Table ${tk.tableNumber}`}
                                 </span>
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                                  Chair {chairNum}
+                                  {isParcelTk ? 'Takeaway' : `Chair ${chairNum}`}
                                 </span>
                               </div>
                               <div className="text-[9.5px] text-slate-400 font-bold mt-0.5">
@@ -510,7 +536,11 @@ export function ScreenM5KitchenSpeed({
                             <div>
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-black text-slate-900 text-xs sm:text-sm">
-                                  Table {bill.tableName}
+                                  {bill.tableName?.startsWith('Table')
+                                    ? bill.tableName
+                                    : bill.tableName === 'Seat 0 (Parcel)' || bill.tableName?.toLowerCase().includes('parcel')
+                                    ? 'Seat 0 (Parcel)'
+                                    : `Table ${bill.tableName}`}
                                 </span>
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-100 text-slate-700">
                                   {bill.seatLabel || 'Whole Table'}
@@ -647,11 +677,17 @@ export function ScreenM5KitchenSpeed({
             ) : (
               kitchenNotificationsList.map((notif) => {
                 const stageBadge = getStageBadge(notif.stage);
-                const isReady = notif.stage === 'PLATED';
-                const isPrep = notif.stage === 'PREP';
-                const isServed = notif.stage === 'SERVED';
-                const isReceived = notif.stage === 'RECEIVED';
-                const isTk = notif.tableNumber === 'TK-01' || String(notif.chairNumber) === '0';
+                const sUpper = String(notif.stage || '').toUpperCase();
+                const isReady = sUpper === 'READY' || sUpper === 'PLATED';
+                const isPrep = sUpper === 'PREP' || sUpper === 'COOKING' || sUpper === 'PREPARING';
+                const isServed = sUpper === 'SERVED';
+                const isReceived = sUpper === 'RECEIVED';
+                const isTk =
+                  notif.tableNumber === 'Seat 0 (Parcel)' ||
+                  notif.tableNumber === 'TK-01' ||
+                  notif.tableNumber.toLowerCase().includes('parcel') ||
+                  notif.tableNumber.toLowerCase().includes('takeaway') ||
+                  String(notif.chairNumber) === '0';
 
                 return (
                   <div
@@ -672,7 +708,11 @@ export function ScreenM5KitchenSpeed({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-black text-slate-900 text-xs">
-                          {isTk ? 'Takeaway Desk' : `Table ${notif.tableNumber}`}
+                          {isTk
+                            ? 'Seat 0 (Parcel)'
+                            : notif.tableNumber.startsWith('Table')
+                            ? notif.tableNumber
+                            : `Table ${notif.tableNumber}`}
                         </span>
                         <span className="px-1.5 py-0.2 rounded text-[9.5px] font-black bg-amber-100 text-amber-900 border border-amber-300">
                           {isTk ? 'Parcel' : `Chair ${notif.chairNumber}`}
@@ -765,7 +805,12 @@ export function ScreenM5KitchenSpeed({
               combinedCustomerPings.map((ping) => {
                 const isResolved = ping.status === 'RESOLVED';
                 const isPending = ping.status === 'PENDING';
-                const isTk = ping.tableNumber === 'TK-01' || ping.seatNumber === 0;
+                const isTk =
+                  ping.tableNumber === 'Seat 0 (Parcel)' ||
+                  ping.tableNumber === 'TK-01' ||
+                  ping.tableNumber.toLowerCase().includes('parcel') ||
+                  ping.tableNumber.toLowerCase().includes('takeaway') ||
+                  ping.seatNumber === 0;
 
                 return (
                   <div
@@ -785,7 +830,11 @@ export function ScreenM5KitchenSpeed({
                           {getPingIcon(ping.type)}
                         </div>
                         <span className="font-black text-slate-900 text-xs">
-                          {isTk ? 'Takeaway Desk' : `Table ${ping.tableNumber}`}
+                          {isTk
+                            ? 'Seat 0 (Parcel)'
+                            : ping.tableNumber.startsWith('Table')
+                            ? ping.tableNumber
+                            : `Table ${ping.tableNumber}`}
                         </span>
                         <span className="px-1.5 py-0.2 rounded text-[9.5px] font-black bg-slate-100 text-slate-700 border border-slate-200">
                           {isTk
@@ -818,7 +867,7 @@ export function ScreenM5KitchenSpeed({
                       )}
                     </div>
 
-                    {/* Bottom row: Live Status badge */}
+                    {/* Bottom row: Live Status badge & optional resolve button */}
                     <div className="flex items-center justify-between pt-1">
                       <span
                         className={`px-2 py-0.5 rounded text-[9.5px] font-black border ${
@@ -832,9 +881,20 @@ export function ScreenM5KitchenSpeed({
                         {ping.status}
                       </span>
 
-                      <span className="text-[9.5px] font-bold text-slate-400">
-                        {isResolved ? 'Resolved by Waiter' : 'Awaiting Floor Server'}
-                      </span>
+                      {!isResolved && onResolveAlert ? (
+                        <button
+                          type="button"
+                          onClick={() => onResolveAlert(ping.id)}
+                          className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <CheckCheck className="h-3 w-3" />
+                          <span>Resolve</span>
+                        </button>
+                      ) : (
+                        <span className="text-[9.5px] font-bold text-slate-400">
+                          {isResolved ? 'Resolved' : 'Awaiting Floor Server'}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
