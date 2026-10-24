@@ -252,15 +252,19 @@ export function ScreenM4BillingPOS({
       device_token: 'manager-pos',
     };
 
-    const newOrderItems: OrderItemRecord[] = draftItems.map((it, idx) => ({
-      chair_id: isTakeaway ? 'TK-01' : activeSeat,
-      seat_label: seatDisplayTitle,
-      dish_id: `dish-pos-${idx}`,
-      dish_name: it.name,
-      quantity: it.qty,
-      price: it.price,
-      stage: 'PLACED',
-    }));
+    const newOrderItems: OrderItemRecord[] = draftItems.map((it, idx) => {
+      const foundDish = MENU_ITEMS.find((m) => m.title === it.name || (m as any).name === it.name);
+      const dishNum = foundDish ? foundDish.id : (idx + 1);
+      return {
+        chair_id: isTakeaway ? 'TK-01' : activeSeat,
+        seat_label: seatDisplayTitle,
+        dish_id: `dish-${dishNum}`,
+        dish_name: it.name,
+        quantity: it.qty,
+        price: it.price,
+        stage: 'PLACED',
+      };
+    });
 
     await realtimeBridge.placeOrder(newOrderRecord, newOrderItems);
 
@@ -323,15 +327,19 @@ export function ScreenM4BillingPOS({
         device_token: 'manager-pos',
       };
 
-      const newOrderItems: OrderItemRecord[] = draftItems.map((it, idx) => ({
-        chair_id: isTakeaway ? 'TK-01' : activeSeat,
-        seat_label: seatDisplayTitle,
-        dish_id: `dish-pos-${idx}`,
-        dish_name: it.name,
-        quantity: it.qty,
-        price: it.price,
-        stage: 'SERVED',
-      }));
+      const newOrderItems: OrderItemRecord[] = draftItems.map((it, idx) => {
+        const foundDish = MENU_ITEMS.find((m) => m.title === it.name || (m as any).name === it.name);
+        const dishNum = foundDish ? foundDish.id : (idx + 1);
+        return {
+          chair_id: isTakeaway ? 'TK-01' : activeSeat,
+          seat_label: seatDisplayTitle,
+          dish_id: `dish-${dishNum}`,
+          dish_name: it.name,
+          quantity: it.qty,
+          price: it.price,
+          stage: 'SERVED',
+        };
+      });
 
       await realtimeBridge.placeOrder(newOrderRecord, newOrderItems);
     }

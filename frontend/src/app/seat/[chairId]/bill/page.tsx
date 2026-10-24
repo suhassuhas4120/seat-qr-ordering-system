@@ -361,6 +361,27 @@ export default function OrderSummaryBillPage() {
         if (bm.mode) {
           setWaiterSelectedMode(bm.mode);
         }
+      } else {
+        const activeReq =
+          realtimeBridge.getActiveBillRequest(chairId) ||
+          realtimeBridge.getActiveBillRequest(cleanChair) ||
+          realtimeBridge.getActiveBillRequest(normChair);
+        if (!activeReq) {
+          setWaiterCalled(false);
+          setWaiterSelectedMode('none');
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.removeItem(`thoogudeepa_waiter_called_${chairId}`);
+              sessionStorage.removeItem(`thoogudeepa_waiter_called_${normChair}`);
+              sessionStorage.removeItem(`thoogudeepa_waiter_mode_${chairId}`);
+              sessionStorage.removeItem(`thoogudeepa_waiter_mode_${normChair}`);
+              localStorage.removeItem(`thoogudeepa_waiter_called_${chairId}`);
+              localStorage.removeItem(`thoogudeepa_waiter_called_${normChair}`);
+              localStorage.removeItem(`thoogudeepa_waiter_mode_${chairId}`);
+              localStorage.removeItem(`thoogudeepa_waiter_mode_${normChair}`);
+            } catch {}
+          }
+        }
       }
     });
 
@@ -439,7 +460,11 @@ export default function OrderSummaryBillPage() {
       });
       if (currentSeat && currentSeat.status === 'billing') {
         setWaiterCalled(true);
-        setWaiterSelectedMode('qr');
+        realtimeBridge.getSeatBillMode(cleanChair || normChair || chairId).then((bm) => {
+          if (bm.active && bm.mode) {
+            setWaiterSelectedMode(bm.mode);
+          }
+        });
       }
     });
 

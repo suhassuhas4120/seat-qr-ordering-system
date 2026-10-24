@@ -208,9 +208,6 @@ function initSocketBridge() {
     socket.on(SOCKET_EVENTS.ORDER_PLACED, (payload: any) => {
       const order = payload.order;
       if (!order) return;
-      if (processedOrderIds.has(order.id) || (order.orderNumber && processedOrderIds.has(order.orderNumber))) return;
-      processedOrderIds.add(order.id);
-      if (order.orderNumber) processedOrderIds.add(order.orderNumber);
 
       const chairId = String(order.seatId || payload.seat?.id || '01');
       const orderRec: OrderRecord = {
@@ -219,7 +216,7 @@ function initSocketBridge() {
         chair_id: chairId,
         seat_label: `SEAT ${chairId}`,
         status: 'pending',
-        total_amount: payload.seat?.activeOrderTotal || 0,
+        total_amount: payload.seat?.activeOrderTotal || order.totalAmount || 0,
         items: order.items?.map((it: any) => ({
           id: it.id,
           order_id: order.id,
@@ -235,20 +232,26 @@ function initSocketBridge() {
       };
 
       const currentLocals = getLocalOrdersList();
-      const cleanTargetChair = chairId.replace(/[^0-9]/g, '');
-      const updatedOrders = [
-        { order: orderRec, items: orderRec.items || [] },
-        ...currentLocals.filter((x) => {
-          if (x.order.id === order.id) return false;
-          if (order.orderNumber && x.order.ticket_number === order.orderNumber) return false;
-          const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
-          if (xChair === cleanTargetChair) {
-            return false;
-          }
-          return true;
-        }),
-      ];
-      setLocalOrdersList(updatedOrders);
+      const alreadyPresent = currentLocals.some(
+        (x) => x.order.id === order.id || (order.orderNumber && x.order.ticket_number === order.orderNumber)
+      );
+      if (!alreadyPresent) {
+        const updatedOrders = [
+          { order: orderRec, items: orderRec.items || [] },
+          ...currentLocals.filter((x) => {
+            if (x.order.id === order.id) return false;
+            if (order.orderNumber && x.order.ticket_number === order.orderNumber) return false;
+            return true;
+          }),
+        ];
+        setLocalOrdersList(updatedOrders);
+      }
+
+      if (processedOrderIds.has(order.id) || (order.orderNumber && processedOrderIds.has(order.orderNumber))) {
+        return;
+      }
+      processedOrderIds.add(order.id);
+      if (order.orderNumber) processedOrderIds.add(order.orderNumber);
 
       activeKdsSubscribers.forEach((cb) => {
         cb.onNewOrder?.({ order: orderRec, items: orderRec.items || [] });
@@ -881,6 +884,23 @@ export const realtimeBridge = {
       const cleanChair = order.chair_id.replace(/[^0-9]/g, '');
       const cleanSeatId = Number(cleanChair) || 1;
 
+      // Detect role
+      let role: 'CUSTOMER' | 'WAITER_MOBILE' | 'WAITER_TABLET' | 'MANAGER' = 'CUSTOMER';
+      const tokenLower = (deviceToken || '').toLowerCase();
+      if (tokenLower.startsWith('manager') || tokenLower === 'manager-pos') {
+        role = 'MANAGER';
+      } else if (tokenLower.startsWith('tablet') || tokenLower.startsWith('waiter-tablet')) {
+        role = 'WAITER_TABLET';
+      } else if (tokenLower.startsWith('waiter') || order.seat_label?.toLowerCase().includes('waiter')) {
+        role = 'WAITER_MOBILE';
+      }
+
+      let waiterId: number | undefined;
+      if (role === 'WAITER_MOBILE' || role === 'WAITER_TABLET') {
+        const num = Number(deviceToken.replace(/[^0-9]/g, ''));
+        if (num > 0) waiterId = num;
+      }
+
       // 1. Authoritative Fastify backend sync (PRIMARY SOURCE OF TRUTH)
       let backendOrderId = generatedId;
       let backendTicketNumber = order.ticket_number;
@@ -898,9 +918,10 @@ export const realtimeBridge = {
           },
           body: JSON.stringify({
             seatId: cleanSeatId,
-            deviceToken,
+            deviceToken: role === 'CUSTOMER' ? deviceToken : undefined,
             items: apiItems,
-            createdByRole: 'CUSTOMER',
+            createdByRole: role,
+            waiterId,
           }),
         });
 
@@ -988,12 +1009,12 @@ export const realtimeBridge = {
         }
       }
 
-      // 5. Purge any temporary client-draft orders or phantom tickets for this chair
+      // 5. Update local orders list keeping previous valid completed/uncompleted order batches for this chair
       const currentLocals = getLocalOrdersList();
       const filteredLocals = currentLocals.filter((x) => {
-        const xChair = (x.order.chair_id || '').replace(/[^0-9]/g, '');
-        if (xChair === cleanChair) return false;
-        return x.order.id !== backendOrderId && x.order.id !== generatedId;
+        if (x.order.id === backendOrderId || x.order.id === generatedId) return false;
+        if (backendTicketNumber && x.order.ticket_number === backendTicketNumber) return false;
+        return true;
       });
 
       const updatedOrders = [
@@ -2772,8 +2793,24 @@ export const realtimeBridge = {
             if (processedOrderIds.has(ordId)) return;
             processedOrderIds.add(ordId);
           }
+          if (data.order) {
+            const currentLocals = getLocalOrdersList();
+            const alreadyPresent = currentLocals.some(
+              (x) => x.order.id === data.order.id || (data.order.ticket_number && x.order.ticket_number === data.order.ticket_number)
+            );
+            if (!alreadyPresent) {
+              const updated = [
+                { order: data.order, items: data.items || [] },
+                ...currentLocals.filter(
+                  (x) => x.order.id !== data.order.id && (!data.order.ticket_number || x.order.ticket_number !== data.order.ticket_number)
+                ),
+              ];
+              setLocalOrdersList(updated);
+            }
+          }
           activeKdsSubscribers.forEach((cb) => {
             if (cb.onNewOrder) cb.onNewOrder({ order: data.order, items: data.items });
+            if (data.order?.chair_id) cb.onSeatOccupancyChange?.({ chairId: data.order.chair_id, isOccupied: true });
           });
         } else if (data.type === 'STAGE_CHANGE') {
           activeKdsSubscribers.forEach((cb) => {

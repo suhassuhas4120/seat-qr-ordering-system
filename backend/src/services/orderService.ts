@@ -207,7 +207,7 @@ export class OrderService {
           id: sessionId,
           seatId,
           sessionToken: sessionToken || newToken,
-          deviceToken: deviceToken || undefined,
+          deviceToken: createdByRole === 'CUSTOMER' ? (deviceToken || undefined) : undefined,
           status: 'ACTIVE',
           startedAt: now,
         };
