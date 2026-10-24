@@ -66,7 +66,7 @@ function CustomerMenuContent() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [vegOnlyFilter, setVegOnlyFilter] = useState<boolean>(false);
+  const [dietaryFilter, setDietaryFilter] = useState<'all' | 'veg' | 'non-veg'>('all');
   const [stockMap, setStockMap] = useState<Record<string, boolean>>(() => {
     return realtimeBridge.getDishAvailability ? realtimeBridge.getDishAvailability() : {};
   });
@@ -77,10 +77,15 @@ function CustomerMenuContent() {
       const savedScroll = sessionStorage.getItem(`thoogudeepa_menu_scroll_${chairId}`);
       const lastItemId = sessionStorage.getItem(`thoogudeepa_menu_last_item_${chairId}`);
       const savedCat = sessionStorage.getItem(`thoogudeepa_menu_cat_${chairId}`);
+      const savedDiet = sessionStorage.getItem(`thoogudeepa_menu_diet_${chairId}`);
       const savedVeg = sessionStorage.getItem(`thoogudeepa_menu_veg_${chairId}`);
 
       if (savedCat) setSelectedCategory(savedCat);
-      if (savedVeg === 'true') setVegOnlyFilter(true);
+      if (savedDiet === 'veg' || savedDiet === 'non-veg' || savedDiet === 'all') {
+        setDietaryFilter(savedDiet);
+      } else if (savedVeg === 'true') {
+        setDietaryFilter('veg');
+      }
 
       if (savedScroll || lastItemId) {
         // Double frame delay to allow DOM nodes and filtered dishes to hydrate
@@ -163,14 +168,19 @@ function CustomerMenuContent() {
     return MENU_ITEMS.filter((item) => {
       const matchesCategory =
         selectedCategory === 'all' || item.categoryId === selectedCategory;
-      const matchesDiet = !vegOnlyFilter || Boolean(item.isVegetarian);
+      const matchesDiet =
+        dietaryFilter === 'all'
+          ? true
+          : dietaryFilter === 'veg'
+          ? Boolean(item.isVegetarian)
+          : !item.isVegetarian;
       const matchesSearch =
         searchQuery.trim() === '' ||
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesDiet && matchesSearch;
     });
-  }, [selectedCategory, vegOnlyFilter, searchQuery]);
+  }, [selectedCategory, dietaryFilter, searchQuery]);
 
   return (
     <div className="min-h-screen w-full flex flex-col justify-between max-w-md mx-auto relative text-[#1A2621]">
@@ -246,23 +256,54 @@ function CustomerMenuContent() {
             </Link>
           </div>
 
-          {/* Row 2: Category Filter Pills + Quick Veg Only Filter */}
+          {/* Row 2: Dietary Toggle Switch [ All | 🟢 Veg | 🔴 Non-Veg ] + Category Filter Pills */}
           <div className="w-full flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-            {/* Quick Dietary Toggle: Veg Only */}
-            <button
-              type="button"
-              onClick={() => setVegOnlyFilter((prev) => !prev)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-black whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 shrink-0 ${
-                vegOnlyFilter
-                  ? 'bg-emerald-700 text-white shadow-[0_2px_8px_rgba(4,120,87,0.35)]'
-                  : 'border border-emerald-600/40 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full border border-current flex items-center justify-center p-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-              </span>
-              <span>Veg Only</span>
-            </button>
+            {/* Unified Dietary Toggle Switch */}
+            <div className="flex items-center bg-[#EFE9DD] p-1 rounded-full border border-[#DCD3C3] shadow-2xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setDietaryFilter('all')}
+                className={`px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  dietaryFilter === 'all'
+                    ? 'bg-[#1E3A2F] text-white shadow-xs'
+                    : 'text-[#5A6860] hover:text-[#1A2621]'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setDietaryFilter((prev) => (prev === 'veg' ? 'all' : 'veg'))}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  dietaryFilter === 'veg'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'text-emerald-800 hover:bg-emerald-100/70'
+                }`}
+                title="Toggle Vegetarian Only"
+              >
+                <span className="w-3.5 h-3.5 rounded-[4px] border border-current flex items-center justify-center p-0.5 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                </span>
+                <span>Veg</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDietaryFilter((prev) => (prev === 'non-veg' ? 'all' : 'non-veg'))}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                  dietaryFilter === 'non-veg'
+                    ? 'bg-rose-700 text-white shadow-xs'
+                    : 'text-rose-800 hover:bg-rose-100/70'
+                }`}
+                title="Toggle Non-Vegetarian Only"
+              >
+                <span className="w-3.5 h-3.5 rounded-[4px] border border-current flex items-center justify-center p-0.5 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                </span>
+                <span>Non-Veg</span>
+              </button>
+            </div>
+
+            <div className="h-5 w-px bg-[#EAE3D5] shrink-0" />
 
             {/* Standard Category Pills */}
             {MENU_CATEGORIES.map((category) => {
@@ -297,7 +338,7 @@ function CustomerMenuContent() {
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('all');
-                setVegOnlyFilter(false);
+                setDietaryFilter('all');
               }}
               className="mt-2 bg-[#C85A32] text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-[0_4px_14px_rgba(200,90,50,0.3)] hover:opacity-95 cursor-pointer"
             >
@@ -329,7 +370,7 @@ function CustomerMenuContent() {
                         sessionStorage.setItem(`thoogudeepa_menu_scroll_${chairId}`, String(window.scrollY));
                         sessionStorage.setItem(`thoogudeepa_menu_last_item_${chairId}`, item.id);
                         sessionStorage.setItem(`thoogudeepa_menu_cat_${chairId}`, selectedCategory);
-                        sessionStorage.setItem(`thoogudeepa_menu_veg_${chairId}`, String(vegOnlyFilter));
+                        sessionStorage.setItem(`thoogudeepa_menu_diet_${chairId}`, dietaryFilter);
                       } catch {}
                     }}
                     className="w-full flex flex-col items-center cursor-pointer active:opacity-75"
