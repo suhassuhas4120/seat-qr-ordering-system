@@ -17,7 +17,10 @@ import {
   Sparkles,
   Check,
   Flame,
+  AlertTriangle,
+  Layers,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { MENU_ITEMS, MENU_CATEGORIES } from '@/lib/data/menuData';
 import { PromoRule } from './types';
 import { realtimeBridge } from '@/lib/supabase';
@@ -42,6 +45,7 @@ export function ScreenM10Menu86Stock() {
   const [isLocked, setIsLocked] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
 
   // Promos list strictly loaded from persistent storage (zero fake default campaigns)
   const [promos, setPromos] = useState<PromoRule[]>(() => {
@@ -70,11 +74,16 @@ export function ScreenM10Menu86Stock() {
   const [startTime, setStartTime] = useState<string>('16:00');
   const [endTime, setEndTime] = useState<string>('19:00');
 
-  // Listen for real-time availability changes from other screens/tabs
+  // Listen for real-time availability & promo changes from other screens/tabs
   useEffect(() => {
     const unsub = realtimeBridge.subscribeKDS({
       onAvailabilityChange: (data) => {
         setStockMap((prev) => ({ ...prev, [data.dishId]: data.isAvailable }));
+      },
+      onPromosUpdated: (rules) => {
+        if (rules && Array.isArray(rules)) {
+          setPromos(rules.filter((p: PromoRule) => !['pr-0', 'pr-1', 'pr-2'].includes(p.id)));
+        }
       },
       onClearAll: () => {
         const allInStock: Record<string, boolean> = {};
@@ -105,21 +114,34 @@ export function ScreenM10Menu86Stock() {
 
   // Toggle dish stock (86 out / in stock)
   const toggleStock = async (dishId: string) => {
-    if (isLocked) return;
+    if (isLocked) {
+      toast.info('Stock editing is locked. Click "Unlock" to change availability.');
+      return;
+    }
+    const dish = MENU_ITEMS.find((d) => d.id === dishId);
     const nextVal = !stockMap[dishId];
     setStockMap((prev) => ({ ...prev, [dishId]: nextVal }));
     await realtimeBridge.setAvailability(dishId, nextVal);
+    toast.success(
+      nextVal
+        ? `${dish?.title || 'Dish'} marked as IN STOCK`
+        : `${dish?.title || 'Dish'} marked as 86 OUT (Sold Out)`
+    );
   };
 
-  // Reset all 49 dishes to In Stock
+  // Reset all dishes to In Stock
   const resetAllInStock = async () => {
-    if (isLocked) return;
+    if (isLocked) {
+      toast.info('Stock editing is locked. Click "Unlock" first.');
+      return;
+    }
     const allTrue: Record<string, boolean> = {};
     for (const dish of MENU_ITEMS) {
       allTrue[dish.id] = true;
       await realtimeBridge.setAvailability(dish.id, true);
     }
     setStockMap(allTrue);
+    toast.success(`All ${MENU_ITEMS.length} dishes reset to IN STOCK`);
   };
 
   // Quick duration selection helper
@@ -140,7 +162,7 @@ export function ScreenM10Menu86Stock() {
   const handleAddOffer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!offerName.trim() || !promoCode.trim()) {
-      alert('Please enter offer name and promo code.');
+      toast.error('Please enter offer name and promo code.');
       return;
     }
 
@@ -174,20 +196,23 @@ export function ScreenM10Menu86Stock() {
     setPromoCode('');
     setDiscountVal('10');
     setMinOrder('500');
-    alert(`Campaign "${newRule.title}" activated with code ${newRule.code}`);
+    toast.success(`Campaign "${newRule.title}" activated with code ${newRule.code}`);
   };
 
   // Toggle active/paused state of a promo
   const togglePromoActive = (id: string) => {
-    const nextList = promos.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p));
+    const target = promos.find((p) => p.id === id);
+    const nextActive = target ? !target.isActive : true;
+    const nextList = promos.map((p) => (p.id === id ? { ...p, isActive: nextActive } : p));
     updatePromos(nextList);
+    toast.info(`Campaign "${target?.title}" is now ${nextActive ? 'ACTIVE' : 'PAUSED'}.`);
   };
 
   // Delete a promo campaign
   const deletePromo = (id: string, title: string) => {
-    if (!confirm(`Remove campaign "${title}"?`)) return;
     const nextList = promos.filter((p) => p.id !== id);
     updatePromos(nextList);
+    toast.success(`Campaign "${title}" removed.`);
   };
 
   // Dynamic real-time campaign validity status calculation
@@ -219,21 +244,30 @@ export function ScreenM10Menu86Stock() {
   }, []);
 
   const soldOutCount = Object.values(stockMap).filter((v) => !v).length;
+  const inStockCount = MENU_ITEMS.length - soldOutCount;
+  const activePromosCount = promos.filter((p) => p.isActive).length;
 
-  // Filter dishes by search and category
+  // Filter dishes by search, category, and stock status
   const filteredDishes = useMemo(() => {
     return MENU_ITEMS.filter((dish) => {
-      const matchesSearch = dish.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory =
-        selectedCategory === 'all' || dish.categoryId === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const q = searchTerm.toLowerCase().trim();
+      const matchesSearch = !q || dish.title.toLowerCase().includes(q) || String(dish.price).includes(q);
+      const matchesCategory = selectedCategory === 'all' || dish.categoryId === selectedCategory;
+
+      const inStock = stockMap[dish.id] ?? true;
+      const matchesStock =
+        stockFilter === 'all' ||
+        (stockFilter === 'in_stock' && inStock) ||
+        (stockFilter === 'out_of_stock' && !inStock);
+
+      return matchesSearch && matchesCategory && matchesStock;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, stockFilter, stockMap]);
 
   return (
     <div className="w-full mx-auto p-1 space-y-4 font-mono">
       {/* Top Header Banner */}
-      <div className="bg-white border border-[#EAE5DF] rounded-xl p-4 sm:p-5 shadow-xs flex items-center justify-between gap-4">
+      <div className="bg-white border border-[#EAE5DF] rounded-xl p-4 sm:p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9C3D1E] text-white shadow-sm">
             <UtensilsCrossed className="h-6 w-6" />
@@ -243,8 +277,32 @@ export function ScreenM10Menu86Stock() {
               MENU STOCKS &amp; OFFERS
             </span>
             <h1 className="text-base sm:text-lg font-black font-mono text-slate-900 mt-1">
-              Menu Stocks and Offers
+              Menu Stocks (86'd) &amp; Customer Offers
             </h1>
+          </div>
+        </div>
+
+        {/* Global Overview Indicators */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-xs font-bold text-slate-700 bg-[#FAF8F5] border border-slate-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+            <Layers className="h-4 w-4 text-slate-700" />
+            <span>Total Dishes: <strong className="text-slate-900">{MENU_ITEMS.length}</strong></span>
+          </div>
+          <div className="text-xs font-bold text-slate-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <span>In Stock: <strong className="text-emerald-700">{inStockCount}</strong></span>
+          </div>
+          <div className={`text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-2 border ${
+            soldOutCount > 0
+              ? 'bg-rose-50 text-rose-800 border-rose-300'
+              : 'bg-[#FAF8F5] text-slate-500 border-slate-200'
+          }`}>
+            <AlertTriangle className={`h-4 w-4 ${soldOutCount > 0 ? 'text-rose-600' : 'text-slate-400'}`} />
+            <span>86'd Out: <strong className={soldOutCount > 0 ? 'text-rose-700' : 'text-slate-700'}>{soldOutCount}</strong></span>
+          </div>
+          <div className="text-xs font-bold text-slate-700 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+            <Tag className="h-4 w-4 text-purple-600" />
+            <span>Promos: <strong className="text-purple-700">{activePromosCount} Active</strong></span>
           </div>
         </div>
       </div>
@@ -263,11 +321,15 @@ export function ScreenM10Menu86Stock() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIsLocked(!isLocked)}
+                onClick={() => {
+                  const nextLock = !isLocked;
+                  setIsLocked(nextLock);
+                  toast.info(nextLock ? 'Stock editing locked' : 'Stock editing unlocked');
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
                   isLocked
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                    : 'bg-rose-50 text-rose-800 border border-rose-300 animate-pulse'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                    : 'bg-rose-50 text-rose-800 border-rose-300 animate-pulse hover:bg-rose-100'
                 }`}
                 title={isLocked ? 'Click to Unlock Stock Editing' : 'Click to Lock Stock Editing'}
               >
@@ -285,52 +347,69 @@ export function ScreenM10Menu86Stock() {
             </div>
           </div>
 
-          {/* Category Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer ${
-                selectedCategory === 'all'
-                  ? 'bg-[#9C3D1E] text-white shadow-xs'
-                  : 'bg-[#FAF8F5] text-slate-600 border border-slate-200 hover:bg-stone-200'
-              }`}
-            >
-              All ({MENU_ITEMS.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('cat-biryani')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer ${
-                selectedCategory === 'cat-biryani'
-                  ? 'bg-[#9C3D1E] text-white shadow-xs'
-                  : 'bg-[#FAF8F5] text-slate-600 border border-slate-200 hover:bg-stone-200'
-              }`}
-            >
-              Biryani &amp; Rice ({MENU_ITEMS.filter((d) => d.categoryId === 'cat-biryani').length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('cat-starters')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer ${
-                selectedCategory === 'cat-starters'
-                  ? 'bg-[#9C3D1E] text-white shadow-xs'
-                  : 'bg-[#FAF8F5] text-slate-600 border border-slate-200 hover:bg-stone-200'
-              }`}
-            >
-              Starters ({MENU_ITEMS.filter((d) => d.categoryId === 'cat-starters').length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('cat-special')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer ${
-                selectedCategory === 'cat-special'
-                  ? 'bg-[#9C3D1E] text-white shadow-xs'
-                  : 'bg-[#FAF8F5] text-slate-600 border border-slate-200 hover:bg-stone-200'
-              }`}
-            >
-              Specials &amp; Soups ({MENU_ITEMS.filter((d) => d.categoryId === 'cat-special').length})
-            </button>
+          {/* Availability Status Filter & Category Tabs */}
+          <div className="space-y-2">
+            {/* Status Filter Chips: All, In Stock, 86 Out */}
+            <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+              <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase">Filter:</span>
+              <button
+                type="button"
+                onClick={() => setStockFilter('all')}
+                className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 transition cursor-pointer ${
+                  stockFilter === 'all'
+                    ? 'bg-[#9C3D1E] text-white shadow-xs'
+                    : 'bg-[#FAF8F5] text-slate-600 border border-slate-200 hover:bg-stone-200'
+                }`}
+              >
+                All ({MENU_ITEMS.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStockFilter('in_stock')}
+                className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 transition cursor-pointer ${
+                  stockFilter === 'in_stock'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                }`}
+              >
+                In Stock ({inStockCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStockFilter('out_of_stock')}
+                className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 transition cursor-pointer ${
+                  stockFilter === 'out_of_stock'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                }`}
+              >
+                86 Out ({soldOutCount})
+              </button>
+            </div>
+
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-t border-slate-100 pt-1.5">
+              {MENU_CATEGORIES.map((cat) => {
+                const count =
+                  cat.id === 'all'
+                    ? MENU_ITEMS.length
+                    : MENU_ITEMS.filter((d) => d.categoryId === cat.id).length;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer ${
+                      selectedCategory === cat.id
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-[#FAF8F5] text-slate-600 border border-slate-200 hover:bg-stone-200'
+                    }`}
+                  >
+                    {cat.title} ({count})
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Search bar */}
@@ -338,53 +417,56 @@ export function ScreenM10Menu86Stock() {
             <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Filter dishes..."
+              placeholder="Search dishes by name or price..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#FAF8F5] border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-400 font-mono"
+              className="w-full bg-[#FAF8F5] border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-orange-400 font-mono font-bold"
             />
           </div>
 
           {/* Dish Availability Scroll List */}
           <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-            {filteredDishes.map((dish) => {
-              const inStock = stockMap[dish.id] ?? true;
-              return (
-                <div
-                  key={dish.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border text-xs transition ${
-                    inStock
-                      ? 'bg-[#FAF8F5] border-slate-200 hover:border-slate-300'
-                      : 'bg-rose-50 border-rose-300 shadow-2xs'
-                  }`}
-                >
-                  <div className="pr-2 truncate">
-                    <span className="font-bold text-slate-900 block truncate">{dish.title}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">₹{dish.price}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleStock(dish.id)}
-                    disabled={isLocked}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
-                      isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
-                    } ${
+            {filteredDishes.length > 0 ? (
+              filteredDishes.map((dish) => {
+                const inStock = stockMap[dish.id] ?? true;
+                return (
+                  <div
+                    key={dish.id}
+                    className={`flex items-center justify-between p-3 rounded-xl border text-xs transition ${
                       inStock
-                        ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
-                        : 'bg-rose-600 text-white shadow-xs hover:bg-rose-700'
+                        ? 'bg-[#FAF8F5] border-slate-200 hover:border-slate-300'
+                        : 'bg-rose-50 border-rose-300 shadow-2xs'
                     }`}
                   >
-                    {inStock ? 'IN STOCK' : '86 OUT'}
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="pr-2 truncate min-w-0">
+                      <span className="font-bold text-slate-900 block truncate">{dish.title}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">₹{dish.price}</span>
+                    </div>
 
-            {promos.length === 0 && (
-              <div className="py-10 text-center text-slate-400 text-xs font-bold border border-dashed border-slate-300 rounded-xl bg-white p-6 space-y-1">
-                <p className="text-slate-700 font-black">No active campaigns</p>
-                <p className="text-[11px] text-slate-400 font-medium">Use the form on the left to create and schedule real promotional offers.</p>
+                    <button
+                      type="button"
+                      onClick={() => toggleStock(dish.id)}
+                      disabled={isLocked}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer shrink-0 ${
+                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
+                      } ${
+                        inStock
+                          ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
+                          : 'bg-rose-600 text-white shadow-xs hover:bg-rose-700'
+                      }`}
+                    >
+                      {inStock ? 'IN STOCK' : '86 OUT'}
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-10 text-center text-slate-400 text-xs font-bold border border-dashed border-slate-200 rounded-xl bg-[#FAF8F5] p-6 space-y-1">
+                <UtensilsCrossed className="h-6 w-6 text-slate-300 mx-auto mb-1" />
+                <p className="text-slate-700 font-black">No dishes found</p>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  No dishes match the selected category or search query.
+                </p>
               </div>
             )}
           </div>
@@ -399,6 +481,9 @@ export function ScreenM10Menu86Stock() {
                 Add Promotional Offers
               </h3>
             </div>
+            <span className="text-[10px] text-slate-400 font-bold">
+              {promos.length} Campaigns Configured
+            </span>
           </div>
 
           {/* Creation Form with Full Date & Time Scheduling */}
@@ -678,8 +763,9 @@ export function ScreenM10Menu86Stock() {
 
             {promos.length === 0 && (
               <div className="py-10 text-center text-slate-400 text-xs font-bold border border-dashed border-slate-300 rounded-xl bg-white p-6 space-y-1">
+                <Tag className="h-6 w-6 text-slate-300 mx-auto mb-1" />
                 <p className="text-slate-700 font-black">No active campaigns</p>
-                <p className="text-[11px] text-slate-400 font-medium">Use the form on the left to create and schedule real promotional offers.</p>
+                <p className="text-[11px] text-slate-400 font-medium">Use the form above to create and schedule promotional offers.</p>
               </div>
             )}
           </div>
