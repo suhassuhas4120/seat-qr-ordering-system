@@ -178,7 +178,7 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
     // Also include active live orders
     liveOrders.forEach((lo) => {
       lo.items?.forEach((item) => {
-        const lower = (item.dish_name || '').toLowerCase();
+        const lower = (item.dish_name || (item as any).name || (item as any).nameSnapshot || '').toLowerCase();
         const price = (item.price || 0) * (item.quantity || 1);
         if (lower.includes('biryani') || lower.includes('khushka')) {
           biryaniSum += price;

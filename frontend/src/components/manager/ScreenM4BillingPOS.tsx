@@ -179,10 +179,7 @@ export function ScreenM4BillingPOS({
       return oChair === activeSeat || oChair === unpadded || Number(oChair) === num || oSeatId === num;
     });
 
-    const hasAuth = matchingLive.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
-    const activeSeatOrders = hasAuth
-      ? matchingLive.filter((o) => !String(o.order.ticket_number).startsWith('TK-'))
-      : matchingLive;
+    const activeSeatOrders = matchingLive;
 
     const list: BillItem[] = [];
     const seenItemKeys = new Set<string>();
@@ -194,9 +191,9 @@ export function ScreenM4BillingPOS({
             seenItemKeys.add(itemKey);
             list.push({
               id: itemKey,
-              name: it.dish_name,
-              price: it.price,
-              qty: it.quantity,
+              name: it.dish_name || (it as any).name || (it as any).nameSnapshot || (it as any).title || 'Dish',
+              price: it.price || (it as any).priceSnapshot || 0,
+              qty: it.quantity || 1,
               seatNumber: isTk ? 'Seat 0 (Parcel)' : num,
               stage: it.stage || 'SERVED',
               isDraft: false,
@@ -207,6 +204,16 @@ export function ScreenM4BillingPOS({
     });
     return list;
   }, [liveOrders, activeSeat, isTakeaway]);
+
+  // If activeSeat has no placed orders and there are occupied seats, auto-focus on first occupied seat
+  useEffect(() => {
+    if (liveOccupiedSeats.size > 0 && !liveOccupiedSeats.has(activeSeat)) {
+      const firstOcc = Array.from(liveOccupiedSeats)[0];
+      if (firstOcc) {
+        handleSwitchSeat(firstOcc);
+      }
+    }
+  }, [liveOccupiedSeats, activeSeat]);
 
   // Draft items pending KOT punch or immediate settlement
   const draftItems = seatDraftMap[activeSeat] || [];

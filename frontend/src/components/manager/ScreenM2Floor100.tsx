@@ -103,7 +103,8 @@ export function ScreenM2Floor100({
         if (oIsTk) return false;
 
         const oChair = chairRaw.replace(/[^0-9]/g, '');
-        return oChair === chairId || oChair === unpadded || Number(oChair) === i;
+        const oSeatId = (o.order as any).seat_id;
+        return oChair === chairId || oChair === unpadded || Number(oChair) === i || oSeatId === i;
       });
 
       const vacateTime = vacatedSeats.get(chairId) || vacatedSeats.get(unpadded);
@@ -135,10 +136,7 @@ export function ScreenM2Floor100({
         }
       }
 
-      const hasAuth = rawMatchingLiveOrders.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
-      const activeSeatOrders = hasAuth
-        ? rawMatchingLiveOrders.filter((o) => !String(o.order.ticket_number).startsWith('TK-'))
-        : rawMatchingLiveOrders;
+      const activeSeatOrders = rawMatchingLiveOrders;
 
       // Deduplicate orders by id and ticket_number
       const seenOrderIds = new Set<string>();
@@ -163,6 +161,9 @@ export function ScreenM2Floor100({
                 ...it,
                 id: it.id || itemKey,
                 order_id: it.order_id || o.order.id,
+                dish_name: it.dish_name || (it as any).name || (it as any).nameSnapshot || (it as any).title || 'Dish',
+                price: it.price || (it as any).priceSnapshot || 0,
+                quantity: it.quantity || 1,
               });
             }
           });
@@ -233,6 +234,19 @@ export function ScreenM2Floor100({
     return list;
   }, [liveOrders, alerts, vacatedSeats]);
 
+  // Auto-focus on first active seat if current seat is vacant
+  React.useEffect(() => {
+    if (seatGrid.length > 0) {
+      const current = seatGrid.find((s) => s.seatNumber === selectedSeatNum);
+      if (!current || current.status === 'vacant') {
+        const firstActive = seatGrid.find((s) => s.status !== 'vacant');
+        if (firstActive) {
+          setSelectedSeatNum(firstActive.seatNumber);
+        }
+      }
+    }
+  }, [seatGrid, selectedSeatNum]);
+
   // Selected Seat Data
   const activeSelectedSeat = useMemo(() => {
     return seatGrid.find((s) => s.seatNumber === selectedSeatNum) || seatGrid[0];
@@ -252,10 +266,10 @@ export function ScreenM2Floor100({
         seenItemKeys.add(key);
         list.push({
           id: key,
-          name: it.dish_name,
-          quantity: it.quantity,
+          name: it.dish_name || (it as any).name || (it as any).nameSnapshot || (it as any).title || 'Dish',
+          quantity: it.quantity || 1,
           prepTag: '[D]',
-          price: it.price,
+          price: it.price || (it as any).priceSnapshot || 0,
           stage: it.stage || 'PLACED',
         });
       }

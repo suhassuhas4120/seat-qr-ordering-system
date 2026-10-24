@@ -1773,24 +1773,32 @@ export const realtimeBridge = {
 
             // Read items from items_payload JSONB column
             let rawItems: any[] = [];
-            if (Array.isArray(o.items_payload) && o.items_payload.length > 0) {
-              rawItems = o.items_payload.map((it: any, idx: number) => ({
+            let payload = o.items_payload;
+            if (typeof payload === 'string') {
+              try {
+                payload = JSON.parse(payload);
+              } catch {}
+            }
+            if (Array.isArray(payload) && payload.length > 0) {
+              rawItems = payload.map((it: any, idx: number) => ({
                 id: it.id || `${o.id}-${it.dish_id || it.menuItemId || idx}`,
                 order_id: o.id,
                 chair_id: normalizedOrder.chair_id,
                 seat_label: normalizedOrder.seat_label,
                 dish_id: it.dish_id ? (String(it.dish_id).startsWith('dish-') ? String(it.dish_id) : `dish-${it.dish_id}`) : `dish-${it.menuItemId || 1}`,
-                dish_name: it.dish_name || it.nameSnapshot || it.name || 'Dish',
+                dish_name: it.dish_name || it.nameSnapshot || it.name || it.title || 'Dish',
                 quantity: it.quantity || 1,
                 price: it.price || it.priceSnapshot || 0,
-                stage: it.stage || 'PLACED',
+                stage: it.stage || (it.itemStage === 'COOKING' ? 'PREP' : it.itemStage === 'READY' ? 'READY' : it.itemStage === 'SERVED' ? 'SERVED' : 'PLACED'),
                 notes: it.notes || '',
                 addons: Array.isArray(it.addons) ? it.addons : [],
               }));
             }
 
             const localOrder = localOrders.find(
-              (lo) => lo.order.id === o.id || lo.order.ticket_number === o.ticket_number
+              (lo) => (lo.order.id && lo.order.id === o.id) ||
+                      (lo.order.ticket_number && lo.order.ticket_number === o.ticket_number) ||
+                      ((lo.order.chair_id || '').replace(/[^0-9]/g, '') === chairIdPadded && lo.order.status !== 'completed')
             );
 
             // Merge local stages / items if any
@@ -1800,7 +1808,7 @@ export const realtimeBridge = {
 
             const processedItems = rawItems.map((it) => {
               const localItem = localOrder?.items?.find(
-                (li) => li.id === it.id || li.dish_id === it.dish_id || li.dish_name?.toLowerCase().trim() === it.dish_name?.toLowerCase().trim()
+                (li) => li.id === it.id || li.dish_id === it.dish_id || (li.dish_name || '').toLowerCase().trim() === (it.dish_name || '').toLowerCase().trim()
               );
               const isLocallyServed = localItem?.stage === 'SERVED' || localItem?.addons?.includes('SERVED');
               const addons = Array.isArray(it.addons) ? [...it.addons] : [];
@@ -1832,60 +1840,25 @@ export const realtimeBridge = {
             };
           });
 
-          const hasAuthRemote = remoteOrders.some((ro) => String(ro.order.ticket_number).startsWith('ORD-'));
-          const cleanedRemoteOrders = hasAuthRemote
-            ? remoteOrders.filter((ro) => !String(ro.order.ticket_number).startsWith('TK-'))
-            : remoteOrders;
-
-          // Deduplicate remote orders by unique ticket, order id, and identical seat items signature
+          // Deduplicate remote orders by unique ticket and order id
           const seenRemoteTickets = new Set<string>();
           const seenRemoteOrderIds = new Set<string>();
-          const seenSeatItemSigs = new Set<string>();
-          const dedupedRemoteOrders = cleanedRemoteOrders.filter((ro) => {
+          const dedupedRemoteOrders = remoteOrders.filter((ro) => {
             if (ro.order.id && seenRemoteOrderIds.has(ro.order.id)) return false;
             if (ro.order.ticket_number && seenRemoteTickets.has(ro.order.ticket_number)) return false;
-
-            const isTkRo =
-              ro.order.chair_id === '0' ||
-              ro.order.chair_id === '00' ||
-              ro.order.chair_id === 'TK-00' ||
-              ro.order.chair_id === 'TK-01' ||
-              (ro.order.chair_id || '').toLowerCase().includes('takeaway') ||
-              (ro.order.chair_id || '').toLowerCase().includes('parcel') ||
-              (ro.order as any).seat_id === 0;
-            const roChair = isTkRo ? '00' : (ro.order.chair_id || '').replace(/[^0-9]/g, '');
-            const roItemsSig = ro.items.map((i) => `${(i.dish_name || i.dish_id || '').toLowerCase().trim()}:${i.quantity}`).sort().join('|');
-            const seatKey = `${roChair}-${roItemsSig}`;
-            if (seenSeatItemSigs.has(seatKey)) return false;
-            seenSeatItemSigs.add(seatKey);
 
             if (ro.order.id) seenRemoteOrderIds.add(ro.order.id);
             if (ro.order.ticket_number) seenRemoteTickets.add(ro.order.ticket_number);
             return true;
           });
 
-          const remoteTickets = new Set(dedupedRemoteOrders.map((ro) => ro.order.ticket_number));
-          const remoteOrderIds = new Set(dedupedRemoteOrders.map((ro) => ro.order.id));
+          const remoteTickets = new Set(dedupedRemoteOrders.map((ro) => ro.order.ticket_number).filter(Boolean));
+          const remoteOrderIds = new Set(dedupedRemoteOrders.map((ro) => ro.order.id).filter(Boolean));
           const validLocalOrders = localOrders.filter((lo) => {
-            if (!lo.order?.id || !lo.order?.ticket_number) return false;
+            if (!lo.order?.id && !lo.order?.ticket_number) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled' || (lo.order.status as string) === 'PAID') return false;
-            if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
-            if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
-
-            const isTkLo =
-              lo.order.chair_id === '0' ||
-              lo.order.chair_id === '00' ||
-              lo.order.chair_id === 'TK-00' ||
-              lo.order.chair_id === 'TK-01' ||
-              (lo.order.chair_id || '').toLowerCase().includes('takeaway') ||
-              (lo.order.chair_id || '').toLowerCase().includes('parcel') ||
-              (lo.order as any).seat_id === 0;
-            const loChair = isTkLo ? '00' : (lo.order.chair_id || '').replace(/[^0-9]/g, '');
-            const loItemsSig = (lo.items || []).map((i) => `${(i.dish_name || i.dish_id || '').toLowerCase().trim()}:${i.quantity}`).sort().join('|');
-            const seatKey = `${loChair}-${loItemsSig}`;
-            if (seenSeatItemSigs.has(seatKey)) return false;
-            seenSeatItemSigs.add(seatKey);
-
+            if (lo.order.ticket_number && remoteTickets.has(lo.order.ticket_number)) return false;
+            if (lo.order.id && remoteOrderIds.has(lo.order.id)) return false;
             return true;
           });
           const merged = [
@@ -1927,9 +1900,10 @@ export const realtimeBridge = {
 
         if (backendSource.length > 0) {
           const backendOrders = backendSource.map((t: any) => {
-            const rawChair = String(t.seatId || (t.seatNumber ? t.seatNumber.replace(/[^0-9]/g, '') : '14'));
-            const chairNum = rawChair.replace(/[^0-9]/g, '').replace(/^0+/, '');
-            const chairId = chairNum.padStart(2, '0');
+            const isTk = t.seatId === 0 || t.seat?.zone === 'TAKEAWAY' || String(t.orderNumber || '').startsWith('TK-') || String(t.seat?.seatNumber || '').toLowerCase().includes('parcel');
+            const rawChair = String(t.seatId !== undefined && t.seatId !== null ? t.seatId : (t.seatNumber ? t.seatNumber.replace(/[^0-9]/g, '') : '14'));
+            const chairNum = isTk ? '0' : (rawChair.replace(/[^0-9]/g, '').replace(/^0+/, '') || '1');
+            const chairId = isTk ? '00' : chairNum.padStart(2, '0');
 
             // Find matching local order by id, ticket, or normalized chair
             const localOrder = localOrders.find((lo) => {
