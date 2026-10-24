@@ -142,7 +142,7 @@ class InDatabase {
       } else if (type === 'ITEM_STAGE_BUMPED') {
         supabaseSync.syncItemStage(payload.orderId, payload.itemId, payload.stage);
       } else if (type === 'PAYMENT_SETTLED' && payload.paymentId) {
-        const payment = this.data.payments.find((p) => p.id === payload.paymentId);
+        const payment = this.data.payments.find((p) => p.id === payload.paymentId || p.gatewayPaymentId === payload.paymentId);
         if (payment) supabaseSync.syncPayment(payment);
       } else if (type === 'SEAT_CLAIMED' && payload.seatId) {
         const seat = this.data.seats.find((s) => s.id === payload.seatId);

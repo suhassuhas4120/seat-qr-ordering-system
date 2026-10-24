@@ -145,7 +145,7 @@ export class PaymentService {
       db.saveState();
       db.logTransaction('PAYMENT_SETTLED', {
         seatId,
-        paymentId: txId,
+        paymentId: paymentRecord.id,
         amount: finalAmount,
         gateway,
         settledByRole,

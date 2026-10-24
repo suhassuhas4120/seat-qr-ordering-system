@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Order, Payment, Seat } from '../shared/index.js';
 
@@ -99,7 +100,21 @@ class SupabaseOutboxSyncService {
       case 'ORDER': {
         const order: Order = item.payload;
         const total = order.items.reduce((sum, it) => sum + (it.priceSnapshot * it.quantity), 0);
-        await this.client
+
+        // 1. Ensure seat session exists in Supabase to satisfy foreign key
+        const { error: sessErr } = await this.client
+          .from('seat_sessions')
+          .upsert({
+            id: order.sessionId,
+            seat_id: order.seatId,
+            session_token: `token-${order.seatId}`,
+            status: 'ACTIVE',
+            started_at: order.placedAt || new Date().toISOString(),
+          }, { onConflict: 'id' });
+        if (sessErr) throw new Error(`Failed to sync session: ${sessErr.message}`);
+
+        // 2. Upsert Order
+        const { error: ordErr } = await this.client
           .from('orders')
           .upsert({
             id: order.id,
@@ -112,11 +127,12 @@ class SupabaseOutboxSyncService {
             created_at: order.placedAt,
             items_payload: order.items,
           }, { onConflict: 'id' });
+        if (ordErr) throw new Error(`Failed to sync order: ${ordErr.message}`);
         break;
       }
       case 'STAGE': {
         const { orderId, itemId, stage } = item.payload;
-        await this.client
+        const { error: stageErr } = await this.client
           .from('order_item_events')
           .insert({
             order_id: orderId,
@@ -124,11 +140,26 @@ class SupabaseOutboxSyncService {
             stage,
             recorded_at: new Date().toISOString(),
           });
+        if (stageErr) throw new Error(`Failed to sync item stage: ${stageErr.message}`);
         break;
       }
       case 'PAYMENT': {
         const payment: Payment = item.payload;
-        await this.client
+
+        // Ensure session exists
+        const { error: sessErr } = await this.client
+          .from('seat_sessions')
+          .upsert({
+            id: payment.sessionId,
+            seat_id: payment.seatId,
+            session_token: `token-${payment.seatId}`,
+            status: 'COMPLETED',
+            started_at: payment.completedAt || new Date().toISOString(),
+            ended_at: payment.completedAt || new Date().toISOString(),
+          }, { onConflict: 'id' });
+        if (sessErr) throw new Error(`Failed to sync payment session: ${sessErr.message}`);
+
+        const { error: payErr } = await this.client
           .from('payments')
           .upsert({
             id: payment.id,
@@ -144,11 +175,12 @@ class SupabaseOutboxSyncService {
             staff_id: payment.staffId ? Number(payment.staffId) : null,
             created_at: payment.completedAt || new Date().toISOString(),
           }, { onConflict: 'id' });
+        if (payErr) throw new Error(`Failed to sync payment: ${payErr.message}`);
         break;
       }
       case 'SEAT': {
         const seat: Seat = item.payload;
-        await this.client
+        const { error: seatErr } = await this.client
           .from('seats')
           .upsert({
             id: seat.id,
@@ -158,11 +190,12 @@ class SupabaseOutboxSyncService {
             active_order_total: seat.activeOrderTotal || 0,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'id' });
+        if (seatErr) throw new Error(`Failed to sync seat: ${seatErr.message}`);
         break;
       }
       case 'ALERT': {
         const alert = item.payload;
-        await this.client
+        const { error: alertErr } = await this.client
           .from('service_alerts')
           .upsert({
             id: alert.id,
@@ -175,17 +208,19 @@ class SupabaseOutboxSyncService {
             is_resolved: Boolean(alert.isResolved),
             created_at: alert.createdAt ? new Date(alert.createdAt).toISOString() : new Date().toISOString(),
           }, { onConflict: 'id' });
+        if (alertErr) throw new Error(`Failed to sync alert: ${alertErr.message}`);
         break;
       }
       case 'AUDIT': {
         const { type, payload } = item.payload;
-        await this.client
+        const { error: auditErr } = await this.client
           .from('audit_logs')
           .insert({
             event_type: type,
             payload,
             created_at: new Date().toISOString(),
           });
+        if (auditErr) throw new Error(`Failed to sync audit log: ${auditErr.message}`);
         break;
       }
     }
