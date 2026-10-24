@@ -712,6 +712,24 @@ export function ScreenM4BillingPOS({
               <span className="font-mono">₹{gst}</span>
             </div>
 
+            {/* Complimentary / VIP 100% Discount Option */}
+            <div className="flex items-center justify-between py-1 border-t border-dashed border-slate-200">
+              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={complimentary}
+                  onChange={(e) => setComplimentary(e.target.checked)}
+                  className="rounded text-[#9C3D1E] focus:ring-0 cursor-pointer"
+                />
+                <span className="font-bold">Complimentary / VIP (100% OFF)</span>
+              </label>
+              {complimentary && (
+                <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
+                  WAIVED (₹0)
+                </span>
+              )}
+            </div>
+
             <div className="flex items-center justify-between text-slate-900 font-black text-base border-t border-slate-300 pt-2">
               <span>Total Table Bill:</span>
               <span className="text-[#9C3D1E] font-mono text-xl">₹{grandTotal}</span>
@@ -923,16 +941,28 @@ export function ScreenM4BillingPOS({
                 <span>₹{lastSettledReceiptSnapshot?.grandTotal ?? grandTotal}</span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPrintThermalOpen(false);
-                setLastSettledReceiptSnapshot(null);
-              }}
-              className="w-full py-2 bg-black text-white text-xs font-bold rounded cursor-pointer mt-2 hover:bg-slate-800 transition"
-            >
-              Close Receipt
-            </button>
+            <div className="flex gap-2 mt-3 pt-1 border-t border-black/10">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') window.print();
+                }}
+                className="flex-1 py-2 bg-[#9C3D1E] hover:bg-orange-700 text-white text-xs font-bold rounded-lg cursor-pointer transition flex items-center justify-center gap-1.5 shadow-xs"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span>Print Thermal Slip</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPrintThermalOpen(false);
+                  setLastSettledReceiptSnapshot(null);
+                }}
+                className="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-lg cursor-pointer transition"
+              >
+                Close Receipt
+              </button>
+            </div>
           </div>
         </div>
       )}
