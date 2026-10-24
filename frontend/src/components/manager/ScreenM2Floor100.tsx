@@ -559,6 +559,35 @@ export function ScreenM2Floor100({
             </div>
           </div>
 
+          {/* Active Service Alert Banner for This Seat */}
+          {activeSelectedSeat?.alert && (
+            <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-xl flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 animate-bounce" />
+                <div>
+                  <span className="font-black text-rose-900 block">
+                    {activeSelectedSeat.alert.title || 'Customer Service Alert'}
+                  </span>
+                  <span className="text-[10px] text-rose-700">
+                    {activeSelectedSeat.alert.message || 'Immediate assistance requested at table'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (activeSelectedSeat.alert?.id) {
+                    await realtimeBridge.resolveServiceAlert(activeSelectedSeat.alert.id);
+                    onRefresh();
+                  }
+                }}
+                className="px-2 py-1 bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 rounded-lg text-[10px] font-black uppercase transition cursor-pointer shrink-0"
+              >
+                Resolve ✓
+              </button>
+            </div>
+          )}
+
           {/* Table Orders Header & Clean Items List (No Chairs!) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

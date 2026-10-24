@@ -134,6 +134,7 @@ export function ScreenM13PettyExpenses({ openingFloat }: ScreenM13PettyExpensesP
     if (numAmount <= 0) return;
 
     const now = new Date();
+    const activeStaff = (typeof window !== 'undefined' ? localStorage.getItem('thoogudeepa_active_manager') : null) || 'Manjunath (Duty Lead)';
     const newVoucher: PettyExpenseItem = {
       id: `pe-${Date.now()}`,
       voucherNumber: `V-${100 + pettyExpenses.length + 1}`,
@@ -141,7 +142,7 @@ export function ScreenM13PettyExpenses({ openingFloat }: ScreenM13PettyExpensesP
       category,
       amount: numAmount,
       paidTo: paidTo.trim() || 'Vendor',
-      paidBy: 'Manjunath (Duty Lead)',
+      paidBy: activeStaff,
       time: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
       date: now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
     };
