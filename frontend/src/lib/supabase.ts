@@ -2447,12 +2447,12 @@ export const realtimeBridge = {
         const STORAGE_SETTLED_BILLS = 'thoogudeepa_v2_settled_bills_history';
         const existingRaw = localStorage.getItem(STORAGE_SETTLED_BILLS);
         const list = existingRaw ? JSON.parse(existingRaw) : [];
-        const isTk = cleanNum === '0' && (rawChair.toLowerCase().includes('tk') || rawChair.toLowerCase().includes('takeaway'));
+        const isTk = cleanNum === '0' || rawChair.toLowerCase().includes('tk') || rawChair.toLowerCase().includes('takeaway') || rawChair.toLowerCase().includes('parcel') || rawChair.toLowerCase().includes('seat 0');
         const billNumber = `INV-${Date.now().toString().slice(-6)}`;
         const localOrders = getLocalOrdersList();
         const matchingOrders = localOrders.filter((o) => {
           const oNum = (o.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
-          if (isTk) return o.order.chair_id?.toLowerCase().includes('tk') || o.order.chair_id?.toLowerCase().includes('takeaway');
+          if (isTk) return o.order.chair_id?.toLowerCase().includes('tk') || o.order.chair_id?.toLowerCase().includes('takeaway') || o.order.chair_id?.toLowerCase().includes('parcel') || o.order.chair_id?.toLowerCase().includes('seat 0') || (o.order as any)?.order_type === 'takeaway';
           return oNum === cleanNum || o.order.chair_id === rawChair;
         });
         const items: any[] = [];
@@ -2473,7 +2473,7 @@ export const realtimeBridge = {
         list.unshift({
           invoiceNumber: billNumber,
           tableName: isTk ? 'TK-01' : `T-${padded}`,
-          seatLabel: isTk ? 'Takeaway Parcel' : `Chair ${cleanNum}`,
+          seatLabel: isTk ? 'Seat 0 (Parcel)' : `Chair ${cleanNum}`,
           seatNumber: isTk ? 0 : Number(cleanNum) || 1,
           captainName: isTk ? 'Takeaway Desk' : 'Floor Captain',
           subtotal,
@@ -2482,6 +2482,8 @@ export const realtimeBridge = {
           sgst: Math.round(tax / 2),
           grandTotal: amount,
           method: paymentMethod || 'UPI',
+          timestamp: new Date().toISOString(),
+          formattedDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
           formattedTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           items,
         });
