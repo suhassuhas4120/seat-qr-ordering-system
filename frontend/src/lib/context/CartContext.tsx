@@ -86,7 +86,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   const getItemQuantity = (itemId: string): number => {
-    return items[itemId]?.quantity || 0;
+    if (!itemId) return 0;
+    const direct = items[itemId];
+    if (direct) return direct.quantity;
+    const clean = itemId.replace(/^dish-/, '');
+    const alt = items[`dish-${clean}`] || items[clean];
+    return alt?.quantity || 0;
   };
 
   const updateQuantity = (itemId: string, newQuantity: number) => {

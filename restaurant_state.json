@@ -280,11 +280,11 @@
       "seatNumber": "S025",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "9db77821ab915467",
+      "epochHash": "4d6cc3adf9055a85",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-24T03:26:34.127Z"
+      "updatedAt": "2026-10-24T03:36:09.393Z"
     },
     {
       "id": 26,
@@ -1346,6 +1346,15 @@
       "status": "COMPLETED",
       "startedAt": "2026-10-24T03:26:34.064Z",
       "endedAt": "2026-10-24T03:26:34.127Z"
+    },
+    {
+      "id": "b4240173-53b4-45ef-8d6a-d8c858eeed93",
+      "seatId": 25,
+      "sessionToken": "cba399b11392cd3ea7b471167e0bf36f1e483e84f16c8c0273aadc93db90039f",
+      "deviceToken": "device_A",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:36:09.279Z",
+      "endedAt": "2026-10-24T03:36:09.393Z"
     }
   ],
   "menuCategories": [
@@ -2672,6 +2681,56 @@
       ],
       "totalAmount": 50,
       "deviceToken": "device_A"
+    },
+    {
+      "id": "b060b3a2-e460-4d57-bd7b-0fc497253dff",
+      "sessionId": "b4240173-53b4-45ef-8d6a-d8c858eeed93",
+      "seatId": 25,
+      "orderNumber": "ORD-9279",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:36:09.279Z",
+      "items": [
+        {
+          "id": "c0e7d45b-3a59-4fb1-8993-cda141fa67c3",
+          "orderId": "b060b3a2-e460-4d57-bd7b-0fc497253dff",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:36:09.279Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "7cc3fa63-f651-4c8d-be9a-6c2a3095db94",
+      "sessionId": "b4240173-53b4-45ef-8d6a-d8c858eeed93",
+      "seatId": 25,
+      "orderNumber": "ORD-9375",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:36:09.375Z",
+      "items": [
+        {
+          "id": "3692330d-5eed-40ef-adb0-89d0bf60c70c",
+          "orderId": "7cc3fa63-f651-4c8d-be9a-6c2a3095db94",
+          "menuItemId": 4,
+          "nameSnapshot": "Dosa (2pcs)",
+          "priceSnapshot": 50,
+          "quantity": 1,
+          "notes": "Extra Kebab",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:36:09.375Z"
+        }
+      ],
+      "totalAmount": 50,
+      "deviceToken": "device_A"
     }
   ],
   "payments": [
@@ -3094,6 +3153,21 @@
       "settledByRole": "MANAGER",
       "staffId": null,
       "completedAt": "2026-10-24T03:26:34.127Z"
+    },
+    {
+      "id": "0e2dfc47-1b30-40e2-bf5f-789e4d8880c9",
+      "sessionId": "b4240173-53b4-45ef-8d6a-d8c858eeed93",
+      "seatId": 25,
+      "subtotal": 290,
+      "taxAmount": 14.5,
+      "discountAmount": 0,
+      "finalAmount": 304.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792812969393_9F7B5CF8",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:36:09.393Z"
     }
   ],
   "users": [

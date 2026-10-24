@@ -179,3 +179,6 @@
 {"timestamp":"2026-10-24T03:26:34.071Z","type":"ORDER_PLACED","payload":{"orderId":"fdba062b-6006-4338-9646-2c5f90294650","orderNumber":"ORD-4064","seatId":25,"itemCount":1,"total":252,"createdByRole":"CUSTOMER","deviceToken":"device_A"}}
 {"timestamp":"2026-10-24T03:26:34.109Z","type":"ORDER_PLACED","payload":{"orderId":"68095515-2cdc-46f2-812e-f84a2f438e02","orderNumber":"ORD-4103","seatId":25,"itemCount":1,"total":304.5,"createdByRole":"CUSTOMER","deviceToken":"device_A"}}
 {"timestamp":"2026-10-24T03:26:34.132Z","type":"PAYMENT_SETTLED","payload":{"seatId":25,"paymentId":"d75a6273-0c14-45e8-9796-d27a271b95cf","amount":304.5,"gateway":"CASH","settledByRole":"MANAGER"}}
+{"timestamp":"2026-10-24T03:36:09.290Z","type":"ORDER_PLACED","payload":{"orderId":"b060b3a2-e460-4d57-bd7b-0fc497253dff","orderNumber":"ORD-9279","seatId":25,"itemCount":1,"total":252,"createdByRole":"CUSTOMER","deviceToken":"device_A"}}
+{"timestamp":"2026-10-24T03:36:09.380Z","type":"ORDER_PLACED","payload":{"orderId":"7cc3fa63-f651-4c8d-be9a-6c2a3095db94","orderNumber":"ORD-9375","seatId":25,"itemCount":1,"total":304.5,"createdByRole":"CUSTOMER","deviceToken":"device_A"}}
+{"timestamp":"2026-10-24T03:36:09.405Z","type":"PAYMENT_SETTLED","payload":{"seatId":25,"paymentId":"0e2dfc47-1b30-40e2-bf5f-789e4d8880c9","amount":304.5,"gateway":"CASH","settledByRole":"MANAGER"}}

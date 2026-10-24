@@ -197,6 +197,10 @@ export default function CustomerCartPage() {
             addons: oi.addons,
           }));
 
+      const storedCustName = typeof window !== 'undefined'
+        ? (sessionStorage.getItem(`thoogudeepa_customer_name_${chairId}`) || localStorage.getItem(`thoogudeepa_customer_name_${chairId}`) || undefined)
+        : undefined;
+
       setActiveDiningSession({
         seatId: chairId,
         ticketNumber: authoritativeTicket,
@@ -206,6 +210,7 @@ export default function CustomerCartPage() {
         orderedAt: isSameSession ? existingSession.orderedAt : Date.now(),
         totalAmount: authoritativeTotal,
         deviceToken,
+        customerName: isSameSession ? (existingSession.customerName || storedCustName) : storedCustName,
         items: authoritativeItems,
       });
 
