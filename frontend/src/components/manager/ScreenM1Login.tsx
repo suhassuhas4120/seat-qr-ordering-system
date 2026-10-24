@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ManagerProfile, ShiftInfo } from './types';
-import { Unlock, Clock, KeyRound, Edit2, Check, X, User } from 'lucide-react';
+import { Unlock, Clock, KeyRound, Edit2, Check, X, User, CheckCircle2 } from 'lucide-react';
 
 export const DEFAULT_PROFILES: ManagerProfile[] = [
   { id: 'mgr-1', name: 'MANJUNATH (GENERAL MANAGER)', role: 'General Manager', pin: '1234' },
@@ -28,6 +28,7 @@ export function ScreenM1Login({ onUnlock, openingFloat, setOpeningFloat }: Scree
   const [otherStaffName, setOtherStaffName] = useState<string>('');
   const [pinInput, setPinInput] = useState<string>('');
   const [authError, setAuthError] = useState<boolean>(false);
+  const [authSuccess, setAuthSuccess] = useState<boolean>(false);
 
   // Float adjustment state
   const [adjustingFloat, setAdjustingFloat] = useState<boolean>(false);
@@ -61,12 +62,47 @@ export function ScreenM1Login({ onUnlock, openingFloat, setOpeningFloat }: Scree
     const expectedPin = isOtherStaff ? '1234' : targetProfile?.pin || '1234';
 
     if (pinInput === expectedPin || pinInput === '1234' || pinInput.length === 4) {
-      if (onUnlock) onUnlock();
+      setAuthSuccess(true);
+      const staffName = isOtherStaff
+        ? (otherStaffName.trim() || 'DUTY MANAGER')
+        : (targetProfile?.name || 'MANJUNATH (GENERAL MANAGER)');
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('thoogudeepa_active_manager', staffName);
+          localStorage.setItem('thoogudeepa_active_shift', activeShift.name);
+        } catch {}
+      }
+
+      setTimeout(() => {
+        if (onUnlock) onUnlock();
+      }, 350);
     } else {
       setAuthError(true);
       setTimeout(() => setAuthError(false), 2000);
     }
   };
+
+  // Physical keyboard support for desktop/POS terminals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture when editing float or typing custom staff name in an input
+      if (adjustingFloat || (isOtherStaff && document.activeElement?.tagName === 'INPUT')) {
+        return;
+      }
+      if (/^[0-9]$/.test(e.key)) {
+        handlePress(e.key);
+      } else if (e.key === 'Backspace') {
+        handleDeleteDigit();
+      } else if (e.key === 'Enter') {
+        handleVerify();
+      } else if (e.key === 'Escape') {
+        handleClearPin();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [adjustingFloat, isOtherStaff, pinInput, selectedProfileId, otherStaffName, activeShift]);
 
   const handleFloatSave = () => {
     const parsed = parseFloat(floatInput);
@@ -190,6 +226,12 @@ export function ScreenM1Login({ onUnlock, openingFloat, setOpeningFloat }: Scree
                 src="/assets/thoogudeepa-logo.png"
                 alt="Thoogudeepa Donne Biryani Mane"
                 className="h-28 w-28 rounded-full object-cover shadow-xl border-4 border-[#D28835]/60"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (!target.src.endsWith('/thoogudeepa-logo.png')) {
+                    target.src = '/thoogudeepa-logo.png';
+                  }
+                }}
               />
             </div>
             <h3 className="text-base font-black font-mono text-slate-900">
@@ -295,10 +337,23 @@ export function ScreenM1Login({ onUnlock, openingFloat, setOpeningFloat }: Scree
           <button
             type="button"
             onClick={handleVerify}
-            className="flex-1 bg-[#9C3D1E] text-white py-2.5 px-4 rounded-xl font-mono text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs hover:bg-orange-700 transition cursor-pointer"
+            className={`flex-1 py-2.5 px-4 rounded-xl font-mono text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition cursor-pointer ${
+              authSuccess
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'bg-[#9C3D1E] text-white hover:bg-orange-700'
+            }`}
           >
-            <Unlock className="h-4 w-4" />
-            <span>VERIFY & UNLOCK DESK</span>
+            {authSuccess ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-white animate-pulse" />
+                <span>ACCESS GRANTED — OPENING LIVE FLOOR...</span>
+              </>
+            ) : (
+              <>
+                <Unlock className="h-4 w-4" />
+                <span>VERIFY & UNLOCK DESK</span>
+              </>
+            )}
           </button>
         </div>
       </div>
