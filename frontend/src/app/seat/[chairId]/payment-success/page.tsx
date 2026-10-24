@@ -22,6 +22,9 @@ function PaymentSuccessContent() {
   const modeParam = searchParams?.get('mode') || 'UPI';
   const amountParam = searchParams?.get('amount');
   const tipParam = searchParams?.get('tip');
+  const discountParam = searchParams?.get('discount');
+  const promoParam = searchParams?.get('promo');
+  const discountAmount = discountParam ? Number(discountParam) : 0;
 
   const [settledAmount, setSettledAmount] = useState<number>(
     amountParam ? Number(amountParam) : 0
@@ -40,7 +43,7 @@ function PaymentSuccessContent() {
     let finalAmount = Number(amountParam) || 0;
     if (s && s.seatId === chairId) {
       if (!finalAmount) {
-        finalAmount = (s.totalAmount || 0) + tipAmount;
+        finalAmount = Math.max(0, (s.totalAmount || 0) + tipAmount - discountAmount);
       }
       setSettledAmount(finalAmount);
       try {
@@ -52,8 +55,10 @@ function PaymentSuccessContent() {
             items: s.items || [],
             subtotal: s.items && s.items.length > 0
               ? s.items.reduce((acc, it) => acc + it.price * it.quantity, 0)
-              : Math.round((finalAmount - tipAmount) / 1.05),
+              : Math.round((finalAmount - tipAmount + discountAmount) / 1.05),
             tip: tipAmount,
+            discount: discountAmount,
+            promo: promoParam || undefined,
             totalAmount: finalAmount,
             mode: modeParam,
             settledAt: Date.now(),

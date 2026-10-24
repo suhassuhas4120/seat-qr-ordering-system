@@ -793,7 +793,7 @@ export default function OrderSummaryBillPage() {
               </button>
             ) : (
               <Link
-                href={`/seat/${chairId}/payment?amount=${grandPayable}&tip=${tipAmount}`}
+                href={`/seat/${chairId}/payment?amount=${grandPayable}&tip=${tipAmount}${discountAmount > 0 ? `&discount=${discountAmount}&promo=${encodeURIComponent(promoCode || '')}` : ''}`}
                 className="w-full bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white py-3 px-3 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl flex items-center justify-center cursor-pointer active:opacity-90 transition-all shadow-md text-center hover:shadow-lg"
               >
                 Self Pay

@@ -1,15 +1,24 @@
 'use client';
 
-import React, { useState, useRef, Suspense } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ChevronLeft, CreditCard, Calendar, Eye, EyeOff } from 'lucide-react';
 import { useHardwareBack } from '../../../../lib/hooks/useHardwareBack';
+import { isDeviceLockedToDifferentSeat } from '../../../../lib/session/diningSession';
 
 function CardDetailsContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const chairId = (params?.chairId as string) || '12';
+
+  // Anti-cheat concurrency protection: verify device isn't locked to another seat
+  useEffect(() => {
+    const lockCheck = isDeviceLockedToDifferentSeat(chairId);
+    if (lockCheck.isLocked && lockCheck.activeSeatId) {
+      window.location.replace(`/seat/${lockCheck.activeSeatId}/card-details`);
+    }
+  }, [chairId]);
 
   // Device hardware back button & swipe back: return to payment methods
   useHardwareBack(`/seat/${chairId}/payment`);
@@ -17,6 +26,8 @@ function CardDetailsContent() {
   const cardParam = searchParams?.get('card') || 'card1';
   const amountParam = searchParams?.get('amount') || '';
   const tipParam = searchParams?.get('tip') || '';
+  const discountParam = searchParams?.get('discount') || '';
+  const promoParam = searchParams?.get('promo') || '';
 
   // Cards catalog matching payment page
   const cardPresets: Record<string, { title: string; number: string; holder: string; expiry: string; logo: string }> = {
@@ -308,7 +319,7 @@ function CardDetailsContent() {
       <div className="sticky bottom-0 z-30 w-full bg-[#FFFEFC]/95 backdrop-blur-sm pt-3 pb-4 border-t border-[#DCE2DE]/60">
         {isFormComplete ? (
           <Link
-            href={`/seat/${chairId}/payment-success?mode=Card&card=${cardParam}${amountParam ? `&amount=${amountParam}` : ''}${tipParam ? `&tip=${tipParam}` : ''}`}
+            href={`/seat/${chairId}/payment-success?mode=Card&card=${cardParam}${amountParam ? `&amount=${amountParam}` : ''}${tipParam ? `&tip=${tipParam}` : ''}${discountParam ? `&discount=${discountParam}` : ''}${promoParam ? `&promo=${encodeURIComponent(promoParam)}` : ''}`}
             className="w-full bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white py-3.5 px-4 text-sm font-bold uppercase tracking-wider rounded-xl flex items-center justify-center cursor-pointer active:opacity-90 transition-opacity text-center shadow-[0_4px_16px_rgba(36,68,54,0.2)] hover:opacity-95"
           >
             Continue
