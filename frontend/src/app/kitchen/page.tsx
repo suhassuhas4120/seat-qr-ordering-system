@@ -139,14 +139,21 @@ export default function KitchenDisplaySystemPage() {
             return prev;
           }
 
-          // 2. Match by ticket_number and chair_id
+          // 2. Match by ticket_number and chair_id, or identical chair dishes
           const cleanNewChair = (newOrder.order.chair_id || '').replace(/[^0-9]/g, '');
+          const newOrderDishesSig = newOrder.items.map(i => `${i.dish_name || i.dish_id}:${i.quantity}`).sort().join('|');
           const matchByTicket = prev.findIndex(
-            (o) =>
-              o.order.ticket_number &&
-              newOrder.order.ticket_number &&
-              o.order.ticket_number === newOrder.order.ticket_number &&
-              (!cleanNewChair || (o.order.chair_id || '').replace(/[^0-9]/g, '') === cleanNewChair)
+            (o) => {
+              if (o.order.ticket_number && newOrder.order.ticket_number && o.order.ticket_number === newOrder.order.ticket_number) {
+                return !cleanNewChair || (o.order.chair_id || '').replace(/[^0-9]/g, '') === cleanNewChair;
+              }
+              const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
+              if (oChair && cleanNewChair && oChair === cleanNewChair) {
+                const oDishesSig = o.items.map(i => `${i.dish_name || i.dish_id}:${i.quantity}`).sort().join('|');
+                return oDishesSig === newOrderDishesSig;
+              }
+              return false;
+            }
           );
 
           if (matchByTicket !== -1) {

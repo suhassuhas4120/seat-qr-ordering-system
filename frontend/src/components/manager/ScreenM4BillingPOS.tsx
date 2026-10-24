@@ -84,6 +84,7 @@ export function ScreenM4BillingPOS({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [printThermalOpen, setPrintThermalOpen] = useState<boolean>(false);
   const [lastSettledReceiptSnapshot, setLastSettledReceiptSnapshot] = useState<SettledReceiptSnapshot | null>(null);
+  const [isPunchingKot, setIsPunchingKot] = useState<boolean>(false);
 
   const isTakeaway = activeSeat === 'TK-01' || activeSeat.toLowerCase().includes('takeaway');
   const seatDisplayTitle = isTakeaway ? 'Takeaway Parcel #01' : `Seat #${activeSeat}`;
@@ -239,7 +240,9 @@ export function ScreenM4BillingPOS({
 
   // Dispatch new items as a real KOT to the Kitchen
   const handlePunchKotToKitchen = async () => {
-    if (draftItems.length === 0) return;
+    if (draftItems.length === 0 || isPunchingKot) return;
+    setIsPunchingKot(true);
+
     const ticketNumber = isTakeaway
       ? `TK-${Date.now().toString().slice(-4)}`
       : `T-${activeSeat}-${Date.now().toString().slice(-3)}`;
@@ -268,19 +271,23 @@ export function ScreenM4BillingPOS({
       };
     });
 
-    await realtimeBridge.placeOrder(newOrderRecord, newOrderItems);
+    try {
+      await realtimeBridge.placeOrder(newOrderRecord, newOrderItems);
 
-    setSeatDraftMap((prev) => {
-      const next = { ...prev };
-      delete next[activeSeat];
-      return next;
-    });
+      setSeatDraftMap((prev) => {
+        const next = { ...prev };
+        delete next[activeSeat];
+        return next;
+      });
 
-    setPunchNotice(`Thermal KOT #${ticketNumber} dispatched to Kitchen for ${seatDisplayTitle}!`);
-    setTimeout(() => setPunchNotice(null), 3500);
+      setPunchNotice(`Thermal KOT #${ticketNumber} dispatched to Kitchen for ${seatDisplayTitle}!`);
+      setTimeout(() => setPunchNotice(null), 3500);
 
-    if (onSettled) {
-      onSettled();
+      if (onSettled) {
+        onSettled();
+      }
+    } finally {
+      setIsPunchingKot(false);
     }
   };
 
@@ -653,12 +660,17 @@ export function ScreenM4BillingPOS({
               {/* Punch KOT to Kitchen Action Button */}
               <button
                 type="button"
+                disabled={isPunchingKot}
                 onClick={handlePunchKotToKitchen}
-                className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs mt-1"
+                className={`w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-1.5 shadow-xs mt-1 ${
+                  isPunchingKot ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                }`}
               >
                 <Send className="h-3.5 w-3.5" />
                 <span>
-                  Punch KOT to Kitchen ({draftItems.reduce((sum, it) => sum + it.qty, 0)} Items)
+                  {isPunchingKot
+                    ? 'Punching to Kitchen...'
+                    : `Punch KOT to Kitchen (${draftItems.reduce((sum, it) => sum + it.qty, 0)} Items)`}
                 </span>
               </button>
             </div>

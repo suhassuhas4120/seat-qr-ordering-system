@@ -915,6 +915,8 @@ function broadcastRealtime(event: string, payload: any) {
   } catch {}
 }
 
+const recentOrderDedupeMap = new Map<string, { timestamp: number; orderId: string; ticketNumber?: string }>();
+
 export const realtimeBridge = {
   // Post order to Fastify backend (primary source of truth), update Supabase & local resilience store, and broadcast
   async placeOrder(order: OrderRecord, items: OrderItemRecord[]): Promise<{ success: boolean; orderId?: string; ticketNumber?: string }> {
@@ -934,6 +936,16 @@ export const realtimeBridge = {
       } else if (tokenLower.startsWith('waiter') || order.seat_label?.toLowerCase().includes('waiter')) {
         role = 'WAITER_MOBILE';
       }
+
+      // Deduplication guard against rapid double-clicks (within 2500ms) for identical seat & items
+      const itemsFingerprint = items.map((i) => `${i.dish_id}:${i.quantity}`).sort().join('|');
+      const dedupeKey = `${cleanSeatId}-${role}-${itemsFingerprint}`;
+      const existingRecent = recentOrderDedupeMap.get(dedupeKey);
+      if (existingRecent && Date.now() - existingRecent.timestamp < 2500) {
+        console.warn('Blocked rapid duplicate order placement for', dedupeKey);
+        return { success: true, orderId: existingRecent.orderId, ticketNumber: existingRecent.ticketNumber };
+      }
+      recentOrderDedupeMap.set(dedupeKey, { timestamp: Date.now(), orderId: generatedId, ticketNumber: order.ticket_number });
 
       let waiterId: number | undefined;
       if (role === 'WAITER_MOBILE' || role === 'WAITER_TABLET') {
@@ -1069,6 +1081,7 @@ export const realtimeBridge = {
       const filteredLocals = currentLocals.filter((x) => {
         if (x.order.id === backendOrderId || x.order.id === generatedId) return false;
         if (backendTicketNumber && x.order.ticket_number === backendTicketNumber) return false;
+        if (order.ticket_number && x.order.ticket_number === order.ticket_number) return false;
         return true;
       });
 
@@ -1809,12 +1822,20 @@ export const realtimeBridge = {
             ? remoteOrders.filter((ro) => !String(ro.order.ticket_number).startsWith('TK-'))
             : remoteOrders;
 
-          // Deduplicate remote orders by unique ticket and order id
+          // Deduplicate remote orders by unique ticket, order id, and identical seat items signature
           const seenRemoteTickets = new Set<string>();
           const seenRemoteOrderIds = new Set<string>();
+          const seenSeatItemSigs = new Set<string>();
           const dedupedRemoteOrders = cleanedRemoteOrders.filter((ro) => {
             if (ro.order.id && seenRemoteOrderIds.has(ro.order.id)) return false;
             if (ro.order.ticket_number && seenRemoteTickets.has(ro.order.ticket_number)) return false;
+
+            const roChair = (ro.order.chair_id || '').replace(/[^0-9]/g, '');
+            const roItemsSig = ro.items.map((i) => `${i.dish_name || i.dish_id}:${i.quantity}`).sort().join('|');
+            const seatKey = `${roChair}-${roItemsSig}`;
+            if (seenSeatItemSigs.has(seatKey)) return false;
+            seenSeatItemSigs.add(seatKey);
+
             if (ro.order.id) seenRemoteOrderIds.add(ro.order.id);
             if (ro.order.ticket_number) seenRemoteTickets.add(ro.order.ticket_number);
             return true;
@@ -1827,6 +1848,13 @@ export const realtimeBridge = {
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled' || (lo.order.status as string) === 'PAID') return false;
             if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
             if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
+
+            const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+            const loItemsSig = (lo.items || []).map((i) => `${i.dish_name || i.dish_id}:${i.quantity}`).sort().join('|');
+            const seatKey = `${loChair}-${loItemsSig}`;
+            if (seenSeatItemSigs.has(seatKey)) return false;
+            seenSeatItemSigs.add(seatKey);
+
             return true;
           });
           const merged = [

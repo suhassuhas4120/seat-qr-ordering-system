@@ -601,10 +601,8 @@ export const TabletCockpitMaster: React.FC = () => {
           setActiveTicketNumber('');
         }
         if (details.items && details.items.length > 0) {
-          const qtyMap: Record<number, number> = {};
           const items: TicketItem[] = details.items.map((it, idx) => {
             const numId = Number(it.dish_id.replace(/[^0-9]/g, '')) || (idx + 1);
-            qtyMap[numId] = (qtyMap[numId] || 0) + it.quantity;
             const dish = MENU_DISHES.find(d => d.id === numId);
             const itStage = it.stage as string;
             const isItemServed = Boolean(
@@ -618,16 +616,17 @@ export const TabletCockpitMaster: React.FC = () => {
               itStage === 'REC' ? 'RECEIVED' : 'PLACED';
             return {
               id: numId,
-              orderItemId: it.id,
+              orderItemId: it.id || `unit-${numId}-${idx}`,
               ticketNumber: details.order?.ticket_number,
               name: it.dish_name,
               quantity: it.quantity,
               price: it.price,
               imageUrl: dish?.imageUrl || '/logo.jpg',
-              status: currentItemStage
+              status: currentItemStage,
+              isPunched: true,
             };
           });
-          setDishQuantities(qtyMap);
+          setDishQuantities({});
           setTicketItems(items);
         } else {
           setDishQuantities({});
@@ -872,6 +871,7 @@ export const TabletCockpitMaster: React.FC = () => {
 
       setActiveTicketNumber(ticketNum);
       setDishQuantities({});
+      setTicketItems(prev => prev.map(it => ({ ...it, isPunched: true, orderItemId: it.orderItemId || `${ticketNum}-${it.id}` })));
 
       // Immediately fetch authoritative tab from server to guarantee exact sync & zero double-counting
       const details = await realtimeBridge.getOrderForSeat(cleanChair);

@@ -86,7 +86,20 @@ export default function KitchenDisplayPage() {
         console.warn('realtimeBridge ticket merge warning:', bridgeErr);
       }
 
-      setOrders(tickets);
+      // Deduplicate tickets to ensure each seat's order items card is rendered only once (zero duplicates)
+      const dedupedTickets: any[] = [];
+      const seenCardKeys = new Set<string>();
+      tickets.forEach((t) => {
+        const seatKey = t.seatId || t.seat?.id || 1;
+        const itemsKey = (t.items || []).map((it: any) => `${it.nameSnapshot || it.name || it.menuItemId}:${it.quantity}`).sort().join('|');
+        const uniqueCardId = `${seatKey}-${itemsKey}`;
+        if (!seenCardKeys.has(uniqueCardId)) {
+          seenCardKeys.add(uniqueCardId);
+          dedupedTickets.push(t);
+        }
+      });
+
+      setOrders(dedupedTickets);
     } catch (err: any) {
       console.warn('Failed to load kitchen tickets:', err);
     }
