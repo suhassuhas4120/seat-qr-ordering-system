@@ -1,7 +1,7 @@
 import { db } from '../db/index.js';
 import { mutexService } from './mutex.js';
 import { io, clearSeatBillMode } from '../sockets/index.js';
-import { SOCKET_EVENTS } from '../shared/index.js';
+import { SOCKET_EVENTS, normalizeSeatIdentity, REALTIME_TOPICS } from '../shared/index.js';
 import crypto from 'crypto';
 import type { PaymentGateway, Payment } from '../shared/index.js';
 
@@ -163,13 +163,41 @@ export class PaymentService {
 
       // 3. Multi-device real-time broadcast in < 50ms
       if (io) {
+        const norm = normalizeSeatIdentity(seatId);
+        const settleData = {
+          seatId,
+          chairId: norm.chairId,
+          normChairId: norm.chairId,
+          paddedChairId: norm.paddedChairId,
+          amount: finalAmount,
+          paymentMethod: gateway,
+          paymentId: txId,
+          completedAt: now,
+        };
+
+        io.to(REALTIME_TOPICS.SEAT_ROOM(seatId)).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, payload);
         io.to(`seat:${seatId}`).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, payload);
+        io.to(`seat:${norm.chairId}`).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, payload);
         io.emit(SOCKET_EVENTS.PAYMENT_SUCCESS, payload);
+
+        io.to(REALTIME_TOPICS.SEAT_ROOM(seatId)).emit('bill:settled', settleData);
+        io.to(`seat:${seatId}`).emit('bill:settled', settleData);
+        io.to(`seat:${norm.chairId}`).emit('bill:settled', settleData);
+        io.emit('bill:settled', settleData);
+
         io.emit(SOCKET_EVENTS.SEAT_VACATED, {
           seatId,
+          chairId: norm.chairId,
           seatNumber: seat.seatNumber,
           vacatedAt: now,
         });
+        io.to(REALTIME_TOPICS.SEAT_ROOM(seatId)).emit(SOCKET_EVENTS.SEAT_VACATED, {
+          seatId,
+          chairId: norm.chairId,
+          seatNumber: seat.seatNumber,
+          vacatedAt: now,
+        });
+
         io.emit(SOCKET_EVENTS.SEAT_STATUS_UPDATED, {
           seatId,
           status: 'VACANT',

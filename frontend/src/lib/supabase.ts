@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './supabaseClient';
 import { getSocket } from './socket';
-import { SOCKET_EVENTS } from '@seat-order/shared';
+import { SOCKET_EVENTS, normalizeSeatIdentity } from '@seat-order/shared';
 
 export function getBackendUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
@@ -175,10 +175,28 @@ function initSocketBridge() {
     const socket = getSocket();
 
     const registerRooms = () => {
-      socket.emit(SOCKET_EVENTS.JOIN_KDS);
-      socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'mobile' });
-      socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'tablet' });
-      socket.emit(SOCKET_EVENTS.JOIN_MANAGER);
+      if (typeof window === 'undefined') return;
+      const path = window.location.pathname || '';
+      if (path.startsWith('/seat/')) {
+        const match = path.match(/\/seat\/([^\/]+)/);
+        if (match && match[1]) {
+          const norm = normalizeSeatIdentity(match[1]);
+          socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: norm.seatId });
+          socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: norm.chairId });
+          socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: norm.paddedChairId });
+        }
+      } else if (path.startsWith('/kds') || path.startsWith('/kitchen')) {
+        socket.emit(SOCKET_EVENTS.JOIN_KDS);
+      } else if (path.startsWith('/waiter')) {
+        socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: path.includes('tablet') ? 'tablet' : 'mobile' });
+      } else if (path.startsWith('/manager')) {
+        socket.emit(SOCKET_EVENTS.JOIN_MANAGER);
+      } else {
+        socket.emit(SOCKET_EVENTS.JOIN_KDS);
+        socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'mobile' });
+        socket.emit(SOCKET_EVENTS.JOIN_STAFF, { type: 'tablet' });
+        socket.emit(SOCKET_EVENTS.JOIN_MANAGER);
+      }
     };
 
     if (socket.connected) {
@@ -2770,5 +2788,18 @@ export const realtimeBridge = {
     return () => {
       activeKdsSubscribers.delete(callbacks);
     };
+  },
+
+  joinSeatRoom(chairId: string | number) {
+    if (typeof window === 'undefined') return;
+    try {
+      const socket = getSocket();
+      const norm = normalizeSeatIdentity(chairId);
+      socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: norm.seatId });
+      socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: norm.chairId });
+      socket.emit(SOCKET_EVENTS.JOIN_SEAT, { seatId: norm.paddedChairId });
+    } catch (err) {
+      console.warn('Failed to join seat room', err);
+    }
   },
 };

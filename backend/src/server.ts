@@ -14,6 +14,8 @@ import {
   UpdateItemAvailabilityInputSchema,
   StaffLoginSchema,
   SOCKET_EVENTS,
+  normalizeSeatIdentity,
+  REALTIME_TOPICS,
 } from './shared/index.js';
 
 const app = fastify({ logger: true });
@@ -262,19 +264,22 @@ app.post('/api/service-alerts/:alertId/resolve', async (req, reply) => {
 // 8C. Seat Active Bill Mode (QR vs Cash selected by Waiter)
 app.get('/api/seats/:seatId/bill-mode', async (req, reply) => {
   const { seatId } = req.params as { seatId: string };
-  const numSeat = Number(seatId) || 0;
-  const numStr = String(numSeat);
-  const activeMode = activeSeatBillModes[numStr] || activeSeatBillModes[seatId];
+  const norm = normalizeSeatIdentity(seatId);
+  const numSeat = norm.seatId;
+  const numStr = norm.chairId;
+  const activeMode = activeSeatBillModes[numStr] || activeSeatBillModes[norm.paddedChairId] || activeSeatBillModes[seatId];
 
   // Also check if seat has an active bill request alert
   const hasBillAlert = (db.data.serviceAlerts || []).some(
-    (a: any) => !a.isResolved && a.chairId === numStr && (a.type === 'customer_call' || String(a.title || '').toLowerCase().includes('bill'))
+    (a: any) => !a.isResolved && (a.chairId === numStr || a.chairId === norm.paddedChairId) && (a.type === 'customer_call' || String(a.title || '').toLowerCase().includes('bill'))
   );
   const seat = db.data.seats.find((s) => s.id === numSeat);
   const isBillStatus = seat?.currentStatus === 'BILL_REQUESTED';
 
   return reply.send({
     seatId: numSeat,
+    chairId: numStr,
+    paddedChairId: norm.paddedChairId,
     active: Boolean(activeMode || hasBillAlert || isBillStatus),
     mode: activeMode?.mode || null,
     amount: activeMode?.amount || 0,
@@ -284,12 +289,18 @@ app.get('/api/seats/:seatId/bill-mode', async (req, reply) => {
 app.post('/api/seats/:seatId/bill-mode', async (req, reply) => {
   const { seatId } = req.params as { seatId: string };
   const body = req.body as any;
-  const numSeat = Number(seatId) || 0;
-  const numStr = String(numSeat);
+  const norm = normalizeSeatIdentity(seatId);
+  const numSeat = norm.seatId;
+  const numStr = norm.chairId;
   const mode: 'qr' | 'cash' = body.mode === 'cash' ? 'cash' : 'qr';
   const amount = Number(body.amount) || 0;
 
   activeSeatBillModes[numStr] = {
+    mode,
+    amount,
+    updatedAt: Date.now(),
+  };
+  activeSeatBillModes[norm.paddedChairId] = {
     mode,
     amount,
     updatedAt: Date.now(),
@@ -306,6 +317,7 @@ app.post('/api/seats/:seatId/bill-mode', async (req, reply) => {
     seatId: numSeat,
     chairId: numStr,
     normChairId: numStr,
+    paddedChairId: norm.paddedChairId,
     mode,
     amount,
     timestamp: new Date().toISOString(),
@@ -313,7 +325,9 @@ app.post('/api/seats/:seatId/bill-mode', async (req, reply) => {
 
   if (io) {
     io.emit('bill:mode:active', payload);
+    io.to(REALTIME_TOPICS.SEAT_ROOM(numSeat)).emit('bill:mode:active', payload);
     io.to(`seat:${numSeat}`).emit('bill:mode:active', payload);
+    io.to(`seat:${numStr}`).emit('bill:mode:active', payload);
     io.to('staff:mobile').emit('bill:mode:active', payload);
     io.to('staff:tablet').emit('bill:mode:active', payload);
     io.to('manager').emit('bill:mode:active', payload);

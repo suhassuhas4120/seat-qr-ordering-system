@@ -1,6 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { Server as HTTPServer } from 'http';
-import { SOCKET_EVENTS } from '../shared/index.js';
+import { SOCKET_EVENTS, normalizeSeatIdentity, REALTIME_TOPICS } from '../shared/index.js';
 import { db } from '../db/index.js';
 
 export let io: SocketIOServer | null = null;
@@ -8,8 +8,10 @@ export let io: SocketIOServer | null = null;
 export const activeSeatBillModes: Record<string, { mode: 'qr' | 'cash'; amount?: number; updatedAt: number }> = {};
 
 export function clearSeatBillMode(seatId: number | string) {
-  const num = String(Number(seatId) || seatId).replace(/^0+/, '');
-  delete activeSeatBillModes[num];
+  const norm = normalizeSeatIdentity(seatId);
+  delete activeSeatBillModes[norm.chairId];
+  delete activeSeatBillModes[norm.paddedChairId];
+  delete activeSeatBillModes[String(norm.seatId)];
   delete activeSeatBillModes[String(seatId)];
 }
 
@@ -25,11 +27,19 @@ export function setupWebSockets(httpServer: HTTPServer) {
   io.on('connection', (socket) => {
     // 1. Customer joins their dedicated seat room
     socket.on(SOCKET_EVENTS.JOIN_SEAT, ({ seatId }) => {
+      const norm = normalizeSeatIdentity(seatId);
       socket.join(`seat:${seatId}`);
+      socket.join(`seat:${norm.seatId}`);
+      socket.join(`seat:${norm.chairId}`);
+      socket.join(`seat:${norm.paddedChairId}`);
     });
 
     socket.on(SOCKET_EVENTS.LEAVE_SEAT, ({ seatId }) => {
+      const norm = normalizeSeatIdentity(seatId);
       socket.leave(`seat:${seatId}`);
+      socket.leave(`seat:${norm.seatId}`);
+      socket.leave(`seat:${norm.chairId}`);
+      socket.leave(`seat:${norm.paddedChairId}`);
     });
 
     // 2. Kitchen KDS joins kitchen room
@@ -115,11 +125,12 @@ export function setupWebSockets(httpServer: HTTPServer) {
 
     // 6. Direct staff / manager bill settlement broadcast across all devices
     socket.on('bill:settled', (payload: any) => {
-      const numSeat = Number(payload.chairId || payload.seatId || payload.normChairId) || 0;
+      const norm = normalizeSeatIdentity(payload.chairId ?? payload.seatId ?? payload.normChairId);
+      const numSeat = norm.seatId;
       const amt = payload.amount || 0;
       const now = new Date().toISOString();
 
-      if (numSeat > 0) {
+      if (numSeat > 0 || norm.isTakeaway) {
         const seat = db.data.seats.find((s) => s.id === numSeat);
         if (seat) {
           seat.currentStatus = 'VACANT';
@@ -132,7 +143,7 @@ export function setupWebSockets(httpServer: HTTPServer) {
         // Auto-resolve any pending alerts for this seat
         if (db.data.serviceAlerts) {
           for (const a of db.data.serviceAlerts) {
-            if (a.chairId === String(numSeat)) {
+            if (a.chairId === norm.chairId || a.chairId === String(numSeat)) {
               a.isResolved = true;
             }
           }
@@ -142,8 +153,9 @@ export function setupWebSockets(httpServer: HTTPServer) {
 
       const broadcastData = {
         seatId: numSeat,
-        chairId: String(numSeat),
-        normChairId: String(numSeat),
+        chairId: norm.chairId,
+        normChairId: norm.chairId,
+        paddedChairId: norm.paddedChairId,
         amount: amt,
         paymentMethod: payload.paymentMethod || 'UPI',
         paymentId: payload.ticketNumber || `SETTLE_${Date.now()}`,
@@ -153,29 +165,49 @@ export function setupWebSockets(httpServer: HTTPServer) {
       clearSeatBillMode(numSeat);
 
       io?.emit(SOCKET_EVENTS.PAYMENT_SUCCESS, broadcastData);
+      io?.to(REALTIME_TOPICS.SEAT_ROOM(numSeat)).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, broadcastData);
+      io?.to(`seat:${numSeat}`).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, broadcastData);
+      io?.to(`seat:${norm.chairId}`).emit(SOCKET_EVENTS.PAYMENT_SUCCESS, broadcastData);
+
       io?.emit(SOCKET_EVENTS.SEAT_VACATED, {
         seatId: numSeat,
-        chairId: String(numSeat),
+        chairId: norm.chairId,
         vacatedAt: now,
       });
+      io?.to(REALTIME_TOPICS.SEAT_ROOM(numSeat)).emit(SOCKET_EVENTS.SEAT_VACATED, {
+        seatId: numSeat,
+        chairId: norm.chairId,
+        vacatedAt: now,
+      });
+
       io?.emit(SOCKET_EVENTS.SEAT_STATUS_UPDATED, {
         seatId: numSeat,
         status: 'VACANT',
         activeOrderTotal: 0,
         activeItemCount: 0,
       });
+
       io?.emit('bill:settled', broadcastData);
+      io?.to(REALTIME_TOPICS.SEAT_ROOM(numSeat)).emit('bill:settled', broadcastData);
+      io?.to(`seat:${numSeat}`).emit('bill:settled', broadcastData);
+      io?.to(`seat:${norm.chairId}`).emit('bill:settled', broadcastData);
     });
 
     // 7. Waiter changes bill collection mode (QR vs Cash)
     socket.on('bill:mode:active', (payload: any) => {
-      const numSeat = Number(payload.chairId || payload.seatId || payload.normChairId) || 0;
-      const numStr = String(numSeat);
+      const norm = normalizeSeatIdentity(payload.chairId ?? payload.seatId ?? payload.normChairId);
+      const numSeat = norm.seatId;
+      const numStr = norm.chairId;
       const mode = payload.mode === 'cash' ? 'cash' : 'qr';
       const amount = Number(payload.amount) || 0;
 
-      if (numSeat > 0) {
+      if (numSeat > 0 || norm.isTakeaway) {
         activeSeatBillModes[numStr] = {
+          mode,
+          amount,
+          updatedAt: Date.now(),
+        };
+        activeSeatBillModes[norm.paddedChairId] = {
           mode,
           amount,
           updatedAt: Date.now(),
@@ -194,13 +226,16 @@ export function setupWebSockets(httpServer: HTTPServer) {
         seatId: numSeat,
         chairId: numStr,
         normChairId: numStr,
+        paddedChairId: norm.paddedChairId,
         mode,
         amount,
         timestamp: new Date().toISOString(),
       };
 
       io?.emit('bill:mode:active', fullPayload);
+      io?.to(REALTIME_TOPICS.SEAT_ROOM(numSeat)).emit('bill:mode:active', fullPayload);
       io?.to(`seat:${numSeat}`).emit('bill:mode:active', fullPayload);
+      io?.to(`seat:${numStr}`).emit('bill:mode:active', fullPayload);
       io?.to('staff:mobile').emit('bill:mode:active', fullPayload);
       io?.to('staff:tablet').emit('bill:mode:active', fullPayload);
       io?.to('manager').emit('bill:mode:active', fullPayload);
