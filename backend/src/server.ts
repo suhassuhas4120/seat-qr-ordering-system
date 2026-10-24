@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { db } from './db/index.js';
 import { orderService } from './services/orderService.js';
 import { paymentService } from './services/paymentService.js';
-import { setupWebSockets, io } from './sockets/index.js';
+import { setupWebSockets, io, activeSeatBillModes, clearSeatBillMode } from './sockets/index.js';
 import {
   ClaimSeatInputSchema,
   PlaceOrderInputSchema,
@@ -259,6 +259,69 @@ app.post('/api/service-alerts/:alertId/resolve', async (req, reply) => {
   return reply.send({ success: true, alertId });
 });
 
+// 8C. Seat Active Bill Mode (QR vs Cash selected by Waiter)
+app.get('/api/seats/:seatId/bill-mode', async (req, reply) => {
+  const { seatId } = req.params as { seatId: string };
+  const numSeat = Number(seatId) || 0;
+  const numStr = String(numSeat);
+  const activeMode = activeSeatBillModes[numStr] || activeSeatBillModes[seatId];
+
+  // Also check if seat has an active bill request alert
+  const hasBillAlert = (db.data.serviceAlerts || []).some(
+    (a: any) => !a.isResolved && a.chairId === numStr && (a.type === 'customer_call' || String(a.title || '').toLowerCase().includes('bill'))
+  );
+  const seat = db.data.seats.find((s) => s.id === numSeat);
+  const isBillStatus = seat?.currentStatus === 'BILL_REQUESTED';
+
+  return reply.send({
+    seatId: numSeat,
+    active: Boolean(activeMode || hasBillAlert || isBillStatus),
+    mode: activeMode?.mode || null,
+    amount: activeMode?.amount || 0,
+  });
+});
+
+app.post('/api/seats/:seatId/bill-mode', async (req, reply) => {
+  const { seatId } = req.params as { seatId: string };
+  const body = req.body as any;
+  const numSeat = Number(seatId) || 0;
+  const numStr = String(numSeat);
+  const mode: 'qr' | 'cash' = body.mode === 'cash' ? 'cash' : 'qr';
+  const amount = Number(body.amount) || 0;
+
+  activeSeatBillModes[numStr] = {
+    mode,
+    amount,
+    updatedAt: Date.now(),
+  };
+
+  const seat = db.data.seats.find((s) => s.id === numSeat);
+  if (seat && seat.currentStatus !== 'VACANT') {
+    seat.currentStatus = 'BILL_REQUESTED';
+    seat.updatedAt = new Date().toISOString();
+    db.saveState();
+  }
+
+  const payload = {
+    seatId: numSeat,
+    chairId: numStr,
+    normChairId: numStr,
+    mode,
+    amount,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (io) {
+    io.emit('bill:mode:active', payload);
+    io.to(`seat:${numSeat}`).emit('bill:mode:active', payload);
+    io.to('staff:mobile').emit('bill:mode:active', payload);
+    io.to('staff:tablet').emit('bill:mode:active', payload);
+    io.to('manager').emit('bill:mode:active', payload);
+  }
+
+  return reply.send({ success: true, ...payload });
+});
+
 // 9. Payment Settlement & Instant Real-Time Auto-Vacate
 app.post('/api/payments/process', async (req, reply) => {
   const { seatId, gateway, settledByRole, staffId, gatewayPaymentId } = req.body as any;
@@ -266,6 +329,8 @@ app.post('/api/payments/process', async (req, reply) => {
   if (seatId === undefined || seatId === null || seatId === '') {
     return reply.status(400).send({ error: 'Missing seatId.' });
   }
+
+  clearSeatBillMode(seatId);
 
   try {
     const effectiveGateway = (gateway || (settledByRole === 'WAITER' || settledByRole === 'MANAGER' ? 'CASH' : 'RAZORPAY')).toUpperCase();

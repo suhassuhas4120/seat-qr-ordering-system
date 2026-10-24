@@ -512,6 +512,34 @@ function initSocketBridge() {
         cb.onSeatOccupancyChange?.({ chairId: paddedChair, isOccupied: false });
       });
     });
+
+    socket.on('bill:mode:active', (payload: any) => {
+      const cleanChair = String(payload.chairId || payload.seatId || '').replace(/[^0-9]/g, '');
+      const normChair = cleanChair.replace(/^0+/, '') || cleanChair;
+      const mode = payload.mode === 'cash' ? 'cash' : 'qr';
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`thoogudeepa_waiter_mode_${cleanChair}`, mode);
+          localStorage.setItem(`thoogudeepa_waiter_mode_${normChair}`, mode);
+          localStorage.setItem(`thoogudeepa_waiter_called_${cleanChair}`, 'true');
+          localStorage.setItem(`thoogudeepa_waiter_called_${normChair}`, 'true');
+          sessionStorage.setItem(`thoogudeepa_waiter_mode_${cleanChair}`, mode);
+          sessionStorage.setItem(`thoogudeepa_waiter_mode_${normChair}`, mode);
+          sessionStorage.setItem(`thoogudeepa_waiter_called_${cleanChair}`, 'true');
+          sessionStorage.setItem(`thoogudeepa_waiter_called_${normChair}`, 'true');
+        } catch {}
+      }
+      activeKdsSubscribers.forEach((cb) => {
+        cb.onBillModeActive?.({
+          chairId: cleanChair,
+          rawChairId: String(payload.chairId || payload.seatId),
+          normChairId: normChair,
+          amount: payload.amount,
+          mode,
+          ticketNumber: payload.ticketNumber,
+        });
+      });
+    });
   } catch (err) {
     console.warn('Socket bridge initialization:', err);
   }
@@ -818,6 +846,8 @@ function broadcastRealtime(event: string, payload: any) {
         sock.emit('bill:settled', payload);
       } else if (event === 'SEAT_RELEASED') {
         sock.emit('seat:released', payload);
+      } else if (event === 'BILL_MODE_ACTIVE') {
+        sock.emit('bill:mode:active', payload);
       }
     }
   } catch {}
@@ -2026,8 +2056,69 @@ export const realtimeBridge = {
       ticketNumber
     };
 
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`thoogudeepa_waiter_mode_${cleanChair}`, mode);
+        localStorage.setItem(`thoogudeepa_waiter_mode_${norm}`, mode);
+        localStorage.setItem(`thoogudeepa_waiter_called_${cleanChair}`, 'true');
+        localStorage.setItem(`thoogudeepa_waiter_called_${norm}`, 'true');
+        sessionStorage.setItem(`thoogudeepa_waiter_mode_${cleanChair}`, mode);
+        sessionStorage.setItem(`thoogudeepa_waiter_mode_${norm}`, mode);
+        sessionStorage.setItem(`thoogudeepa_waiter_called_${cleanChair}`, 'true');
+        sessionStorage.setItem(`thoogudeepa_waiter_called_${norm}`, 'true');
+      } catch {}
+    }
+
+    // Fastify backend REST sync
+    try {
+      fetch(`${getBackendUrl()}/api/seats/${cleanChair}/bill-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, amount }),
+      }).catch(() => {});
+    } catch {}
+
     broadcastRealtime('BILL_MODE_ACTIVE', payload);
     return true;
+  },
+
+  // Check active bill mode (QR vs Cash) selected by waiter or captain
+  async getSeatBillMode(chairId: string): Promise<{ active: boolean; mode: 'qr' | 'cash' | null; amount?: number }> {
+    const cleanChair = chairId.replace(/[^0-9]/g, '');
+    const norm = cleanChair.replace(/^0+/, '') || cleanChair;
+
+    // 1. Check Fastify backend REST
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/seats/${cleanChair}/bill-mode`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.active || data.mode)) {
+          return { active: true, mode: data.mode, amount: data.amount };
+        }
+      }
+    } catch {}
+
+    // 2. Check local/session storage fallback
+    if (typeof window !== 'undefined') {
+      try {
+        const storedMode = sessionStorage.getItem(`thoogudeepa_waiter_mode_${cleanChair}`) ||
+          sessionStorage.getItem(`thoogudeepa_waiter_mode_${norm}`) ||
+          localStorage.getItem(`thoogudeepa_waiter_mode_${cleanChair}`) ||
+          localStorage.getItem(`thoogudeepa_waiter_mode_${norm}`);
+        const called = sessionStorage.getItem(`thoogudeepa_waiter_called_${cleanChair}`) ||
+          sessionStorage.getItem(`thoogudeepa_waiter_called_${norm}`) ||
+          localStorage.getItem(`thoogudeepa_waiter_called_${cleanChair}`) ||
+          localStorage.getItem(`thoogudeepa_waiter_called_${norm}`);
+        if (storedMode === 'qr' || storedMode === 'cash') {
+          return { active: true, mode: storedMode as any };
+        }
+        if (called === 'true') {
+          return { active: true, mode: null };
+        }
+      } catch {}
+    }
+
+    return { active: false, mode: null };
   },
 
   // Broadcast when customer confirms completed UPI payment
@@ -2056,6 +2147,19 @@ export const realtimeBridge = {
     this.clearActiveBillRequest(chairId);
     this.clearActiveBillRequest(cleanNum);
     this.clearActiveBillRequest(cleanChair);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(`thoogudeepa_waiter_mode_${cleanNum}`);
+        localStorage.removeItem(`thoogudeepa_waiter_mode_${cleanChair}`);
+        localStorage.removeItem(`thoogudeepa_waiter_called_${cleanNum}`);
+        localStorage.removeItem(`thoogudeepa_waiter_called_${cleanChair}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_mode_${cleanNum}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_mode_${cleanChair}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_called_${cleanNum}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_called_${cleanChair}`);
+      } catch {}
+    }
 
     // 2. Mark order completed in Supabase
     if (supabase) {

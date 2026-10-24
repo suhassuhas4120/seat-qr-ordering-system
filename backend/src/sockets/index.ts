@@ -5,6 +5,14 @@ import { db } from '../db/index.js';
 
 export let io: SocketIOServer | null = null;
 
+export const activeSeatBillModes: Record<string, { mode: 'qr' | 'cash'; amount?: number; updatedAt: number }> = {};
+
+export function clearSeatBillMode(seatId: number | string) {
+  const num = String(Number(seatId) || seatId).replace(/^0+/, '');
+  delete activeSeatBillModes[num];
+  delete activeSeatBillModes[String(seatId)];
+}
+
 export function setupWebSockets(httpServer: HTTPServer) {
   io = new SocketIOServer(httpServer, {
     cors: {
@@ -142,6 +150,8 @@ export function setupWebSockets(httpServer: HTTPServer) {
         completedAt: now,
       };
 
+      clearSeatBillMode(numSeat);
+
       io?.emit(SOCKET_EVENTS.PAYMENT_SUCCESS, broadcastData);
       io?.emit(SOCKET_EVENTS.SEAT_VACATED, {
         seatId: numSeat,
@@ -155,6 +165,45 @@ export function setupWebSockets(httpServer: HTTPServer) {
         activeItemCount: 0,
       });
       io?.emit('bill:settled', broadcastData);
+    });
+
+    // 7. Waiter changes bill collection mode (QR vs Cash)
+    socket.on('bill:mode:active', (payload: any) => {
+      const numSeat = Number(payload.chairId || payload.seatId || payload.normChairId) || 0;
+      const numStr = String(numSeat);
+      const mode = payload.mode === 'cash' ? 'cash' : 'qr';
+      const amount = Number(payload.amount) || 0;
+
+      if (numSeat > 0) {
+        activeSeatBillModes[numStr] = {
+          mode,
+          amount,
+          updatedAt: Date.now(),
+        };
+
+        const seat = db.data.seats.find((s) => s.id === numSeat);
+        if (seat && seat.currentStatus !== 'VACANT') {
+          seat.currentStatus = 'BILL_REQUESTED';
+          seat.updatedAt = new Date().toISOString();
+          db.saveState();
+        }
+      }
+
+      const fullPayload = {
+        ...payload,
+        seatId: numSeat,
+        chairId: numStr,
+        normChairId: numStr,
+        mode,
+        amount,
+        timestamp: new Date().toISOString(),
+      };
+
+      io?.emit('bill:mode:active', fullPayload);
+      io?.to(`seat:${numSeat}`).emit('bill:mode:active', fullPayload);
+      io?.to('staff:mobile').emit('bill:mode:active', fullPayload);
+      io?.to('staff:tablet').emit('bill:mode:active', fullPayload);
+      io?.to('manager').emit('bill:mode:active', fullPayload);
     });
 
     socket.on('disconnect', () => {

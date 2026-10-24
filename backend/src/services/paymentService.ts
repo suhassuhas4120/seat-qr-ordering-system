@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 import { mutexService } from './mutex.js';
-import { io } from '../sockets/index.js';
+import { io, clearSeatBillMode } from '../sockets/index.js';
 import { SOCKET_EVENTS } from '../shared/index.js';
 import crypto from 'crypto';
 import type { PaymentGateway, Payment } from '../shared/index.js';
@@ -139,6 +139,8 @@ export class PaymentService {
           }
         }
       }
+
+      clearSeatBillMode(seatId);
 
       db.saveState();
       db.logTransaction('PAYMENT_SETTLED', {
