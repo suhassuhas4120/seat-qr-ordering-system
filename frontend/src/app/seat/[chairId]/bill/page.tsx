@@ -2,16 +2,38 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ChevronLeft, Bell, ArrowLeft, Ticket, Banknote, Scan, Receipt, ArrowRight, QrCode, CheckCircle2, ShieldCheck, Loader2 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  ChevronLeft,
+  Bell,
+  ArrowLeft,
+  Ticket,
+  Banknote,
+  Scan,
+  Receipt,
+  ArrowRight,
+  QrCode,
+  CheckCircle2,
+  ShieldCheck,
+  Loader2,
+  Printer,
+  Sparkles,
+} from 'lucide-react';
 import { useHardwareBack } from '../../../../lib/hooks/useHardwareBack';
-import { getActiveDiningSession, setActiveDiningSession, ActiveDiningSession } from '../../../../lib/session/diningSession';
+import {
+  getActiveDiningSession,
+  setActiveDiningSession,
+  ActiveDiningSession,
+  isDeviceLockedToDifferentSeat,
+} from '../../../../lib/session/diningSession';
 import { realtimeBridge } from '../../../../lib/supabase';
 import { getSocket } from '../../../../lib/socket';
 import { SOCKET_EVENTS } from '@seat-order/shared';
+import { getMenuItemById } from '../../../../lib/data/menuData';
 
 export default function OrderSummaryBillPage() {
   const params = useParams();
+  const router = useRouter();
   const chairId = (params?.chairId as string) || '12';
 
   // Device hardware back button & swipe back: return to live tracking
@@ -21,12 +43,13 @@ export default function OrderSummaryBillPage() {
 
   const [session, setSession] = useState<ActiveDiningSession | null>(null);
   const [promoCode, setPromoCode] = useState<string>('');
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [promoMessage, setPromoMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [selectedTip, setSelectedTip] = useState<string>('None');
   const [showWaiterModal, setShowWaiterModal] = useState<boolean>(false);
   const [waiterCalled, setWaiterCalled] = useState<boolean>(false);
   const [waiterSelectedMode, setWaiterSelectedMode] = useState<'none' | 'qr' | 'cash'>('none');
   const [isReportingPaid, setIsReportingPaid] = useState<boolean>(false);
-  const [selectedPaymentSubMode, setSelectedPaymentSubMode] = useState<'scan' | 'cash'>('cash');
 
   const tipOptions = ['None', '₹ 30', '₹ 50', '₹ 100'];
 
@@ -45,7 +68,7 @@ export default function OrderSummaryBillPage() {
   const cgst = Math.round(itemsSubtotal * 0.025);
   const sgst = Math.round(itemsSubtotal * 0.025);
   const gstAmount = cgst + sgst;
-  const billTotal = itemsSubtotal + gstAmount;
+  const billTotal = Math.max(0, itemsSubtotal - discountAmount + gstAmount);
 
   const tipAmount = selectedTip === '₹ 30' ? 30 : selectedTip === '₹ 50' ? 50 : selectedTip === '₹ 100' ? 100 : 0;
   const grandPayable = billTotal + tipAmount;
@@ -58,8 +81,35 @@ export default function OrderSummaryBillPage() {
   itemsSubtotalRef.current = itemsSubtotal;
   const tipAmountRef = React.useRef(tipAmount);
   tipAmountRef.current = tipAmount;
+  const discountAmountRef = React.useRef(discountAmount);
+  discountAmountRef.current = discountAmount;
 
-  const normalizeSeatId = (id?: string | null) => (id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
+  const normalizeSeatId = (id?: string | null) =>
+    (id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
+
+  const handleApplyPromo = () => {
+    const code = promoCode.trim().toUpperCase();
+    if (!code) {
+      setPromoMessage({ text: 'Please enter a coupon code', isError: true });
+      return;
+    }
+    if (code === 'DONNE10') {
+      const disc = Math.round(itemsSubtotal * 0.1);
+      setDiscountAmount(disc);
+      setPromoMessage({ text: `Code DONNE10 applied! 10% off (saved ₹${disc})`, isError: false });
+    } else if (code === 'MILITARY50') {
+      const disc = Math.min(50, itemsSubtotal);
+      setDiscountAmount(disc);
+      setPromoMessage({ text: `Code MILITARY50 applied! Flat ₹50 off`, isError: false });
+    } else if (code === 'FESTIVE') {
+      const disc = Math.round(itemsSubtotal * 0.15);
+      setDiscountAmount(disc);
+      setPromoMessage({ text: `Code FESTIVE applied! 15% off (saved ₹${disc})`, isError: false });
+    } else {
+      setDiscountAmount(0);
+      setPromoMessage({ text: 'Invalid coupon. Try DONNE10 or MILITARY50', isError: true });
+    }
+  };
 
   const handleCallCaptain = () => {
     setWaiterCalled(true);
@@ -90,12 +140,33 @@ export default function OrderSummaryBillPage() {
     realtimeBridge.sendServiceAlert({
       seatNumber: paddedSeat,
       title: `Bill Requested (₹${grandPayable})`,
-      message: `Bill settlement requested for Seat ${cleanNum}: ₹${grandPayable}${tipAmount > 0 ? ` (incl. ₹${tipAmount} tip)` : ''}`,
+      message: `Bill settlement requested for Seat ${cleanNum}: ₹${grandPayable}${
+        tipAmount > 0 ? ` (incl. ₹${tipAmount} tip)` : ''
+      }${discountAmount > 0 ? ` [Discount: ₹${discountAmount}]` : ''}`,
       guestName: `Seat ${cleanNum} Guest`,
       type: 'customer_call',
       billAmount: grandPayable,
       isUrgent: true,
     }).catch(console.error);
+  };
+
+  const handleCancelWaiterCall = () => {
+    setWaiterCalled(false);
+    setWaiterSelectedMode('none');
+    const cleanNum = normalizeSeatId(chairId);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`thoogudeepa_waiter_called_${chairId}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_mode_${chairId}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_called_${cleanNum}`);
+        sessionStorage.removeItem(`thoogudeepa_waiter_mode_${cleanNum}`);
+        localStorage.removeItem(`thoogudeepa_waiter_called_${chairId}`);
+        localStorage.removeItem(`thoogudeepa_waiter_mode_${chairId}`);
+        localStorage.removeItem(`thoogudeepa_waiter_called_${cleanNum}`);
+        localStorage.removeItem(`thoogudeepa_waiter_mode_${cleanNum}`);
+      } catch {}
+    }
+    realtimeBridge.clearActiveBillRequest(chairId);
   };
 
   useEffect(() => {
@@ -108,6 +179,13 @@ export default function OrderSummaryBillPage() {
   }, [waiterSelectedMode]);
 
   useEffect(() => {
+    // 0. Anti-Cheat: block viewing other seat's bill if device is locked to another seat
+    const lock = isDeviceLockedToDifferentSeat(chairId);
+    if (lock.isLocked && lock.activeSeatId && lock.activeSeatId !== chairId) {
+      router.replace(`/seat/${lock.activeSeatId}/bill`);
+      return;
+    }
+
     // Restore any previously chosen tip for this seat
     if (typeof window !== 'undefined') {
       const storedTip = sessionStorage.getItem(`thoogudeepa_selected_tip_${chairId}`);
@@ -122,14 +200,16 @@ export default function OrderSummaryBillPage() {
     // Restore stored waiter called and mode from sessionStorage/localStorage
     if (typeof window !== 'undefined') {
       try {
-        const storedCalled = sessionStorage.getItem(`thoogudeepa_waiter_called_${chairId}`) ||
+        const storedCalled =
+          sessionStorage.getItem(`thoogudeepa_waiter_called_${chairId}`) ||
           sessionStorage.getItem(`thoogudeepa_waiter_called_${normChair}`) ||
           localStorage.getItem(`thoogudeepa_waiter_called_${chairId}`) ||
           localStorage.getItem(`thoogudeepa_waiter_called_${normChair}`);
         if (storedCalled === 'true') {
           setWaiterCalled(true);
         }
-        const storedMode = sessionStorage.getItem(`thoogudeepa_waiter_mode_${chairId}`) ||
+        const storedMode =
+          sessionStorage.getItem(`thoogudeepa_waiter_mode_${chairId}`) ||
           sessionStorage.getItem(`thoogudeepa_waiter_mode_${normChair}`) ||
           localStorage.getItem(`thoogudeepa_waiter_mode_${chairId}`) ||
           localStorage.getItem(`thoogudeepa_waiter_mode_${normChair}`);
@@ -147,7 +227,7 @@ export default function OrderSummaryBillPage() {
       }
     } catch {}
 
-    // 0. Query server authoritative bill mode
+    // Check server authoritative bill mode
     realtimeBridge.getSeatBillMode(cleanChair || normChair || chairId).then((bm) => {
       if (bm.active) {
         setWaiterCalled(true);
@@ -157,7 +237,7 @@ export default function OrderSummaryBillPage() {
       }
     });
 
-    // 1. Check if bill request is already active
+    // Check if bill request is already active
     const activeReq =
       realtimeBridge.getActiveBillRequest(chairId) ||
       realtimeBridge.getActiveBillRequest(cleanChair) ||
@@ -167,7 +247,7 @@ export default function OrderSummaryBillPage() {
       setWaiterCalled(true);
     }
 
-    // 2. Fetch authoritative live order for this specific seat from floor orders
+    // Fetch authoritative live order for this specific seat from floor orders
     realtimeBridge.getOrderForSeat(cleanChair || chairId).then((res) => {
       if (res.order && res.items && res.items.length > 0) {
         const liveItems = res.items.map((it, idx) => ({
@@ -211,7 +291,7 @@ export default function OrderSummaryBillPage() {
         setSession(verifiedSession);
         setActiveDiningSession(verifiedSession);
       } else {
-        // 3. Fallback to local dining session if order is pending sync
+        // Fallback to local dining session if order is pending sync
         const s = getActiveDiningSession();
         if (s && s.paymentStatus === 'unpaid') {
           if (s.seatId !== chairId) {
@@ -307,6 +387,7 @@ export default function OrderSummaryBillPage() {
                 seatId: chairId,
                 items: sessionRef.current?.items || [],
                 subtotal: itemsSubtotalRef.current,
+                discount: discountAmountRef.current,
                 tip: tipAmountRef.current,
                 totalAmount: amtVal,
                 mode: modeVal,
@@ -314,20 +395,24 @@ export default function OrderSummaryBillPage() {
               })
             );
           } catch {}
-          window.location.replace(`/seat/${chairId}/payment-success?mode=${encodeURIComponent(modeVal)}&amount=${amtVal}&tip=${tipAmountRef.current}`);
+          window.location.replace(
+            `/seat/${chairId}/payment-success?mode=${encodeURIComponent(modeVal)}&amount=${amtVal}&tip=${tipAmountRef.current}`
+          );
         }
       },
       onSeatOccupancyChange: (data) => {
         const targetNorm = normalizeSeatId(data.chairId);
         const currentNorm = normalizeSeatId(chairId);
         if ((targetNorm === currentNorm || data.chairId === chairId) && !data.isOccupied) {
-          window.location.replace(`/seat/${chairId}/payment-success?mode=Cash&amount=${grandPayableRef.current}&tip=${tipAmountRef.current}`);
+          window.location.replace(
+            `/seat/${chairId}/payment-success?mode=Cash&amount=${grandPayableRef.current}&tip=${tipAmountRef.current}`
+          );
         }
-      }
+      },
     });
 
     return () => unsub();
-  }, [chairId]);
+  }, [chairId, router]);
 
   const handleCustomerConfirmQrPayment = async () => {
     setIsReportingPaid(true);
@@ -345,6 +430,7 @@ export default function OrderSummaryBillPage() {
           seatId: chairId,
           items: session?.items || [],
           subtotal: itemsSubtotal,
+          discount: discountAmount,
           tip: tipAmount,
           totalAmount: grandPayable,
           mode: 'UPI QR',
@@ -352,7 +438,9 @@ export default function OrderSummaryBillPage() {
         })
       );
     } catch {}
-    window.location.replace(`/seat/${chairId}/payment-success?mode=UPI%20QR&amount=${grandPayable}&tip=${tipAmount}`);
+    window.location.replace(
+      `/seat/${chairId}/payment-success?mode=UPI%20QR&amount=${grandPayable}&tip=${tipAmount}`
+    );
   };
 
   return (
@@ -404,34 +492,80 @@ export default function OrderSummaryBillPage() {
             </div>
           ) : (
             <>
-              {/* Section Header */}
-              <div className="w-full flex items-center justify-between border-b border-[rgba(220,226,222,0.7)] pb-2">
-                <span className="text-xs font-black uppercase tracking-wider text-[#1A2621]">
-                  Ticket #{session.ticketNumber}
-                </span>
-                <span className="text-[10px] font-bold border border-[#244436]/20 px-2 py-0.5 rounded-full uppercase bg-[#F9F8F5] text-[#244436]">
-                  Dine-In
-                </span>
+              {/* Section Header with Print Button */}
+              <div className="w-full flex items-center justify-between border-b border-[rgba(220,226,222,0.7)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#1A2621]">
+                    Ticket #{session.ticketNumber}
+                  </span>
+                  <span className="text-[10px] font-bold border border-[#244436]/20 px-2 py-0.5 rounded-full uppercase bg-[#F9F8F5] text-[#244436]">
+                    Dine-In
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1 text-[10px] font-bold border border-[rgba(220,226,222,0.9)] bg-[#F9F8F5] hover:bg-zinc-100 text-[#5A6860] px-2 py-1 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                  title="Print Bill"
+                >
+                  <Printer className="w-3 h-3 text-[#244436]" />
+                  <span>Print</span>
+                </button>
               </div>
 
-              {/* Real Order Breakdown with Each Item & Price */}
+              {/* Real Order Breakdown with Each Item, FSSAI Badge & Notes */}
               {itemsList.length > 0 ? (
                 <div className="w-full flex flex-col gap-2.5 py-1">
-                  {itemsList.map((it, idx) => (
-                    <div key={idx} className="w-full flex items-center justify-between text-xs py-0.5">
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <span className="font-bold text-[#1A2621] truncate">
-                          {it.quantity} &times; {it.title}
-                        </span>
-                        <span className="text-[10px] text-[#5A6860] font-semibold">
-                          ₹ {it.price} each
+                  {itemsList.map((it, idx) => {
+                    const cleanId = (it.dish_id || it.id || '').replace(/^dish-/, '');
+                    const dishMeta = getMenuItemById(cleanId);
+
+                    return (
+                      <div
+                        key={idx}
+                        className="w-full flex items-start justify-between text-xs py-1 border-b border-[rgba(220,226,222,0.4)] last:border-0"
+                      >
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            {/* FSSAI Dietary Badge */}
+                            <span
+                              className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center shrink-0 p-0.5 ${
+                                dishMeta.isVegetarian
+                                  ? 'border-emerald-600 bg-emerald-50/60'
+                                  : 'border-red-600 bg-red-50/60'
+                              }`}
+                              title={dishMeta.isVegetarian ? 'Vegetarian' : 'Non-Vegetarian'}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  dishMeta.isVegetarian ? 'bg-emerald-600' : 'bg-red-600'
+                                }`}
+                              />
+                            </span>
+
+                            <span className="font-bold text-[#1A2621] truncate">
+                              {it.quantity} &times; {it.title}
+                            </span>
+                          </div>
+
+                          {it.notes && (
+                            <span className="text-[10px] text-[#5A6860] line-clamp-1 italic ml-5 mt-0.5">
+                              {it.notes}
+                            </span>
+                          )}
+
+                          <span className="text-[10px] text-[#5A6860] font-semibold ml-5">
+                            ₹ {it.price} each
+                          </span>
+                        </div>
+
+                        <span className="font-black text-[#244436] shrink-0">
+                          ₹ {it.price * it.quantity}
                         </span>
                       </div>
-                      <span className="font-black text-[#244436] shrink-0">
-                        ₹ {it.price * it.quantity}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="w-full flex flex-col gap-2 py-1">
@@ -448,9 +582,19 @@ export default function OrderSummaryBillPage() {
               {/* Subtotal & Taxes Breakdown */}
               <div className="w-full border-t border-[rgba(220,226,222,0.7)] pt-3 flex flex-col gap-1.5 text-xs text-[#5A6860]">
                 <div className="w-full flex items-center justify-between">
-                  <span>Item Subtotal ({itemsList.reduce((acc, curr) => acc + curr.quantity, 0)} items)</span>
+                  <span>
+                    Item Subtotal ({itemsList.reduce((acc, curr) => acc + curr.quantity, 0)} items)
+                  </span>
                   <span className="font-bold text-[#1A2621]">₹ {itemsSubtotal}</span>
                 </div>
+
+                {discountAmount > 0 && (
+                  <div className="w-full flex items-center justify-between text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+                    <span>Coupon Discount ({promoCode.toUpperCase()})</span>
+                    <span>- ₹ {discountAmount}</span>
+                  </div>
+                )}
+
                 <div className="w-full flex items-center justify-between text-[#5A6860]">
                   <span>CGST (2.5%)</span>
                   <span className="font-bold text-[#1A2621]">₹ {cgst}</span>
@@ -489,23 +633,39 @@ export default function OrderSummaryBillPage() {
 
         {/* Promo Code Section */}
         {session && (
-          <div className="w-full border border-[rgba(220,226,222,0.8)] rounded-2xl p-2 flex items-center justify-between gap-2 bg-[#FFFEFC] shadow-[0_4px_16px_-4px_rgba(36,68,54,0.05)] print:hidden">
-            <div className="flex items-center gap-2 pl-2 flex-1">
-              <Ticket className="w-4 h-4 text-[#5A6860] shrink-0" />
-              <input
-                type="text"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                placeholder="Promo Code"
-                className="w-full text-xs font-bold outline-none bg-transparent text-[#1A2621] uppercase placeholder:normal-case placeholder:font-normal placeholder:text-zinc-400"
-              />
+          <div className="w-full flex flex-col gap-1.5 print:hidden">
+            <div className="w-full border border-[rgba(220,226,222,0.8)] rounded-2xl p-2 flex items-center justify-between gap-2 bg-[#FFFEFC] shadow-[0_4px_16px_-4px_rgba(36,68,54,0.05)]">
+              <div className="flex items-center gap-2 pl-2 flex-1">
+                <Ticket className="w-4 h-4 text-[#5A6860] shrink-0" />
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value);
+                    if (promoMessage) setPromoMessage(null);
+                  }}
+                  placeholder="Enter Coupon (e.g. DONNE10)"
+                  className="w-full text-xs font-bold outline-none bg-transparent text-[#1A2621] uppercase placeholder:normal-case placeholder:font-normal placeholder:text-zinc-400"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleApplyPromo}
+                className="px-4 py-2 border border-[#244436]/30 bg-[#244436] text-white text-xs font-bold rounded-xl uppercase tracking-wider cursor-pointer active:opacity-80 transition-all hover:bg-[#1a3328]"
+              >
+                Apply
+              </button>
             </div>
-            <button
-              type="button"
-              className="px-4 py-2 border border-[#244436]/30 bg-[#244436] text-white text-xs font-bold rounded-xl uppercase tracking-wider cursor-pointer active:opacity-80"
-            >
-              Apply
-            </button>
+
+            {promoMessage && (
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                  promoMessage.isError ? 'text-red-700 bg-red-50' : 'text-emerald-700 bg-emerald-50'
+                }`}
+              >
+                {promoMessage.text}
+              </span>
+            )}
           </div>
         )}
 
@@ -553,7 +713,9 @@ export default function OrderSummaryBillPage() {
         </div>
         <div className="flex justify-between">
           <span suppressHydrationWarning>Date: {new Date().toLocaleDateString('en-IN')}</span>
-          <span suppressHydrationWarning>Time: {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span suppressHydrationWarning>
+            Time: {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          </span>
         </div>
         <div className="border-b border-black my-2" />
         <div className="flex justify-between font-bold">
@@ -563,7 +725,9 @@ export default function OrderSummaryBillPage() {
         <div className="border-b border-dashed border-black my-1" />
         {itemsList.map((it, idx) => (
           <div key={idx} className="flex justify-between py-0.5">
-            <span>{it.quantity}x {it.title}</span>
+            <span>
+              {it.quantity}x {it.title}
+            </span>
             <span>₹ {it.price * it.quantity}</span>
           </div>
         ))}
@@ -572,6 +736,12 @@ export default function OrderSummaryBillPage() {
           <span>Subtotal:</span>
           <span>₹ {itemsSubtotal}</span>
         </div>
+        {discountAmount > 0 && (
+          <div className="flex justify-between">
+            <span>Coupon Discount:</span>
+            <span>- ₹ {discountAmount}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>CGST (2.5%):</span>
           <span>₹ {cgst}</span>
@@ -644,7 +814,9 @@ export default function OrderSummaryBillPage() {
 
                   <div className="p-3 bg-[#FFFEFC] border border-[rgba(220,226,222,0.9)] rounded-2xl shadow-sm">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`upi://pay?pa=thoogudeepa@okicici&pn=Thoogudeepa&am=${grandPayable}&tn=Seat-${seatNumber}`)}`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                        `upi://pay?pa=thoogudeepa@okicici&pn=Thoogudeepa&am=${grandPayable}&tn=Seat-${seatNumber}`
+                      )}`}
                       alt="UPI QR Code"
                       className="w-40 h-40 object-contain rounded-xl"
                     />
@@ -660,10 +832,18 @@ export default function OrderSummaryBillPage() {
                   </div>
 
                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-zinc-800 shadow-2xs">GPay</span>
-                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-indigo-700 shadow-2xs">PhonePe</span>
-                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-sky-700 shadow-2xs">Paytm</span>
-                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-emerald-700 shadow-2xs">BHIM</span>
+                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-zinc-800 shadow-2xs">
+                      GPay
+                    </span>
+                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-indigo-700 shadow-2xs">
+                      PhonePe
+                    </span>
+                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-sky-700 shadow-2xs">
+                      Paytm
+                    </span>
+                    <span className="px-2 py-0.5 bg-[#FFFEFC] border border-zinc-200 rounded-md text-[9px] font-black text-emerald-700 shadow-2xs">
+                      BHIM
+                    </span>
                   </div>
 
                   <button
@@ -697,7 +877,9 @@ export default function OrderSummaryBillPage() {
                     Captain Selected Cash Payment
                   </span>
                   <p className="text-xs text-amber-900 font-bold">
-                    Please hand over <span className="font-black text-sm text-[#1A2621]">₹{grandPayable}</span> to your Floor Captain.
+                    Please hand over{' '}
+                    <span className="font-black text-sm text-[#1A2621]">₹{grandPayable}</span> to your
+                    Floor Captain.
                   </p>
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-200/60 rounded-full text-[10px] font-extrabold text-amber-900 mt-1">
                     <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
@@ -721,6 +903,15 @@ export default function OrderSummaryBillPage() {
                   </div>
                 </div>
               )}
+
+              {/* Cancel Waiter Call & Self Pay Link */}
+              <button
+                type="button"
+                onClick={handleCancelWaiterCall}
+                className="text-[11px] font-bold text-zinc-500 hover:text-zinc-800 underline text-center cursor-pointer py-1"
+              >
+                Cancel Floor Captain Call &amp; Pay Online
+              </button>
             </div>
           )}
         </div>
@@ -779,7 +970,9 @@ export default function OrderSummaryBillPage() {
                   realtimeBridge.sendServiceAlert({
                     seatNumber: paddedSeat,
                     title: `Bill Requested (₹${grandPayable})`,
-                    message: `Bill settlement requested for Seat ${seatNumber}: ₹${grandPayable}${tipAmount > 0 ? ` (incl. ₹${tipAmount} tip)` : ''}`,
+                    message: `Bill settlement requested for Seat ${seatNumber}: ₹${grandPayable}${
+                      tipAmount > 0 ? ` (incl. ₹${tipAmount} tip)` : ''
+                    }${discountAmount > 0 ? ` [Discount: ₹${discountAmount}]` : ''}`,
                     guestName: `Seat ${seatNumber} Guest`,
                     type: 'customer_call',
                     billAmount: grandPayable,
