@@ -39,6 +39,34 @@ interface KitchenItemNotification {
   serverName: string;
 }
 
+// ── Normalization helpers for stage-accurate filtering across all screens ──
+export const normalizeItemStage = (rawStage?: string): 'PLACED' | 'PREP' | 'READY' | 'SERVED' => {
+  const s = String(rawStage || '').toUpperCase().trim();
+  if (s === 'SERVED') return 'SERVED';
+  if (s === 'READY' || s === 'PLATED') return 'READY';
+  if (s === 'PREP' || s === 'COOKING' || s === 'PREPARING' || s === 'IN_PROGRESS') return 'PREP';
+  return 'PLACED';
+};
+
+export const getTicketStage = (tk: SharedKDSTicket): 'PLACED' | 'PREP' | 'READY' | 'SERVED' => {
+  const rawStatus = String(tk.status || '').toUpperCase().trim();
+  if (rawStatus === 'SERVED') return 'SERVED';
+  if (rawStatus === 'READY' || rawStatus === 'PLATED') return 'READY';
+
+  if (tk.items && tk.items.length > 0) {
+    const itemStages = tk.items.map((it) => normalizeItemStage(it.stage));
+    if (itemStages.every((st) => st === 'SERVED')) return 'SERVED';
+    if (itemStages.some((st) => st === 'READY')) return 'READY';
+    if (itemStages.some((st) => st === 'PREP')) return 'PREP';
+    return 'PLACED';
+  }
+
+  if (rawStatus === 'PREP' || rawStatus === 'COOKING' || rawStatus === 'PREPARING' || rawStatus === 'IN_PROGRESS') {
+    return 'PREP';
+  }
+  return 'PLACED';
+};
+
 interface ScreenM5KitchenSpeedProps {
   liveOrders?: { order: OrderRecord; items: OrderItemRecord[] }[];
   alerts?: ServiceAlertRecord[];
@@ -52,6 +80,9 @@ export function ScreenM5KitchenSpeed({
 }: ScreenM5KitchenSpeedProps) {
   const [activeTab, setActiveTab] = useState<'PLACED' | 'PAID'>('PLACED');
   const [placedFilter, setPlacedFilter] = useState<'ALL' | 'READY' | 'PREP' | 'PLACED'>('ALL');
+  const [paidFilter, setPaidFilter] = useState<'ALL' | 'UPI' | 'CASH' | 'CARD'>('ALL');
+  const [kitchenFilter, setKitchenFilter] = useState<'ALL' | 'READY' | 'PREP' | 'PLACED'>('ALL');
+  const [customerFilter, setCustomerFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [settledBills, setSettledBills] = useState<SettledBillSnapshot[]>(() => {
     return realtimeBridge.getSettledBills ? realtimeBridge.getSettledBills() : [];
@@ -102,12 +133,27 @@ export function ScreenM5KitchenSpeed({
             })
           : 'Just now',
         elapsedMinutes,
-        status: (lo.order.status as any) || 'NEW',
+        status: ((): 'NEW' | 'PREP' | 'READY' | 'COMPLETED' | 'SERVED' => {
+          const raw = String(lo.order.status || '').toUpperCase().trim();
+          if (raw === 'SERVED') return 'SERVED';
+          if (raw === 'COMPLETED') return 'COMPLETED';
+          if (raw === 'READY' || raw === 'PLATED') return 'READY';
+          if (raw === 'PREP' || raw === 'COOKING' || raw === 'IN_PROGRESS' || raw === 'PREPARING') return 'PREP';
+
+          const items = lo.items || [];
+          if (items.length > 0) {
+            const stages = items.map((i) => normalizeItemStage(i.stage));
+            if (stages.every((s) => s === 'SERVED')) return 'SERVED';
+            if (stages.some((s) => s === 'READY')) return 'READY';
+            if (stages.some((s) => s === 'PREP')) return 'PREP';
+          }
+          return 'NEW';
+        })(),
         items: (lo.items || []).map((it, iIdx) => ({
           id: it.id || `live-item-${chairNum}-${iIdx}`,
           name: it.dish_name || (it as any).name || (it as any).nameSnapshot || (it as any).title || 'Dish',
           quantity: it.quantity || 1,
-          stage: it.stage || 'PLACED',
+          stage: normalizeItemStage(it.stage),
           prepMode: 'Standard',
           price: it.price || (it as any).priceSnapshot || 0,
           seatNumber: isTk ? 0 : chairNum,
@@ -177,32 +223,91 @@ export function ScreenM5KitchenSpeed({
   }, [combinedPlacedOrders]);
 
   // Filtered Placed Orders for Left Column
-  const filteredPlaced = combinedPlacedOrders.filter((tk) => {
-    const matchesSearch =
-      tk.tableNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tk.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tk.items.some((it) => it.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPlaced = useMemo(() => {
+    return combinedPlacedOrders.filter((tk) => {
+      const q = searchTerm.toLowerCase().trim();
+      if (q) {
+        const chairNum = tk.seatNumber || tk.items[0]?.seatNumber || 1;
+        const isParcel =
+          tk.tableNumber === 'Seat 0 (Parcel)' ||
+          tk.tableNumber === 'TK-01' ||
+          tk.tableNumber.toLowerCase().includes('parcel') ||
+          tk.tableNumber.toLowerCase().includes('takeaway') ||
+          String(chairNum) === '0';
 
-    if (!matchesSearch) return false;
-    const hasReady = tk.items.some((it) => it.stage === 'READY' || it.stage === 'PLATED');
-    const hasPrep = tk.items.some((it) => it.stage === 'PREP' || it.stage === 'COOKING');
-    const isPlaced = tk.items.some((it) => it.stage === 'PLACED' || it.stage === 'QUEUED');
+        const matchesSearch =
+          tk.tableNumber.toLowerCase().includes(q) ||
+          tk.id.toLowerCase().includes(q) ||
+          (isParcel && ('parcel'.includes(q) || 'takeaway'.includes(q) || 'seat 0'.includes(q) || '0'.includes(q))) ||
+          (!isParcel &&
+            (`table ${tk.tableNumber}`.toLowerCase().includes(q) ||
+              `chair ${chairNum}`.toLowerCase().includes(q) ||
+              `seat ${chairNum}`.toLowerCase().includes(q))) ||
+          tk.items.some((it) => it.name.toLowerCase().includes(q));
 
-    if (placedFilter === 'READY') return tk.status === 'READY' || hasReady;
-    if (placedFilter === 'PREP') return tk.status === 'PREP' || (tk.status as string) === 'in_progress' || hasPrep;
-    if (placedFilter === 'PLACED') return tk.status === 'NEW' || (tk.status as string) === 'pending' || isPlaced;
-    return true;
-  });
+        if (!matchesSearch) return false;
+      }
+
+      if (placedFilter === 'ALL') return true;
+
+      const tkStage = getTicketStage(tk);
+      if (placedFilter === 'READY') {
+        return tkStage === 'READY' || tk.items.some((it) => normalizeItemStage(it.stage) === 'READY');
+      }
+      if (placedFilter === 'PREP') {
+        return tkStage === 'PREP' || tk.items.some((it) => normalizeItemStage(it.stage) === 'PREP');
+      }
+      if (placedFilter === 'PLACED') {
+        return tkStage === 'PLACED' || tk.items.some((it) => normalizeItemStage(it.stage) === 'PLACED');
+      }
+      return true;
+    });
+  }, [combinedPlacedOrders, searchTerm, placedFilter]);
 
   // Filtered Paid Orders for Left Column
-  const filteredPaid = combinedPaidOrders.filter((bill) => {
-    return (
-      bill.tableName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bill.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bill.method.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bill.items.some((it) => it.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
+  const filteredPaid = useMemo(() => {
+    return combinedPaidOrders.filter((bill) => {
+      const q = searchTerm.toLowerCase().trim();
+      if (q) {
+        const matchesSearch =
+          bill.tableName.toLowerCase().includes(q) ||
+          bill.invoiceNumber.toLowerCase().includes(q) ||
+          bill.method.toLowerCase().includes(q) ||
+          bill.items.some((it) => it.name.toLowerCase().includes(q));
+        if (!matchesSearch) return false;
+      }
+
+      if (paidFilter !== 'ALL') {
+        const m = (bill.method || '').toUpperCase();
+        if (paidFilter === 'CASH' && !m.includes('CASH')) return false;
+        if (paidFilter === 'UPI' && !m.includes('UPI') && !m.includes('ONLINE') && !m.includes('QR')) return false;
+        if (paidFilter === 'CARD' && !m.includes('CARD')) return false;
+      }
+      return true;
+    });
+  }, [combinedPaidOrders, searchTerm, paidFilter]);
+
+  // Filtered Kitchen Notifications for Middle Column
+  const filteredKitchenNotifications = useMemo(() => {
+    return kitchenNotificationsList.filter((notif) => {
+      if (kitchenFilter === 'ALL') return true;
+      const s = normalizeItemStage(notif.stage);
+      if (kitchenFilter === 'READY') return s === 'READY';
+      if (kitchenFilter === 'PREP') return s === 'PREP';
+      if (kitchenFilter === 'PLACED') return s === 'PLACED';
+      return true;
+    });
+  }, [kitchenNotificationsList, kitchenFilter]);
+
+  // Filtered Customer Notifications for Right Column
+  const filteredCustomerPings = useMemo(() => {
+    return combinedCustomerPings.filter((ping) => {
+      if (customerFilter === 'ALL') return true;
+      if (customerFilter === 'PENDING') return ping.status === 'PENDING';
+      if (customerFilter === 'RESOLVED') return ping.status === 'RESOLVED';
+      return true;
+    });
+  }, [combinedCustomerPings, customerFilter]);
 
   // Stage Badge Formatting: PLACED, RECEIVED, PREPARING, READY, SERVED
   const getStageBadge = (stage?: string, status?: string) => {
@@ -372,25 +477,77 @@ export function ScreenM5KitchenSpeed({
                   <Filter className="h-3 w-3" />
                   <span>FILTER:</span>
                 </span>
-                {(['ALL', 'READY', 'PREP', 'PLACED'] as const).map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setPlacedFilter(st)}
-                    className={`px-2 py-0.5 rounded-md font-bold transition text-[11px] shrink-0 cursor-pointer ${
-                      placedFilter === st
-                        ? 'bg-[#9C3D1E] text-white'
-                        : 'bg-[#FAF8F5] text-slate-600 hover:bg-stone-200 border border-slate-200'
-                    }`}
-                  >
-                    {st === 'ALL'
-                      ? `All (${combinedPlacedOrders.length})`
+                {(['ALL', 'READY', 'PREP', 'PLACED'] as const).map((st) => {
+                  const count =
+                    st === 'ALL'
+                      ? combinedPlacedOrders.length
                       : st === 'READY'
-                      ? `Ready (${combinedPlacedOrders.filter((t) => t.status === 'READY' || t.items?.some((i) => i.stage === 'READY' || i.stage === 'PLATED')).length})`
+                      ? combinedPlacedOrders.filter(
+                          (t) => getTicketStage(t) === 'READY' || t.items.some((i) => normalizeItemStage(i.stage) === 'READY')
+                        ).length
                       : st === 'PREP'
-                      ? `Prep (${combinedPlacedOrders.filter((t) => t.status === 'PREP' || (t.status as string) === 'in_progress' || t.items?.some((i) => i.stage === 'PREP' || i.stage === 'COOKING')).length})`
-                      : `Placed (${combinedPlacedOrders.filter((t) => t.status === 'NEW' || (t.status as string) === 'pending' || t.items?.some((i) => i.stage === 'PLACED' || i.stage === 'QUEUED')).length})`}
-                  </button>
-                ))}
+                      ? combinedPlacedOrders.filter(
+                          (t) => getTicketStage(t) === 'PREP' || t.items.some((i) => normalizeItemStage(i.stage) === 'PREP')
+                        ).length
+                      : combinedPlacedOrders.filter(
+                          (t) => getTicketStage(t) === 'PLACED' || t.items.some((i) => normalizeItemStage(i.stage) === 'PLACED')
+                        ).length;
+
+                  return (
+                    <button
+                      key={st}
+                      onClick={() => setPlacedFilter(st)}
+                      className={`px-2.5 py-1 rounded-md font-bold transition text-[11px] shrink-0 cursor-pointer ${
+                        placedFilter === st
+                          ? 'bg-[#9C3D1E] text-white shadow-xs'
+                          : 'bg-[#FAF8F5] text-slate-600 hover:bg-stone-200 border border-slate-200'
+                      }`}
+                    >
+                      {st === 'ALL'
+                        ? `All (${count})`
+                        : st === 'READY'
+                        ? `Ready (${count})`
+                        : st === 'PREP'
+                        ? `Prep (${count})`
+                        : `Placed (${count})`}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === 'PAID' && (
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs pt-1 border-t border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 mr-1 flex items-center gap-1 shrink-0">
+                  <Filter className="h-3 w-3" />
+                  <span>METHOD:</span>
+                </span>
+                {(['ALL', 'UPI', 'CASH', 'CARD'] as const).map((meth) => {
+                  const count =
+                    meth === 'ALL'
+                      ? combinedPaidOrders.length
+                      : combinedPaidOrders.filter((b) => {
+                          const m = (b.method || '').toUpperCase();
+                          if (meth === 'CASH') return m.includes('CASH');
+                          if (meth === 'UPI') return m.includes('UPI') || m.includes('ONLINE') || m.includes('QR');
+                          if (meth === 'CARD') return m.includes('CARD');
+                          return true;
+                        }).length;
+
+                  return (
+                    <button
+                      key={meth}
+                      onClick={() => setPaidFilter(meth)}
+                      className={`px-2.5 py-1 rounded-md font-bold transition text-[11px] shrink-0 cursor-pointer ${
+                        paidFilter === meth
+                          ? 'bg-[#9C3D1E] text-white shadow-xs'
+                          : 'bg-[#FAF8F5] text-slate-600 hover:bg-stone-200 border border-slate-200'
+                      }`}
+                    >
+                      {meth === 'ALL' ? `All (${count})` : `${meth} (${count})`}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -409,7 +566,8 @@ export function ScreenM5KitchenSpeed({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[780px] overflow-y-auto pr-1">
                   {filteredPlaced.map((tk) => {
                     const chairNum = tk.seatNumber || tk.items[0]?.seatNumber || 1;
-                    const overallStage = getStageBadge(undefined, tk.status);
+                    const tkStage = getTicketStage(tk);
+                    const overallStage = getStageBadge(tkStage);
                     const isParcelTk =
                       tk.tableNumber === 'Seat 0 (Parcel)' ||
                       tk.tableNumber === 'TK-01' ||
@@ -660,22 +818,53 @@ export function ScreenM5KitchenSpeed({
             </div>
 
             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-orange-800 border border-orange-200">
-              {kitchenNotificationsList.length}
+              {filteredKitchenNotifications.length} / {kitchenNotificationsList.length}
             </span>
+          </div>
+
+          {/* Kitchen Stage Filter Chips */}
+          <div className="flex items-center gap-1 overflow-x-auto text-xs bg-white border border-[#EAE5DF] rounded-xl p-1.5 shadow-xs">
+            {(['ALL', 'READY', 'PREP', 'PLACED'] as const).map((st) => {
+              const count =
+                st === 'ALL'
+                  ? kitchenNotificationsList.length
+                  : kitchenNotificationsList.filter((n) => normalizeItemStage(n.stage) === st).length;
+              return (
+                <button
+                  key={st}
+                  onClick={() => setKitchenFilter(st)}
+                  className={`px-2 py-0.5 rounded-md font-bold transition text-[10px] shrink-0 cursor-pointer ${
+                    kitchenFilter === st
+                      ? 'bg-[#9C3D1E] text-white shadow-xs'
+                      : 'bg-[#FAF8F5] text-slate-600 hover:bg-stone-200 border border-slate-200'
+                  }`}
+                >
+                  {st === 'ALL'
+                    ? `All (${count})`
+                    : st === 'READY'
+                    ? `Ready (${count})`
+                    : st === 'PREP'
+                    ? `Prep (${count})`
+                    : `Placed (${count})`}
+                </button>
+              );
+            })}
           </div>
 
           {/* Kitchen Notifications Scrollable Feed (Clean Overview, No Advance Button) */}
           <div className="space-y-2.5 max-h-[860px] overflow-y-auto pr-1">
-            {kitchenNotificationsList.length === 0 ? (
+            {filteredKitchenNotifications.length === 0 ? (
               <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200 space-y-1">
                 <ChefHat className="h-6 w-6 text-slate-300 mx-auto mb-1" />
                 <div className="font-bold text-xs text-slate-700">No Kitchen Notifications</div>
                 <p className="text-[10px] text-slate-400">
-                  Dishes placed in kitchen will stream their live status here.
+                  {kitchenFilter === 'ALL'
+                    ? 'Dishes placed in kitchen will stream their live status here.'
+                    : `No dishes currently in ${kitchenFilter} stage.`}
                 </p>
               </div>
             ) : (
-              kitchenNotificationsList.map((notif) => {
+              filteredKitchenNotifications.map((notif) => {
                 const stageBadge = getStageBadge(notif.stage);
                 const sUpper = String(notif.stage || '').toUpperCase();
                 const isReady = sUpper === 'READY' || sUpper === 'PLATED';
@@ -787,22 +976,51 @@ export function ScreenM5KitchenSpeed({
             </div>
 
             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-800 border border-red-200">
-              {combinedCustomerPings.length}
+              {filteredCustomerPings.length} / {combinedCustomerPings.length}
             </span>
+          </div>
+
+          {/* Customer Alert Status Filter Chips */}
+          <div className="flex items-center gap-1 overflow-x-auto text-xs bg-white border border-[#EAE5DF] rounded-xl p-1.5 shadow-xs">
+            {(['ALL', 'PENDING', 'RESOLVED'] as const).map((st) => {
+              const count =
+                st === 'ALL'
+                  ? combinedCustomerPings.length
+                  : combinedCustomerPings.filter((p) => p.status === st).length;
+              return (
+                <button
+                  key={st}
+                  onClick={() => setCustomerFilter(st)}
+                  className={`px-2 py-0.5 rounded-md font-bold transition text-[10px] shrink-0 cursor-pointer ${
+                    customerFilter === st
+                      ? 'bg-[#9C3D1E] text-white shadow-xs'
+                      : 'bg-[#FAF8F5] text-slate-600 hover:bg-stone-200 border border-slate-200'
+                  }`}
+                >
+                  {st === 'ALL'
+                    ? `All (${count})`
+                    : st === 'PENDING'
+                    ? `Pending (${count})`
+                    : `Resolved (${count})`}
+                </button>
+              );
+            })}
           </div>
 
           {/* Customer Notifications Scrollable Feed */}
           <div className="space-y-2.5 max-h-[860px] overflow-y-auto pr-1">
-            {combinedCustomerPings.length === 0 ? (
+            {filteredCustomerPings.length === 0 ? (
               <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200 space-y-1">
                 <BellRing className="h-6 w-6 text-slate-300 mx-auto mb-1" />
-                <div className="font-bold text-xs text-slate-700">No Active Customer Notifications</div>
+                <div className="font-bold text-xs text-slate-700">No Customer Notifications</div>
                 <p className="text-[10px] text-slate-400">
-                  Guest service calls (Water, Waiter, Bill) will ping here instantly.
+                  {customerFilter === 'ALL'
+                    ? 'Guest service calls (Water, Waiter, Bill) will ping here instantly.'
+                    : `No ${customerFilter.toLowerCase()} guest alerts.`}
                 </p>
               </div>
             ) : (
-              combinedCustomerPings.map((ping) => {
+              filteredCustomerPings.map((ping) => {
                 const isResolved = ping.status === 'RESOLVED';
                 const isPending = ping.status === 'PENDING';
                 const isTk =
