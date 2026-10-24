@@ -891,13 +891,23 @@ export const realtimeBridge = {
         }));
         const res = await fetch(`${getBackendUrl()}/api/orders`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-device-token': deviceToken,
+          },
           body: JSON.stringify({
             seatId: cleanSeatId,
+            deviceToken,
             items: apiItems,
             createdByRole: 'CUSTOMER',
           }),
         });
+
+        if (res.status === 409) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'SEAT_ALREADY_OCCUPIED: Seat is currently occupied by another customer.');
+        }
+
         if (res.ok) {
           const resData = await res.json();
           if (resData?.order) {
@@ -908,7 +918,10 @@ export const realtimeBridge = {
           }
         }
         processedOrderIds.add(generatedId);
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.message?.includes('SEAT_ALREADY_OCCUPIED') || e?.message?.includes('ACTIVE_SESSION_EXISTS')) {
+          throw e;
+        }
         console.warn('Backend order placement warning:', e);
       }
 
@@ -1016,32 +1029,40 @@ export const realtimeBridge = {
     }
   },
 
-  // Check seat occupancy state (Anti-Hijack Check)
+  // Check seat occupancy state (Anti-Hijack & Anti-Cheat Check)
   async getSeatOccupancy(chairId: string, currentDeviceToken: string): Promise<{
     isOccupied: boolean;
     isOwner: boolean;
     ticketNumber?: string;
     orderStatus?: string;
     placedAt?: number;
+    activeSeatIdForDevice?: number | null;
   }> {
     try {
       const cleanChair = chairId.replace(/[^0-9]/g, '');
-      const paddedChair = cleanChair.padStart(2, '0');
-      const unpaddedChair = cleanChair.replace(/^0+/, '');
+      const cleanSeatId = cleanChair === '' ? (chairId.toLowerCase().includes('takeaway') ? 0 : 1) : Number(cleanChair);
 
-      // 1. Check in-memory occupancy registry first
-      const map = getLocalOccupancyMap();
-      const localRecord = map[chairId] || map[paddedChair] || map[unpaddedChair] || map[cleanChair];
-
-      if (localRecord && localRecord.status !== 'completed' && localRecord.status !== 'cancelled') {
-        return {
-          isOccupied: true,
-          isOwner: true,
-          ticketNumber: localRecord.ticketNumber,
-          orderStatus: localRecord.status,
-          placedAt: localRecord.placedAt,
-        };
+      // 1. Authoritative Backend Check (PRIMARY SOURCE OF TRUTH)
+      try {
+        const res = await fetch(`${getBackendUrl()}/api/seats/${cleanSeatId}/occupancy?deviceToken=${encodeURIComponent(currentDeviceToken)}`, {
+          headers: { 'x-device-token': currentDeviceToken },
+        });
+        if (res.ok) {
+          const occ = await res.json();
+          return {
+            isOccupied: Boolean(occ.isOccupied),
+            isOwner: Boolean(occ.isOwner),
+            ticketNumber: occ.ticketNumber,
+            orderStatus: occ.orderStatus,
+            activeSeatIdForDevice: occ.activeSeatIdForDevice,
+          };
+        }
+      } catch {
+        // Backend temporarily unreachable, fall back to Supabase/local
       }
+
+      const paddedChair = cleanChair ? cleanChair.padStart(2, '0') : '00';
+      const unpaddedChair = cleanChair ? cleanChair.replace(/^0+/, '') : '0';
 
       // 2. Check remote database if online
       if (supabase) {
@@ -1055,13 +1076,37 @@ export const realtimeBridge = {
           .maybeSingle();
 
         if (!error && activeOrder) {
+          const orderDeviceToken = (activeOrder as any).device_token;
+          const isOwner = Boolean(
+            currentDeviceToken &&
+            orderDeviceToken &&
+            orderDeviceToken === currentDeviceToken
+          );
           return {
             isOccupied: true,
-            isOwner: true,
+            isOwner,
             ticketNumber: activeOrder.ticket_number,
             orderStatus: activeOrder.status,
           };
         }
+      }
+
+      // 3. Check in-memory occupancy registry
+      const map = getLocalOccupancyMap();
+      const localRecord = map[chairId] || map[paddedChair] || map[unpaddedChair] || map[cleanChair];
+
+      if (localRecord && localRecord.status !== 'completed' && localRecord.status !== 'cancelled') {
+        const isOwner = Boolean(
+          !localRecord.deviceToken ||
+          (currentDeviceToken && localRecord.deviceToken === currentDeviceToken)
+        );
+        return {
+          isOccupied: true,
+          isOwner,
+          ticketNumber: localRecord.ticketNumber,
+          orderStatus: localRecord.status,
+          placedAt: localRecord.placedAt,
+        };
       }
 
       return { isOccupied: false, isOwner: false };

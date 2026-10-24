@@ -8,9 +8,61 @@ import type { ItemStage, CreatedByRole, OrderStage, SeatTabSummary, Order, Order
 
 export class OrderService {
   /**
+   * Authoritative Seat Occupancy and Ownership Verification
+   */
+  async getSeatOccupancy(seatId: number, deviceToken?: string) {
+    const seat = db.data.seats.find((s) => s.id === seatId);
+    if (!seat) {
+      return { isOccupied: false, isOwner: false };
+    }
+
+    // Check if device has an unsettled active session on ANOTHER seat
+    let activeSeatIdForDevice: number | null = null;
+    if (deviceToken) {
+      const otherSession = db.data.seatSessions.find(
+        (s) => s.status === 'ACTIVE' && s.seatId !== seatId && s.deviceToken === deviceToken
+      );
+      if (otherSession) {
+        activeSeatIdForDevice = otherSession.seatId;
+      }
+    }
+
+    const activeSession = db.data.seatSessions.find(
+      (s) => s.seatId === seatId && s.status === 'ACTIVE'
+    );
+
+    const isOccupied = Boolean(seat.currentStatus !== 'VACANT' && activeSession);
+
+    if (!isOccupied || !activeSession) {
+      return {
+        isOccupied: false,
+        isOwner: false,
+        activeSeatIdForDevice,
+      };
+    }
+
+    const isOwner = Boolean(
+      deviceToken &&
+      activeSession.deviceToken &&
+      activeSession.deviceToken === deviceToken
+    );
+
+    const seatOrders = db.data.orders.filter((o) => o.seatId === seatId);
+    const latestOrder = seatOrders.length > 0 ? seatOrders[seatOrders.length - 1] : undefined;
+
+    return {
+      isOccupied: true,
+      isOwner,
+      ticketNumber: latestOrder?.orderNumber,
+      orderStatus: latestOrder?.overallStage || 'PLACED',
+      activeSeatIdForDevice,
+    };
+  }
+
+  /**
    * Claim a seat via dynamic QR code or resume existing active session.
    */
-  async claimSeat(seatId: number, sig: string, clientIp?: string, existingToken?: string) {
+  async claimSeat(seatId: number, sig: string, clientIp?: string, existingToken?: string, deviceToken?: string) {
     const seat = db.data.seats.find((s) => s.id === seatId);
     if (!seat) {
       throw new Error(`Seat #${seatId} does not exist`);
@@ -91,121 +143,164 @@ export class OrderService {
   /**
    * Collaborative cross-actor order placement.
    * Customer, Waiter, or Manager can add items to the active seat tab.
+   * Concurrency-guarded with seat-level mutex lock to prevent order collisions and swaps.
    */
   async placeOrder(params: {
     seatId: number;
     sessionToken?: string;
+    deviceToken?: string;
     items: Array<{ menuItemId: number; quantity: number; notes?: string }>;
     createdByRole: CreatedByRole;
     waiterId?: number;
+    clientIp?: string;
   }) {
-    const { seatId, sessionToken, items, createdByRole, waiterId } = params;
+    const { seatId, sessionToken, deviceToken, items, createdByRole, waiterId, clientIp } = params;
 
-    // 1. Fetch active session, or auto-initialize one so orders never get rejected
-    let session = db.data.seatSessions.find(
-      (s) => s.seatId === seatId && s.status === 'ACTIVE'
-    );
+    // Concurrency Lock: Strictly serialize order creation per seat to prevent race collisions & order swapping
+    const lockAcquired = await mutexService.acquireLock(`order:seat:${seatId}`, clientIp || deviceToken || 'actor', 5);
+    if (!lockAcquired) {
+      throw new Error('Order is currently being processed for this seat. Please retry in a moment.');
+    }
 
-    if (!session) {
-      const seat = db.data.seats.find((s) => s.id === seatId);
-      if (!seat) throw new Error('Seat not found');
+    try {
+      // 1. Anti-Cheat Check: Customer cannot place orders at Seat Y if they currently owe an unpaid meal at Seat X
+      if (createdByRole === 'CUSTOMER' && deviceToken) {
+        const otherActiveSession = db.data.seatSessions.find(
+          (s) => s.status === 'ACTIVE' && s.seatId !== seatId && s.deviceToken === deviceToken
+        );
+        if (otherActiveSession) {
+          throw new Error(`ACTIVE_SESSION_EXISTS: You currently have an active meal at Seat ${otherActiveSession.seatId}. Please settle your bill before ordering at another table.`);
+        }
+      }
 
-      const sessionId = crypto.randomUUID();
-      const newToken = generateSessionToken();
+      // 2. Fetch active session
+      let session = db.data.seatSessions.find(
+        (s) => s.seatId === seatId && s.status === 'ACTIVE'
+      );
+
+      // Anti-Hijack & Anti-Swap Check:
+      // If seat already has an active session and request is from a CUSTOMER:
+      if (session && createdByRole === 'CUSTOMER') {
+        const isSameDevice = Boolean(deviceToken && session.deviceToken && session.deviceToken === deviceToken);
+        const isSameToken = Boolean(sessionToken && session.sessionToken && session.sessionToken === sessionToken);
+
+        // If seat already claimed by another device and neither token matches:
+        if (session.deviceToken && !isSameDevice && !isSameToken) {
+          throw new Error('SEAT_ALREADY_OCCUPIED: Seat is currently occupied by another customer. Please scan a vacant table.');
+        }
+
+        // If session didn't have deviceToken bound yet, bind it now to this device
+        if (!session.deviceToken && deviceToken) {
+          session.deviceToken = deviceToken;
+        }
+      }
+
+      if (!session) {
+        const seat = db.data.seats.find((s) => s.id === seatId);
+        if (!seat) throw new Error('Seat not found');
+
+        const sessionId = crypto.randomUUID();
+        const newToken = generateSessionToken();
+        const now = new Date().toISOString();
+
+        session = {
+          id: sessionId,
+          seatId,
+          sessionToken: sessionToken || newToken,
+          deviceToken: deviceToken || undefined,
+          status: 'ACTIVE',
+          startedAt: now,
+        };
+
+        db.data.seatSessions.push(session);
+
+        seat.currentStatus = 'OCCUPIED';
+        seat.activeSessionId = sessionId;
+        seat.updatedAt = now;
+      }
+
+      // 3. Fetch menu items for snapshot pricing and names
+      const itemMap = new Map(db.data.menuItems.map((m) => [m.id, m]));
+
+      // 4. Create Order and OrderItems
+      const orderId = crypto.randomUUID();
+      const orderNumber = `ORD-${Date.now().toString().slice(-4)}`;
       const now = new Date().toISOString();
 
-      session = {
-        id: sessionId,
+      const createdOrderItems: OrderItem[] = [];
+      for (const item of items) {
+        const dish = itemMap.get(item.menuItemId);
+        if (!dish) continue;
+
+        createdOrderItems.push({
+          id: crypto.randomUUID(),
+          orderId,
+          menuItemId: item.menuItemId,
+          nameSnapshot: dish.name,
+          priceSnapshot: dish.price,
+          quantity: item.quantity,
+          notes: item.notes || null,
+          itemStage: 'QUEUED',
+          updatedAt: now,
+        });
+      }
+
+      const calculatedSubtotal = createdOrderItems.reduce((acc, curr) => acc + curr.priceSnapshot * curr.quantity, 0);
+
+      const newOrder: Order = {
+        id: orderId,
+        sessionId: session.id,
         seatId,
-        sessionToken: sessionToken || newToken,
-        status: 'ACTIVE',
-        startedAt: now,
+        orderNumber,
+        overallStage: 'PLACED',
+        createdByRole,
+        waiterId: waiterId || null,
+        placedAt: now,
+        items: createdOrderItems,
+        totalAmount: calculatedSubtotal,
+        deviceToken: session.deviceToken,
+      } as any;
+
+      db.data.orders.push(newOrder);
+
+      // Update seat running totals
+      const seat = db.data.seats.find((s) => s.id === seatId)!;
+      const tabSummary = await this.getSeatTabSummary(seatId);
+      seat.activeOrderTotal = tabSummary.total;
+      seat.activeItemCount = tabSummary.allItems.length;
+      seat.updatedAt = now;
+
+      db.saveState();
+      db.logTransaction('ORDER_PLACED', {
+        orderId: newOrder.id,
+        orderNumber: newOrder.orderNumber,
+        seatId,
+        itemCount: newOrder.items.length,
+        total: tabSummary.total,
+        createdByRole,
+        waiterId,
+        deviceToken: session.deviceToken,
+      });
+
+      const payload = {
+        order: newOrder,
+        seat,
       };
 
-      db.data.seatSessions.push(session);
+      // 5. Real-time broadcast to all connected portals in < 50ms
+      if (io) {
+        io.emit(SOCKET_EVENTS.ORDER_PLACED, payload);
+        io.to(`seat:${seatId}`).emit(SOCKET_EVENTS.ORDER_PLACED, payload);
+        io.to('kds').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
+        io.to('staff:mobile').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
+        io.to('staff:tablet').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
+        io.to('manager').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
+      }
 
-      seat.currentStatus = 'OCCUPIED';
-      seat.activeSessionId = sessionId;
-      seat.updatedAt = now;
+      return payload;
+    } finally {
+      await mutexService.releaseLock(`order:seat:${seatId}`, clientIp || deviceToken || 'actor');
     }
-
-    // 2. Fetch menu items for snapshot pricing and names
-    const itemMap = new Map(db.data.menuItems.map((m) => [m.id, m]));
-
-    // 3. Create Order and OrderItems
-    const orderId = crypto.randomUUID();
-    const orderNumber = `ORD-${Date.now().toString().slice(-4)}`;
-    const now = new Date().toISOString();
-
-    const createdOrderItems: OrderItem[] = [];
-    for (const item of items) {
-      const dish = itemMap.get(item.menuItemId);
-      if (!dish) continue;
-
-      createdOrderItems.push({
-        id: crypto.randomUUID(),
-        orderId,
-        menuItemId: item.menuItemId,
-        nameSnapshot: dish.name,
-        priceSnapshot: dish.price,
-        quantity: item.quantity,
-        notes: item.notes || null,
-        itemStage: 'QUEUED',
-        updatedAt: now,
-      });
-    }
-
-    const calculatedSubtotal = createdOrderItems.reduce((acc, curr) => acc + curr.priceSnapshot * curr.quantity, 0);
-
-    const newOrder: Order = {
-      id: orderId,
-      sessionId: session.id,
-      seatId,
-      orderNumber,
-      overallStage: 'PLACED',
-      createdByRole,
-      waiterId: waiterId || null,
-      placedAt: now,
-      items: createdOrderItems,
-      totalAmount: calculatedSubtotal,
-    } as any;
-
-    db.data.orders.push(newOrder);
-
-    // Update seat running totals
-    const seat = db.data.seats.find((s) => s.id === seatId)!;
-    const tabSummary = await this.getSeatTabSummary(seatId);
-    seat.activeOrderTotal = tabSummary.total;
-    seat.activeItemCount = tabSummary.allItems.length;
-    seat.updatedAt = now;
-
-    db.saveState();
-    db.logTransaction('ORDER_PLACED', {
-      orderId: newOrder.id,
-      orderNumber: newOrder.orderNumber,
-      seatId,
-      itemCount: newOrder.items.length,
-      total: tabSummary.total,
-      createdByRole,
-      waiterId,
-    });
-
-    const payload = {
-      order: newOrder,
-      seat,
-    };
-
-    // 4. Real-time broadcast to all connected portals in < 50ms
-    if (io) {
-      io.emit(SOCKET_EVENTS.ORDER_PLACED, payload);
-      io.to(`seat:${seatId}`).emit(SOCKET_EVENTS.ORDER_PLACED, payload);
-      io.to('kds').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
-      io.to('staff:mobile').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
-      io.to('staff:tablet').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
-      io.to('manager').emit(SOCKET_EVENTS.ORDER_PLACED, payload);
-    }
-
-    return payload;
   }
 
   /**

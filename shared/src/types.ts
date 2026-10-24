@@ -19,6 +19,7 @@ export interface SeatSession {
   seatId: number;
   sessionToken: string;
   clientIp?: string;
+  deviceToken?: string;
   status: 'ACTIVE' | 'SETTLING' | 'COMPLETED' | 'CANCELLED';
   startedAt: string;
   endedAt?: string | null;

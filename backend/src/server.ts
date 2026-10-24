@@ -84,6 +84,17 @@ app.get('/api/seats/:seatId/claim', async (req, reply) => {
   }
 });
 
+// 3B. Real-Time Authoritative Seat Occupancy & Ownership Verification (Anti-Hijack & Anti-Cheat)
+app.get('/api/seats/:seatId/occupancy', async (req, reply) => {
+  const { seatId } = req.params as { seatId: string };
+  const { deviceToken } = req.query as { deviceToken?: string };
+  const tokenHeader = (req.headers['x-device-token'] as string) || deviceToken;
+
+  const norm = normalizeSeatIdentity(seatId);
+  const result = await orderService.getSeatOccupancy(norm.seatId, tokenHeader);
+  return reply.send(result);
+});
+
 // 4. Get Consolidated Active Seat Tab
 app.get('/api/seats/:seatId/tab', async (req, reply) => {
   const { seatId } = req.params as { seatId: string };
@@ -98,25 +109,29 @@ app.get('/api/seats/:seatId/tab', async (req, reply) => {
 // 5. Collaborative Order Placement (Customer, Waiter Mobile, Tablet, Manager)
 app.post('/api/orders', async (req, reply) => {
   const sessionTokenHeader = req.headers['x-seat-session-token'] as string;
+  const deviceTokenHeader = req.headers['x-device-token'] as string;
   const parseResult = PlaceOrderInputSchema.safeParse(req.body);
 
   if (!parseResult.success) {
     return reply.status(400).send({ error: parseResult.error.format() });
   }
 
-  const { seatId, sessionToken, items, createdByRole, waiterId } = parseResult.data;
+  const { seatId, sessionToken, deviceToken, items, createdByRole, waiterId } = parseResult.data;
 
   try {
     const result = await orderService.placeOrder({
       seatId,
       sessionToken: sessionToken || sessionTokenHeader,
+      deviceToken: deviceToken || deviceTokenHeader,
       items,
       createdByRole,
       waiterId,
+      clientIp: req.ip,
     });
     return reply.status(201).send(result);
   } catch (error: any) {
-    return reply.status(400).send({ error: error.message });
+    const isConflict = error.message?.includes('SEAT_ALREADY_OCCUPIED') || error.message?.includes('ACTIVE_SESSION_EXISTS');
+    return reply.status(isConflict ? 409 : 400).send({ error: error.message });
   }
 });
 

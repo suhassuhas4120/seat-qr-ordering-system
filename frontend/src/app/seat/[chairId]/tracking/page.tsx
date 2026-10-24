@@ -743,15 +743,6 @@ export default function LiveOrderTrackingPage() {
                 <PlusCircle className="w-4 h-4 text-[#244436]" />
                 <span>Add More Dishes</span>
               </Link>
-
-              <button
-                type="button"
-                onClick={handleOrderAgain}
-                className="w-full py-3 border-2 border-dashed border-amber-600/50 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 bg-amber-500/10 text-amber-900 cursor-pointer active:scale-98 transition-all hover:bg-amber-500/20 shadow-xs"
-              >
-                <UtensilsCrossed className="w-4 h-4 text-amber-700" />
-                <span>Start New Meal / Order Again</span>
-              </button>
             </div>
           </>
         )}
@@ -774,13 +765,6 @@ export default function LiveOrderTrackingPage() {
 
           {allDishesServed ? (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleOrderAgain}
-                className="px-3.5 py-2.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all"
-              >
-                Order Again
-              </button>
               <Link
                 href={`/seat/${chairId}/bill`}
                 className="px-5 py-2.5 bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:opacity-90 cursor-pointer text-center shadow-md hover:shadow-lg transition-all"

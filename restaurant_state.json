@@ -1,224 +1,235 @@
 {
   "seats": [
     {
+      "id": 0,
+      "seatNumber": "TK-01",
+      "zone": "COUNTER_A",
+      "currentStatus": "VACANT",
+      "epochHash": "6d6f866e777ed540",
+      "activeSessionId": null,
+      "activeOrderTotal": 0,
+      "activeItemCount": 0,
+      "updatedAt": "2026-10-24T03:17:08.921Z"
+    },
+    {
       "id": 1,
       "seatNumber": "S001",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "b6c69b4adbd33688",
+      "epochHash": "e2c7deb4384fe5a9",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.540Z"
+      "updatedAt": "2026-10-24T03:17:07.155Z"
     },
     {
       "id": 2,
       "seatNumber": "S002",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "447729d51c68e093",
+      "epochHash": "b86157602a72b863",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.167Z"
     },
     {
       "id": 3,
       "seatNumber": "S003",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "380541ed7f5b53a1",
+      "epochHash": "24024e6a7d2919be",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.182Z"
     },
     {
       "id": 4,
       "seatNumber": "S004",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "e03fdcabc748af4c",
+      "epochHash": "9d3893172222c5bf",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.195Z"
     },
     {
       "id": 5,
       "seatNumber": "S005",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "88f8bc47163123a4",
+      "epochHash": "54ba8b258cdc419c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:50.654Z"
+      "updatedAt": "2026-10-24T03:17:07.203Z"
     },
     {
       "id": 6,
       "seatNumber": "S006",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "c414931d6813f73d",
+      "epochHash": "3e7d1f6847e39e66",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.216Z"
     },
     {
       "id": 7,
       "seatNumber": "S007",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "773138af801a52cb",
+      "epochHash": "78c2cba366563dd7",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.229Z"
     },
     {
       "id": 8,
       "seatNumber": "S008",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "f5e7d0e456d5d821",
+      "epochHash": "49e74e0e981f465a",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.240Z"
     },
     {
       "id": 9,
       "seatNumber": "S009",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "153a9445c9e2306c",
+      "epochHash": "e2a90812f3252433",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.253Z"
     },
     {
       "id": 10,
       "seatNumber": "S010",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "791551863cdd4bea",
+      "epochHash": "bdaa1558723547dc",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.264Z"
     },
     {
       "id": 11,
       "seatNumber": "S011",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "dff2c7c264054e3a",
+      "epochHash": "935da102b29c7d0f",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.276Z"
     },
     {
       "id": 12,
       "seatNumber": "S012",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "d4adbdb5d6979e5a",
+      "epochHash": "bad71bd1ee07f41c",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.287Z"
     },
     {
       "id": 13,
       "seatNumber": "S013",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "670beabfa664185a",
+      "epochHash": "88beb0a0ed91eab8",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.297Z"
     },
     {
       "id": 14,
       "seatNumber": "S014",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "d8b4535b0792556f",
+      "epochHash": "ac4d6cf823688f8b",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.310Z"
     },
     {
       "id": 15,
       "seatNumber": "S015",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "36c0fbd3639cdda4",
+      "epochHash": "f886d98df54f7fe7",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.319Z"
     },
     {
       "id": 16,
       "seatNumber": "S016",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "8da06443d72b8c6a",
+      "epochHash": "f4ba3becf078a3a3",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.332Z"
     },
     {
       "id": 17,
       "seatNumber": "S017",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "fcbfe75197e9eedd",
+      "epochHash": "4174c7959fe6170b",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.344Z"
     },
     {
       "id": 18,
       "seatNumber": "S018",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "624b02ac4f69c5f0",
+      "epochHash": "30b1ada3dd944079",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.354Z"
     },
     {
       "id": 19,
       "seatNumber": "S019",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "04c40224ce705a87",
+      "epochHash": "72d1010c9e3debf5",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.366Z"
     },
     {
       "id": 20,
       "seatNumber": "S020",
       "zone": "COUNTER_A",
       "currentStatus": "VACANT",
-      "epochHash": "db58292b4c50e67c",
+      "epochHash": "8677adb0f8be6b87",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "updatedAt": "2026-10-24T03:17:07.378Z"
     },
     {
       "id": 21,
@@ -268,12 +279,12 @@
       "id": 25,
       "seatNumber": "S025",
       "zone": "COUNTER_B",
-      "currentStatus": "VACANT",
-      "epochHash": "ea31ddf8ef5a263e",
-      "activeSessionId": null,
-      "activeOrderTotal": 0,
-      "activeItemCount": 0,
-      "updatedAt": "2026-10-22T23:23:25.541Z"
+      "currentStatus": "OCCUPIED",
+      "epochHash": "030e50e676f390bd",
+      "activeSessionId": "3b1f41fe-05e2-4693-b090-3bd5ba93f275",
+      "activeOrderTotal": 535.5,
+      "activeItemCount": 1,
+      "updatedAt": "2026-10-24T03:17:08.894Z"
     },
     {
       "id": 26,
@@ -1109,6 +1120,222 @@
       "status": "COMPLETED",
       "startedAt": "2026-10-22T23:23:50.486Z",
       "endedAt": "2026-10-22T23:23:50.654Z"
+    },
+    {
+      "id": "sess-25-1792811789581",
+      "seatId": 25,
+      "sessionToken": "token-1792811789581",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:16:29.581Z",
+      "deviceToken": "device_A",
+      "endedAt": "2026-10-24T03:16:47.584Z"
+    },
+    {
+      "id": "5c3f833d-5876-4fb0-b6a9-4112a6ac125a",
+      "seatId": 25,
+      "sessionToken": "fd1258b12ac90aa358f198f936bc3bb340e994010beb06bc1db881096dec07a0",
+      "deviceToken": "device_A",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:16:47.623Z",
+      "endedAt": "2026-10-24T03:16:47.666Z"
+    },
+    {
+      "id": "0e8a84d1-f5e8-4a4a-8533-a531e771e54f",
+      "seatId": 0,
+      "sessionToken": "03d94d2e1624b40cd9ebcc57858f4bbeee456a13563d5b6515d9f46fe9bc8eed",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:16:56.693Z",
+      "endedAt": "2026-10-24T03:16:56.701Z"
+    },
+    {
+      "id": "8ca7b5f3-91e8-4ac5-8715-d95f19ab3ae1",
+      "seatId": 7,
+      "sessionToken": "02cdf5cd298a9c262a92f73e93f6999d3fdd9042e70497f5ee8a6cabdc732f41",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:16:56.710Z",
+      "endedAt": "2026-10-24T03:16:56.737Z"
+    },
+    {
+      "id": "4e14e6e1-de00-488f-9011-a5d02947ba61",
+      "seatId": 1,
+      "sessionToken": "7331f4b67fccbb61ef94ad765d9c35ef9851ace4355dc1b39343e8b77dd0a6f6",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.638Z",
+      "endedAt": "2026-10-24T03:17:07.155Z"
+    },
+    {
+      "id": "6c7618f0-5883-4ab2-8bed-b54babb8aa51",
+      "seatId": 2,
+      "sessionToken": "ae121fd2d413a2da179ee991639c3db8d73c88f94c88f012f616b38193313252",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.660Z",
+      "endedAt": "2026-10-24T03:17:07.167Z"
+    },
+    {
+      "id": "0db34409-ac9b-4011-a7c8-3315ed811f47",
+      "seatId": 3,
+      "sessionToken": "43f10b97c0bf4fc0f2eb2865f480d8e76e69210ca34e8528e52bdcf97efedabc",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.676Z",
+      "endedAt": "2026-10-24T03:17:07.182Z"
+    },
+    {
+      "id": "4d0f0824-3cc4-4d54-ab6a-312ceee035c3",
+      "seatId": 4,
+      "sessionToken": "4341fe90b7f53dbc616e1b94b0de0b89908885b79c49815a8871b0148da17f44",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.695Z",
+      "endedAt": "2026-10-24T03:17:07.195Z"
+    },
+    {
+      "id": "3b5e5bdf-4bcd-4da2-8464-96880501f364",
+      "seatId": 5,
+      "sessionToken": "488fe66bd277fd7691027558bdd9fd8eeff460c46139daa7d721ef6a029ba79a",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.712Z",
+      "endedAt": "2026-10-24T03:17:07.203Z"
+    },
+    {
+      "id": "552f6103-3652-45be-82ed-d039667f912c",
+      "seatId": 6,
+      "sessionToken": "a55e5d8c1820d6eec214313bd9a7e8d0539c3dbfd0d3d060248f4fc988397f53",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.730Z",
+      "endedAt": "2026-10-24T03:17:07.216Z"
+    },
+    {
+      "id": "ba5071b2-f34c-4016-81ea-cfd0d46e1177",
+      "seatId": 7,
+      "sessionToken": "8d631e17e84eea5283fa1a3e4dccefa4f80b9e3dd245af46968742f6212dfafc",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.745Z",
+      "endedAt": "2026-10-24T03:17:07.229Z"
+    },
+    {
+      "id": "7fe65f89-832d-46b8-9521-eddd69df417d",
+      "seatId": 8,
+      "sessionToken": "4dd95ff66030c9bb2ed2607923357930125b9ab0fe48acf9e412cb5c1f8bed69",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.755Z",
+      "endedAt": "2026-10-24T03:17:07.240Z"
+    },
+    {
+      "id": "3c2609eb-982f-4e39-a631-88402dc2594f",
+      "seatId": 9,
+      "sessionToken": "decedd1ed714f792b9bce0d360bd88bbd3da47e712917cf82d9180ee3b09fd9f",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.769Z",
+      "endedAt": "2026-10-24T03:17:07.253Z"
+    },
+    {
+      "id": "090d54f1-5095-4e8b-8dbc-a10c9fbd94ea",
+      "seatId": 10,
+      "sessionToken": "d3c8f95386ed6383cb5aa5e7e245170500ccc0f85f93f1754865d64fda587725",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.779Z",
+      "endedAt": "2026-10-24T03:17:07.264Z"
+    },
+    {
+      "id": "8c621a7f-2352-43d9-80ef-ae39ac020fba",
+      "seatId": 11,
+      "sessionToken": "f3692cc33255d8fed704ba3c75973ee5a5d64a911b0f9525390e7ca4a3d8745e",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.790Z",
+      "endedAt": "2026-10-24T03:17:07.276Z"
+    },
+    {
+      "id": "abd5a3b6-b940-4b2a-903b-0572129a5c1e",
+      "seatId": 12,
+      "sessionToken": "589dc9e0b80a3152cf1dfc00b86468c927116db8474ba68e43f8a5d317d76c78",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.802Z",
+      "endedAt": "2026-10-24T03:17:07.287Z"
+    },
+    {
+      "id": "37113d21-0406-4e06-bdd5-02258d10ef01",
+      "seatId": 13,
+      "sessionToken": "de6842f2c673dd552ed2e5eba68b7fb11ae5daac6ef20cd9f97c1ee735e5fc5f",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.811Z",
+      "endedAt": "2026-10-24T03:17:07.297Z"
+    },
+    {
+      "id": "0e2d189f-978e-4fd1-a30b-9cba879c5519",
+      "seatId": 14,
+      "sessionToken": "6178d7b739d04ca63a5ddda76948c33859947838935b33b839044d28f195755a",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.824Z",
+      "endedAt": "2026-10-24T03:17:07.310Z"
+    },
+    {
+      "id": "6e2e397d-2fef-4d30-9429-ce0fa0620aef",
+      "seatId": 15,
+      "sessionToken": "70a93b6154e4df4bec0d70bc1ac97b98aa0d697c83b80c420a527e872a13fc96",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.833Z",
+      "endedAt": "2026-10-24T03:17:07.319Z"
+    },
+    {
+      "id": "2ce259b9-fef0-48a2-9d73-3ae586856b36",
+      "seatId": 16,
+      "sessionToken": "074bd4ed2d6fc535bea6621c4d7c5679f230a838d3c4819cbb23be1549fcf378",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.843Z",
+      "endedAt": "2026-10-24T03:17:07.332Z"
+    },
+    {
+      "id": "8eb49d9d-73f0-4933-b956-0e4aef164e81",
+      "seatId": 17,
+      "sessionToken": "afd52f6a3aa6e2a87454fac89f89ccf844503a49649645a8e0e3700cf1ada12e",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.854Z",
+      "endedAt": "2026-10-24T03:17:07.344Z"
+    },
+    {
+      "id": "2ca4718a-1310-46ad-95c1-d9e41b70d58d",
+      "seatId": 18,
+      "sessionToken": "6884f0ea2c715b28a5e34d136eddff76461d623a3db04eea5814bb12eca66cfe",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.866Z",
+      "endedAt": "2026-10-24T03:17:07.354Z"
+    },
+    {
+      "id": "e6ede39d-4d86-48b5-958f-115c807aee50",
+      "seatId": 19,
+      "sessionToken": "d401094abae958c7082bc320e014770f08567c60e2b4c3b263f85d982857f7bd",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.883Z",
+      "endedAt": "2026-10-24T03:17:07.366Z"
+    },
+    {
+      "id": "0910b253-0a11-498b-9cc8-6983c97375bc",
+      "seatId": 20,
+      "sessionToken": "4babf60997114364eac201b1d98048626dc103f506a203830309a4cff198d985",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:03.896Z",
+      "endedAt": "2026-10-24T03:17:07.378Z"
+    },
+    {
+      "id": "3b1f41fe-05e2-4693-b090-3bd5ba93f275",
+      "seatId": 25,
+      "sessionToken": "0bb5a6bb32e99e58fcd89c51f0e1acc5a56e0d5722ddc2b231a150d7247c56cd",
+      "status": "ACTIVE",
+      "startedAt": "2026-10-24T03:17:08.893Z"
+    },
+    {
+      "id": "sess-26-1792811828907",
+      "seatId": 26,
+      "sessionToken": "token-1792811828907",
+      "status": "ACTIVE",
+      "startedAt": "2026-10-24T03:17:08.907Z"
+    },
+    {
+      "id": "6d1fd8a6-c048-4e71-ba2c-f0160c3dcf3a",
+      "seatId": 0,
+      "sessionToken": "a009f5381d0793fce1bef6f9febe3327ef5767ca9b323b28952cd8a1b4a9c0f8",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T03:17:08.911Z",
+      "endedAt": "2026-10-24T03:17:08.921Z"
     }
   ],
   "menuCategories": [
@@ -1410,6 +1637,981 @@
           "updatedAt": "2026-10-22T23:23:50.486Z"
         }
       ]
+    },
+    {
+      "id": "bd294a42-a94c-45ba-a7dd-633c5aba9714",
+      "sessionId": "sess-25-1792811789581",
+      "seatId": 25,
+      "orderNumber": "ORD-9634",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:16:29.634Z",
+      "items": [
+        {
+          "id": "59d5e404-1615-40d2-918d-d9d6f56eef3d",
+          "orderId": "bd294a42-a94c-45ba-a7dd-633c5aba9714",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:16:29.634Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "713c797b-f077-4043-9dfd-62d4284efbf2",
+      "sessionId": "5c3f833d-5876-4fb0-b6a9-4112a6ac125a",
+      "seatId": 25,
+      "orderNumber": "ORD-7623",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:16:47.623Z",
+      "items": [
+        {
+          "id": "683660e8-4bbd-46c5-8b10-693b84ffb1b8",
+          "orderId": "713c797b-f077-4043-9dfd-62d4284efbf2",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:16:47.623Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "c0794833-63b7-48b5-be4e-e1764082848c",
+      "sessionId": "5c3f833d-5876-4fb0-b6a9-4112a6ac125a",
+      "seatId": 25,
+      "orderNumber": "ORD-7657",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:16:47.657Z",
+      "items": [
+        {
+          "id": "b3427593-3f7e-4fe6-a60d-2dacc240be9f",
+          "orderId": "c0794833-63b7-48b5-be4e-e1764082848c",
+          "menuItemId": 4,
+          "nameSnapshot": "Dosa (2pcs)",
+          "priceSnapshot": 50,
+          "quantity": 1,
+          "notes": "Extra Kebab",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:16:47.657Z"
+        }
+      ],
+      "totalAmount": 50,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "59a7d5f1-5de0-4c24-97a1-50184516a6fc",
+      "sessionId": "0e8a84d1-f5e8-4a4a-8533-a531e771e54f",
+      "seatId": 0,
+      "orderNumber": "ORD-6693",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:16:56.693Z",
+      "items": [
+        {
+          "id": "aa84fcb4-990c-481f-b53d-7bc552f7f0ef",
+          "orderId": "59a7d5f1-5de0-4c24-97a1-50184516a6fc",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 1,
+          "notes": "Takeaway Parcel Pack",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:16:56.693Z"
+        }
+      ],
+      "totalAmount": 120
+    },
+    {
+      "id": "dd0c8fcd-5fa2-450e-a58a-3766c76f3a16",
+      "sessionId": "8ca7b5f3-91e8-4ac5-8715-d95f19ab3ae1",
+      "seatId": 7,
+      "orderNumber": "ORD-6710",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:16:56.710Z",
+      "items": [
+        {
+          "id": "809f30f5-ca53-4693-aa1a-bd8b6f915d81",
+          "orderId": "dd0c8fcd-5fa2-450e-a58a-3766c76f3a16",
+          "menuItemId": 2,
+          "nameSnapshot": "Plain Soup",
+          "priceSnapshot": 25,
+          "quantity": 1,
+          "notes": "Starters",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:16:56.710Z"
+        }
+      ],
+      "totalAmount": 25
+    },
+    {
+      "id": "24bccff5-6b71-403c-a5c5-bce18fc8f395",
+      "sessionId": "8ca7b5f3-91e8-4ac5-8715-d95f19ab3ae1",
+      "seatId": 7,
+      "orderNumber": "ORD-6719",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:16:56.719Z",
+      "items": [
+        {
+          "id": "8ed5380b-b596-43bc-b525-094012fa7212",
+          "orderId": "24bccff5-6b71-403c-a5c5-bce18fc8f395",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Main Course",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:16:56.719Z"
+        }
+      ],
+      "totalAmount": 240
+    },
+    {
+      "id": "27537108-c3cd-4f2a-be48-dd8cbdd13d65",
+      "sessionId": "4e14e6e1-de00-488f-9011-a5d02947ba61",
+      "seatId": 1,
+      "orderNumber": "ORD-3638",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.638Z",
+      "items": [
+        {
+          "id": "68398262-e0e2-4752-bef9-2e7c83182dbf",
+          "orderId": "27537108-c3cd-4f2a-be48-dd8cbdd13d65",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:04.941Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "0ddfdeb1-51de-4353-884a-644ebf98388b",
+          "orderId": "27537108-c3cd-4f2a-be48-dd8cbdd13d65",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:04.967Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 620
+    },
+    {
+      "id": "0ee87f39-ba9f-460b-927c-7e016efd02ae",
+      "sessionId": "6c7618f0-5883-4ab2-8bed-b54babb8aa51",
+      "seatId": 2,
+      "orderNumber": "ORD-3660",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.660Z",
+      "items": [
+        {
+          "id": "50d76b29-1c06-41f8-bff4-0045e316f7a5",
+          "orderId": "0ee87f39-ba9f-460b-927c-7e016efd02ae",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:04.993Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "d984876d-f50a-4e5f-9794-2b689747d700",
+          "orderId": "0ee87f39-ba9f-460b-927c-7e016efd02ae",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.017Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 650
+    },
+    {
+      "id": "1ba22e67-cf53-4d2d-bbe5-4f9fde1cd699",
+      "sessionId": "0db34409-ac9b-4011-a7c8-3315ed811f47",
+      "seatId": 3,
+      "orderNumber": "ORD-3676",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.676Z",
+      "items": [
+        {
+          "id": "240ac4e1-1eaa-491a-a2e4-4bcf2984c798",
+          "orderId": "1ba22e67-cf53-4d2d-bbe5-4f9fde1cd699",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.043Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "5daf89ea-3ba3-4606-acd3-f94f112de8ba",
+          "orderId": "1ba22e67-cf53-4d2d-bbe5-4f9fde1cd699",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.075Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 340
+    },
+    {
+      "id": "88470bb9-39e8-4de0-8685-108f722eb82d",
+      "sessionId": "4d0f0824-3cc4-4d54-ab6a-312ceee035c3",
+      "seatId": 4,
+      "orderNumber": "ORD-3695",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.695Z",
+      "items": [
+        {
+          "id": "3268c0ea-b44b-4adf-a565-f59dcd6111a5",
+          "orderId": "88470bb9-39e8-4de0-8685-108f722eb82d",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.102Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "4f7bbc97-04fa-479f-85e4-8a18adc85eee",
+          "orderId": "88470bb9-39e8-4de0-8685-108f722eb82d",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.128Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 480
+    },
+    {
+      "id": "4cb8a753-0807-4075-a02d-2bd42414c277",
+      "sessionId": "3b5e5bdf-4bcd-4da2-8464-96880501f364",
+      "seatId": 5,
+      "orderNumber": "ORD-3712",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.712Z",
+      "items": [
+        {
+          "id": "fc0527e1-63ab-432d-9a6a-8d05332b7ec1",
+          "orderId": "4cb8a753-0807-4075-a02d-2bd42414c277",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.155Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "64d357a6-d877-44ab-bb23-ffe6a112cf8e",
+          "orderId": "4cb8a753-0807-4075-a02d-2bd42414c277",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.179Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 490
+    },
+    {
+      "id": "a7267677-13a0-4121-b88e-da9e6f57e1d4",
+      "sessionId": "552f6103-3652-45be-82ed-d039667f912c",
+      "seatId": 6,
+      "orderNumber": "ORD-3730",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.730Z",
+      "items": [
+        {
+          "id": "09222958-c0bb-4d26-bd86-b890d2f949de",
+          "orderId": "a7267677-13a0-4121-b88e-da9e6f57e1d4",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.202Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "a414ee39-2b17-4a32-955b-1b149bcc4d44",
+          "orderId": "a7267677-13a0-4121-b88e-da9e6f57e1d4",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.229Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 620
+    },
+    {
+      "id": "760286a8-3ef3-47c1-a91d-1b9ddbb871f9",
+      "sessionId": "ba5071b2-f34c-4016-81ea-cfd0d46e1177",
+      "seatId": 7,
+      "orderNumber": "ORD-3745",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.745Z",
+      "items": [
+        {
+          "id": "0476842a-2820-47a3-8167-9023d9927a39",
+          "orderId": "760286a8-3ef3-47c1-a91d-1b9ddbb871f9",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.257Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "43c39c53-5414-42dc-9a70-8970e596684c",
+          "orderId": "760286a8-3ef3-47c1-a91d-1b9ddbb871f9",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.289Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 650
+    },
+    {
+      "id": "0afdb1d7-47c6-4b76-98d6-a04186bf11df",
+      "sessionId": "7fe65f89-832d-46b8-9521-eddd69df417d",
+      "seatId": 8,
+      "orderNumber": "ORD-3756",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.756Z",
+      "items": [
+        {
+          "id": "6b0fc171-ac03-434b-9ae0-e6fe3b89fce3",
+          "orderId": "0afdb1d7-47c6-4b76-98d6-a04186bf11df",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.317Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "65a6f2e8-9753-4e88-93fd-3bb3e9eecc5b",
+          "orderId": "0afdb1d7-47c6-4b76-98d6-a04186bf11df",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.343Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 340
+    },
+    {
+      "id": "0d032f9e-ff6a-4b81-b1b4-c202255006d6",
+      "sessionId": "3c2609eb-982f-4e39-a631-88402dc2594f",
+      "seatId": 9,
+      "orderNumber": "ORD-3769",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.769Z",
+      "items": [
+        {
+          "id": "139c61ed-80ed-440c-82fb-79624847ebc0",
+          "orderId": "0d032f9e-ff6a-4b81-b1b4-c202255006d6",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.366Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "629e9d7f-b0b3-4682-a7d4-57ca99c868d8",
+          "orderId": "0d032f9e-ff6a-4b81-b1b4-c202255006d6",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.395Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 480
+    },
+    {
+      "id": "4c210a0a-d553-4198-ab78-683624bf6ad2",
+      "sessionId": "090d54f1-5095-4e8b-8dbc-a10c9fbd94ea",
+      "seatId": 10,
+      "orderNumber": "ORD-3779",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:03.779Z",
+      "items": [
+        {
+          "id": "07b28b51-93ee-48f2-bfb8-20bd1659f920",
+          "orderId": "4c210a0a-d553-4198-ab78-683624bf6ad2",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.419Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "01329cef-2777-404b-8946-fb025c894b8e",
+          "orderId": "4c210a0a-d553-4198-ab78-683624bf6ad2",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.447Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 490
+    },
+    {
+      "id": "118d6669-cb34-4b90-8587-efcc70de03a2",
+      "sessionId": "8c621a7f-2352-43d9-80ef-ae39ac020fba",
+      "seatId": 11,
+      "orderNumber": "ORD-3790",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_MOBILE",
+      "waiterId": 3,
+      "placedAt": "2026-10-24T03:17:03.790Z",
+      "items": [
+        {
+          "id": "48d46203-fbed-47cc-8531-b0a210d31b47",
+          "orderId": "118d6669-cb34-4b90-8587-efcc70de03a2",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.477Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "c7a64be6-c965-44bd-aa69-00f60053e8f6",
+          "orderId": "118d6669-cb34-4b90-8587-efcc70de03a2",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.507Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 620
+    },
+    {
+      "id": "9e53f639-87f1-4ed1-a67e-00a1876e4171",
+      "sessionId": "abd5a3b6-b940-4b2a-903b-0572129a5c1e",
+      "seatId": 12,
+      "orderNumber": "ORD-3802",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_MOBILE",
+      "waiterId": 1,
+      "placedAt": "2026-10-24T03:17:03.802Z",
+      "items": [
+        {
+          "id": "9ece5bdb-d0a2-40cf-a70f-b975782e7e7e",
+          "orderId": "9e53f639-87f1-4ed1-a67e-00a1876e4171",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.545Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "a5eda493-c36d-4970-bd4d-b92e8f10f042",
+          "orderId": "9e53f639-87f1-4ed1-a67e-00a1876e4171",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.574Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 650
+    },
+    {
+      "id": "49f31d24-ae16-400d-88a7-ecba1d862d2e",
+      "sessionId": "37113d21-0406-4e06-bdd5-02258d10ef01",
+      "seatId": 13,
+      "orderNumber": "ORD-3811",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_MOBILE",
+      "waiterId": 2,
+      "placedAt": "2026-10-24T03:17:03.811Z",
+      "items": [
+        {
+          "id": "fcd03cf7-f909-4ad4-bb11-2bc328cfaa3e",
+          "orderId": "49f31d24-ae16-400d-88a7-ecba1d862d2e",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.604Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "0be7d752-1aac-422f-bc20-c37fdfd2c083",
+          "orderId": "49f31d24-ae16-400d-88a7-ecba1d862d2e",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.633Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 340
+    },
+    {
+      "id": "fbc3f4d8-8ee0-41a2-968f-27d762810ec2",
+      "sessionId": "0e2d189f-978e-4fd1-a30b-9cba879c5519",
+      "seatId": 14,
+      "orderNumber": "ORD-3824",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_MOBILE",
+      "waiterId": 3,
+      "placedAt": "2026-10-24T03:17:03.824Z",
+      "items": [
+        {
+          "id": "963b18db-2015-4397-ac84-ab286db33f31",
+          "orderId": "fbc3f4d8-8ee0-41a2-968f-27d762810ec2",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.668Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "56dadfec-e51e-4897-9f13-1ac235e56110",
+          "orderId": "fbc3f4d8-8ee0-41a2-968f-27d762810ec2",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.711Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 480
+    },
+    {
+      "id": "b692a2c5-7301-4d86-ab59-ce8b628f2488",
+      "sessionId": "6e2e397d-2fef-4d30-9429-ce0fa0620aef",
+      "seatId": 15,
+      "orderNumber": "ORD-3833",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_MOBILE",
+      "waiterId": 1,
+      "placedAt": "2026-10-24T03:17:03.833Z",
+      "items": [
+        {
+          "id": "b7b56825-b068-4fdd-88c9-20744dd6cf4c",
+          "orderId": "b692a2c5-7301-4d86-ab59-ce8b628f2488",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.744Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "619c66d0-aebc-4b2c-a1b8-1b8bf829dbf9",
+          "orderId": "b692a2c5-7301-4d86-ab59-ce8b628f2488",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.782Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 490
+    },
+    {
+      "id": "68c04415-acde-4c85-b8c9-16d7143bb24f",
+      "sessionId": "2ce259b9-fef0-48a2-9d73-3ae586856b36",
+      "seatId": 16,
+      "orderNumber": "ORD-3843",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_TABLET",
+      "waiterId": 2,
+      "placedAt": "2026-10-24T03:17:03.843Z",
+      "items": [
+        {
+          "id": "537a74e5-466b-4788-afb7-ee2e09ebb68d",
+          "orderId": "68c04415-acde-4c85-b8c9-16d7143bb24f",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.822Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "ea844609-869f-43b2-a216-cdf44812a409",
+          "orderId": "68c04415-acde-4c85-b8c9-16d7143bb24f",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.858Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 620
+    },
+    {
+      "id": "1362cd0c-0fe1-4899-99f8-31debcc8b98c",
+      "sessionId": "8eb49d9d-73f0-4933-b956-0e4aef164e81",
+      "seatId": 17,
+      "orderNumber": "ORD-3854",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_TABLET",
+      "waiterId": 3,
+      "placedAt": "2026-10-24T03:17:03.854Z",
+      "items": [
+        {
+          "id": "c7da6621-f5d4-441f-9354-6d635b7bc94b",
+          "orderId": "1362cd0c-0fe1-4899-99f8-31debcc8b98c",
+          "menuItemId": 22,
+          "nameSnapshot": "Mutton Biryani",
+          "priceSnapshot": 280,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.889Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "db979b13-1c71-438a-bc97-b7dfb354603e",
+          "orderId": "1362cd0c-0fe1-4899-99f8-31debcc8b98c",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.925Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 650
+    },
+    {
+      "id": "252f8562-7109-42a1-bb46-ed34190feba5",
+      "sessionId": "2ca4718a-1310-46ad-95c1-d9e41b70d58d",
+      "seatId": 18,
+      "orderNumber": "ORD-3867",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_TABLET",
+      "waiterId": 1,
+      "placedAt": "2026-10-24T03:17:03.867Z",
+      "items": [
+        {
+          "id": "61fe0c4d-292d-47cf-85fa-e2abb4889aeb",
+          "orderId": "252f8562-7109-42a1-bb46-ed34190feba5",
+          "menuItemId": 21,
+          "nameSnapshot": "Biryani Rice",
+          "priceSnapshot": 90,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.958Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "c0ccacd0-7f0b-4c16-a971-5d6422f91261",
+          "orderId": "252f8562-7109-42a1-bb46-ed34190feba5",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:05.992Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 340
+    },
+    {
+      "id": "19fd0eee-c5fd-4e1e-bd34-92916fcfcdb0",
+      "sessionId": "e6ede39d-4d86-48b5-958f-115c807aee50",
+      "seatId": 19,
+      "orderNumber": "ORD-3883",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_TABLET",
+      "waiterId": 2,
+      "placedAt": "2026-10-24T03:17:03.883Z",
+      "items": [
+        {
+          "id": "ae975052-19d7-435f-93c8-c873c8b051cf",
+          "orderId": "19fd0eee-c5fd-4e1e-bd34-92916fcfcdb0",
+          "menuItemId": 18,
+          "nameSnapshot": "Chicken Kabab",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:06.024Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "c6f8a97b-04cf-4d19-9c01-97c8a09936bc",
+          "orderId": "19fd0eee-c5fd-4e1e-bd34-92916fcfcdb0",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:06.058Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 480
+    },
+    {
+      "id": "f61c9ab6-4c72-48c9-afec-da462b13589b",
+      "sessionId": "0910b253-0a11-498b-9cc8-6983c97375bc",
+      "seatId": 20,
+      "orderNumber": "ORD-3896",
+      "overallStage": "PAID",
+      "createdByRole": "WAITER_TABLET",
+      "waiterId": 3,
+      "placedAt": "2026-10-24T03:17:03.896Z",
+      "items": [
+        {
+          "id": "5fd8717e-a34a-4ee2-be04-273bc92c904f",
+          "orderId": "f61c9ab6-4c72-48c9-afec-da462b13589b",
+          "menuItemId": 13,
+          "nameSnapshot": "Chicken Fry",
+          "priceSnapshot": 160,
+          "quantity": 2,
+          "notes": "Spicy",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:06.102Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        },
+        {
+          "id": "dc9c0ea1-14ab-446a-8eb3-2bf63c8c09ac",
+          "orderId": "f61c9ab6-4c72-48c9-afec-da462b13589b",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 1,
+          "notes": "Regular",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:06.137Z",
+          "bumpedByChefId": 7,
+          "deliveredByWaiterId": 1
+        }
+      ],
+      "totalAmount": 490
+    },
+    {
+      "id": "0f43d038-f5f4-4822-be90-32e9188f8204",
+      "sessionId": "3b1f41fe-05e2-4693-b090-3bd5ba93f275",
+      "seatId": 25,
+      "orderNumber": "ORD-8894",
+      "overallStage": "PLACED",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:08.894Z",
+      "items": [
+        {
+          "id": "a838b7ac-559d-4aa3-aa20-2e27aa79349c",
+          "orderId": "0f43d038-f5f4-4822-be90-32e9188f8204",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 3,
+          "notes": null,
+          "itemStage": "QUEUED",
+          "updatedAt": "2026-10-24T03:17:08.894Z"
+        }
+      ],
+      "totalAmount": 510
+    },
+    {
+      "id": "f775b56c-1f5d-447c-874a-aaedd95c9b86",
+      "sessionId": "6d1fd8a6-c048-4e71-ba2c-f0160c3dcf3a",
+      "seatId": 0,
+      "orderNumber": "ORD-8911",
+      "overallStage": "PAID",
+      "createdByRole": "MANAGER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T03:17:08.911Z",
+      "items": [
+        {
+          "id": "a638ed39-fee3-4ee1-a08f-64c15afcc53d",
+          "orderId": "f775b56c-1f5d-447c-874a-aaedd95c9b86",
+          "menuItemId": 20,
+          "nameSnapshot": "Chicken Biryani",
+          "priceSnapshot": 170,
+          "quantity": 2,
+          "notes": null,
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T03:17:08.911Z"
+        }
+      ],
+      "totalAmount": 340
     }
   ],
   "payments": [
@@ -1427,6 +2629,381 @@
       "settledByRole": "WAITER",
       "staffId": 1,
       "completedAt": "2026-10-22T23:23:50.654Z"
+    },
+    {
+      "id": "7c170f18-6ad7-46d8-81c6-e4bca6d37c62",
+      "sessionId": "sess-25-1792811789581",
+      "seatId": 25,
+      "subtotal": 240,
+      "taxAmount": 12,
+      "discountAmount": 0,
+      "finalAmount": 252,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811807584_E48A6247",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:16:47.584Z"
+    },
+    {
+      "id": "5384a785-1e86-478f-ab51-9ed6b5725de6",
+      "sessionId": "5c3f833d-5876-4fb0-b6a9-4112a6ac125a",
+      "seatId": 25,
+      "subtotal": 290,
+      "taxAmount": 14.5,
+      "discountAmount": 0,
+      "finalAmount": 304.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811807666_6C60EDDB",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:16:47.666Z"
+    },
+    {
+      "id": "bf21021e-b4c9-4ba6-81b4-1dba0c398528",
+      "sessionId": "0e8a84d1-f5e8-4a4a-8533-a531e771e54f",
+      "seatId": 0,
+      "subtotal": 120,
+      "taxAmount": 6,
+      "discountAmount": 0,
+      "finalAmount": 126,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811816701_671685B0",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:16:56.701Z"
+    },
+    {
+      "id": "a3eaf42b-d5af-4bf2-b153-0cdcb77c51e0",
+      "sessionId": "8ca7b5f3-91e8-4ac5-8715-d95f19ab3ae1",
+      "seatId": 7,
+      "subtotal": 265,
+      "taxAmount": 13.25,
+      "discountAmount": 0,
+      "finalAmount": 278.25,
+      "gateway": "UPI",
+      "gatewayPaymentId": "PAY_1792811816737_429267CA",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:16:56.737Z"
+    },
+    {
+      "id": "7c2fcd85-801b-43d9-9613-5c5ef4fdded6",
+      "sessionId": "4e14e6e1-de00-488f-9011-a5d02947ba61",
+      "seatId": 1,
+      "subtotal": 620,
+      "taxAmount": 31,
+      "discountAmount": 0,
+      "finalAmount": 651,
+      "gateway": "RAZORPAY",
+      "gatewayPaymentId": "TXN-SELF-1-1792811827157",
+      "status": "SUCCESS",
+      "settledByRole": "CUSTOMER_SELF",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:17:07.155Z"
+    },
+    {
+      "id": "a97e029f-e85e-4984-828b-0cfddaccdb7f",
+      "sessionId": "6c7618f0-5883-4ab2-8bed-b54babb8aa51",
+      "seatId": 2,
+      "subtotal": 650,
+      "taxAmount": 32.5,
+      "discountAmount": 0,
+      "finalAmount": 682.5,
+      "gateway": "UPI",
+      "gatewayPaymentId": "TXN-SELF-2-1792811827168",
+      "status": "SUCCESS",
+      "settledByRole": "CUSTOMER_SELF",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:17:07.167Z"
+    },
+    {
+      "id": "9f16bdc6-a345-4f8d-8690-2b337d61ac27",
+      "sessionId": "0db34409-ac9b-4011-a7c8-3315ed811f47",
+      "seatId": 3,
+      "subtotal": 340,
+      "taxAmount": 17,
+      "discountAmount": 0,
+      "finalAmount": 357,
+      "gateway": "RAZORPAY",
+      "gatewayPaymentId": "TXN-SELF-3-1792811827181",
+      "status": "SUCCESS",
+      "settledByRole": "CUSTOMER_SELF",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:17:07.182Z"
+    },
+    {
+      "id": "e8bd91ee-9756-41da-af90-495ea4132fdc",
+      "sessionId": "4d0f0824-3cc4-4d54-ab6a-312ceee035c3",
+      "seatId": 4,
+      "subtotal": 480,
+      "taxAmount": 24,
+      "discountAmount": 0,
+      "finalAmount": 504,
+      "gateway": "UPI",
+      "gatewayPaymentId": "TXN-SELF-4-1792811827196",
+      "status": "SUCCESS",
+      "settledByRole": "CUSTOMER_SELF",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:17:07.195Z"
+    },
+    {
+      "id": "ae357090-00e9-4a03-ad87-31c779166528",
+      "sessionId": "3b5e5bdf-4bcd-4da2-8464-96880501f364",
+      "seatId": 5,
+      "subtotal": 490,
+      "taxAmount": 24.5,
+      "discountAmount": 0,
+      "finalAmount": 514.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827203_7DE8F21F",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 3,
+      "completedAt": "2026-10-24T03:17:07.203Z"
+    },
+    {
+      "id": "6d7268fc-dfa4-4070-83dc-90bfb8921f49",
+      "sessionId": "552f6103-3652-45be-82ed-d039667f912c",
+      "seatId": 6,
+      "subtotal": 620,
+      "taxAmount": 31,
+      "discountAmount": 0,
+      "finalAmount": 651,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827216_2B4FC262",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 1,
+      "completedAt": "2026-10-24T03:17:07.216Z"
+    },
+    {
+      "id": "625120aa-6060-4e7c-ac32-3c6b9df0c3e6",
+      "sessionId": "ba5071b2-f34c-4016-81ea-cfd0d46e1177",
+      "seatId": 7,
+      "subtotal": 650,
+      "taxAmount": 32.5,
+      "discountAmount": 0,
+      "finalAmount": 682.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827229_2EA6FC56",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 2,
+      "completedAt": "2026-10-24T03:17:07.229Z"
+    },
+    {
+      "id": "947f1c20-8696-43c4-8333-aa9572da9434",
+      "sessionId": "7fe65f89-832d-46b8-9521-eddd69df417d",
+      "seatId": 8,
+      "subtotal": 340,
+      "taxAmount": 17,
+      "discountAmount": 0,
+      "finalAmount": 357,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827240_8DCE45A4",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 3,
+      "completedAt": "2026-10-24T03:17:07.240Z"
+    },
+    {
+      "id": "3a250424-7fe8-4359-bc97-89b020b3a22b",
+      "sessionId": "3c2609eb-982f-4e39-a631-88402dc2594f",
+      "seatId": 9,
+      "subtotal": 480,
+      "taxAmount": 24,
+      "discountAmount": 0,
+      "finalAmount": 504,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827253_9BB10CB1",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 1,
+      "completedAt": "2026-10-24T03:17:07.253Z"
+    },
+    {
+      "id": "b834e430-8b33-4ab5-b6f2-ab38f9535b6d",
+      "sessionId": "090d54f1-5095-4e8b-8dbc-a10c9fbd94ea",
+      "seatId": 10,
+      "subtotal": 490,
+      "taxAmount": 24.5,
+      "discountAmount": 0,
+      "finalAmount": 514.5,
+      "gateway": "UPI",
+      "gatewayPaymentId": "PAY_1792811827264_2B1886EA",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 1,
+      "completedAt": "2026-10-24T03:17:07.264Z"
+    },
+    {
+      "id": "f77462ee-1d73-41b1-9fc5-3c65d2e03c4e",
+      "sessionId": "8c621a7f-2352-43d9-80ef-ae39ac020fba",
+      "seatId": 11,
+      "subtotal": 620,
+      "taxAmount": 31,
+      "discountAmount": 0,
+      "finalAmount": 651,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827276_8100D950",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 1,
+      "completedAt": "2026-10-24T03:17:07.276Z"
+    },
+    {
+      "id": "2a654646-9013-4084-a977-55b8337261de",
+      "sessionId": "abd5a3b6-b940-4b2a-903b-0572129a5c1e",
+      "seatId": 12,
+      "subtotal": 650,
+      "taxAmount": 32.5,
+      "discountAmount": 0,
+      "finalAmount": 682.5,
+      "gateway": "UPI",
+      "gatewayPaymentId": "PAY_1792811827287_6EF78E56",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 1,
+      "completedAt": "2026-10-24T03:17:07.287Z"
+    },
+    {
+      "id": "eab3d708-d450-4c93-919f-745c470f5d0a",
+      "sessionId": "37113d21-0406-4e06-bdd5-02258d10ef01",
+      "seatId": 13,
+      "subtotal": 340,
+      "taxAmount": 17,
+      "discountAmount": 0,
+      "finalAmount": 357,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827297_2A9614C4",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 2,
+      "completedAt": "2026-10-24T03:17:07.297Z"
+    },
+    {
+      "id": "aabe1701-3cbf-4c89-b173-48f5d546c444",
+      "sessionId": "0e2d189f-978e-4fd1-a30b-9cba879c5519",
+      "seatId": 14,
+      "subtotal": 480,
+      "taxAmount": 24,
+      "discountAmount": 0,
+      "finalAmount": 504,
+      "gateway": "UPI",
+      "gatewayPaymentId": "PAY_1792811827310_8CF09AF6",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 2,
+      "completedAt": "2026-10-24T03:17:07.310Z"
+    },
+    {
+      "id": "e75d8acd-f534-4458-97ac-0eb9f1779a5a",
+      "sessionId": "6e2e397d-2fef-4d30-9429-ce0fa0620aef",
+      "seatId": 15,
+      "subtotal": 490,
+      "taxAmount": 24.5,
+      "discountAmount": 0,
+      "finalAmount": 514.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827320_3A0B9796",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 2,
+      "completedAt": "2026-10-24T03:17:07.319Z"
+    },
+    {
+      "id": "bea157c8-3b9e-4a3a-bb52-fa0097a93539",
+      "sessionId": "2ce259b9-fef0-48a2-9d73-3ae586856b36",
+      "seatId": 16,
+      "subtotal": 620,
+      "taxAmount": 31,
+      "discountAmount": 0,
+      "finalAmount": 651,
+      "gateway": "UPI",
+      "gatewayPaymentId": "PAY_1792811827332_15EFF4BF",
+      "status": "SUCCESS",
+      "settledByRole": "WAITER",
+      "staffId": 2,
+      "completedAt": "2026-10-24T03:17:07.332Z"
+    },
+    {
+      "id": "dc59dad9-55f9-4529-ba84-9da5430d8be3",
+      "sessionId": "8eb49d9d-73f0-4933-b956-0e4aef164e81",
+      "seatId": 17,
+      "subtotal": 650,
+      "taxAmount": 32.5,
+      "discountAmount": 0,
+      "finalAmount": 682.5,
+      "gateway": "UPI",
+      "gatewayPaymentId": "PAY_1792811827344_CDCCC94B",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": 99,
+      "completedAt": "2026-10-24T03:17:07.344Z"
+    },
+    {
+      "id": "fd875e7e-4d1e-4485-98c9-564b3b666ba5",
+      "sessionId": "2ca4718a-1310-46ad-95c1-d9e41b70d58d",
+      "seatId": 18,
+      "subtotal": 340,
+      "taxAmount": 17,
+      "discountAmount": 0,
+      "finalAmount": 357,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827354_44036F20",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": 99,
+      "completedAt": "2026-10-24T03:17:07.354Z"
+    },
+    {
+      "id": "7890dc41-4b58-452e-a5a1-9018de6097ec",
+      "sessionId": "e6ede39d-4d86-48b5-958f-115c807aee50",
+      "seatId": 19,
+      "subtotal": 480,
+      "taxAmount": 24,
+      "discountAmount": 0,
+      "finalAmount": 504,
+      "gateway": "STRIPE",
+      "gatewayPaymentId": "PAY_1792811827366_08649552",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": 99,
+      "completedAt": "2026-10-24T03:17:07.366Z"
+    },
+    {
+      "id": "d5049e47-8e11-4f82-a36a-103eed83fb47",
+      "sessionId": "0910b253-0a11-498b-9cc8-6983c97375bc",
+      "seatId": 20,
+      "subtotal": 490,
+      "taxAmount": 24.5,
+      "discountAmount": 0,
+      "finalAmount": 514.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811827379_96E2204D",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": 99,
+      "completedAt": "2026-10-24T03:17:07.378Z"
+    },
+    {
+      "id": "d55a2a96-da6d-4fd7-8176-c648da61eede",
+      "sessionId": "6d1fd8a6-c048-4e71-ba2c-f0160c3dcf3a",
+      "seatId": 0,
+      "subtotal": 340,
+      "taxAmount": 17,
+      "discountAmount": 0,
+      "finalAmount": 357,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792811828922_72C4C645",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T03:17:08.921Z"
     }
   ],
   "users": [
@@ -1486,5 +3063,6 @@
       "assignedZone": null,
       "isActive": true
     }
-  ]
+  ],
+  "serviceAlerts": []
 }

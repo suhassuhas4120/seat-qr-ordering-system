@@ -214,8 +214,18 @@ export default function CustomerCartPage() {
       realtimeBridge.clearActiveBillRequest(chairId);
 
       router.push(`/seat/${chairId}/tracking`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Order dispatch error:', err);
+      if (err?.message?.includes('SEAT_ALREADY_OCCUPIED') || err?.message?.includes('occupied')) {
+        alert('This table has just been occupied by another customer. Please scan a vacant table.');
+        router.replace(`/seat/${chairId}`);
+        return;
+      }
+      if (err?.message?.includes('ACTIVE_SESSION_EXISTS')) {
+        alert(err.message || 'You currently have an unsettled dining session at another table.');
+        router.replace(`/seat/${chairId}`);
+        return;
+      }
       router.push(`/seat/${chairId}/tracking`);
     } finally {
       setIsSubmitting(false);

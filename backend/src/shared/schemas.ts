@@ -16,6 +16,7 @@ export const OrderItemInputSchema = z.object({
 export const PlaceOrderInputSchema = z.object({
   seatId: z.number().int().nonnegative(),
   sessionToken: z.string().min(16).optional(),
+  deviceToken: z.string().optional(),
   items: z.array(OrderItemInputSchema).min(1),
   createdByRole: z.enum(['CUSTOMER', 'WAITER_MOBILE', 'WAITER_TABLET', 'MANAGER']).default('CUSTOMER'),
   waiterId: z.number().int().positive().optional(),

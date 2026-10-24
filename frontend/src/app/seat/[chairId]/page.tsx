@@ -25,6 +25,7 @@ export default function CustomerSeatPage() {
     isOwner: boolean;
     ticketNumber?: string;
     orderStatus?: string;
+    activeSeatIdForDevice?: number | null;
   }>({ isOccupied: false, isOwner: false });
   const [isLoadingOccupancy, setIsLoadingOccupancy] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -104,10 +105,17 @@ export default function CustomerSeatPage() {
   }`;
 
   // SCENARIO 1: Device Locked to Another Seat (Customer placed an unpaid order from Seat X and scans Seat Y)
+  const lockedTargetSeat = activeSession?.seatId || (occupancy.activeSeatIdForDevice ? String(occupancy.activeSeatIdForDevice) : '');
+
   const isLockedToDifferentSeat =
-    activeSession &&
-    activeSession.seatId !== chairId &&
-    activeSession.paymentStatus === 'unpaid';
+    (activeSession &&
+      activeSession.seatId !== chairId &&
+      activeSession.paymentStatus === 'unpaid') ||
+    Boolean(
+      occupancy.activeSeatIdForDevice !== undefined &&
+      occupancy.activeSeatIdForDevice !== null &&
+      String(occupancy.activeSeatIdForDevice) !== chairId
+    );
 
   // SCENARIO 2: Seat Occupied by Another Customer (Stranger scans Seat X which is already occupied)
   const isOccupiedByAnotherGuest =
@@ -121,7 +129,7 @@ export default function CustomerSeatPage() {
     (occupancy.isOccupied && occupancy.isOwner);
 
   // --- VIEW 1: LOCKED TO DIFFERENT SEAT ---
-  if (isLockedToDifferentSeat && activeSession) {
+  if (isLockedToDifferentSeat && (activeSession || lockedTargetSeat)) {
     return (
       <div className="min-h-screen w-full bg-white text-black flex flex-col items-center justify-between px-6 py-10 max-w-md mx-auto">
         {/* Header Notice */}
@@ -140,17 +148,17 @@ export default function CustomerSeatPage() {
 
           <div className="flex flex-col gap-1.5">
             <h2 className="text-lg font-black tracking-tight text-zinc-950 uppercase">
-              Active Order At Seat {activeSession.seatId}
+              Active Order At Seat {(activeSession?.seatId || lockedTargetSeat)}
             </h2>
             <p className="text-xs text-zinc-600 font-medium max-w-xs leading-relaxed">
-              You currently have an unsettled feast (Ticket #{activeSession.ticketNumber}) placed from <strong>Seat {activeSession.seatId}</strong>.
+              You currently have an unsettled feast (Ticket #{activeSession.ticketNumber}) placed from <strong>Seat {(activeSession?.seatId || lockedTargetSeat)}</strong>.
             </p>
           </div>
 
           <div className="w-full bg-zinc-50 border border-zinc-300 rounded-xl p-3.5 text-left text-xs font-semibold flex flex-col gap-2">
             <div className="flex justify-between items-center text-zinc-700">
               <span>Your Active Seat:</span>
-              <span className="font-bold text-black uppercase">Seat {activeSession.seatId}</span>
+              <span className="font-bold text-black uppercase">Seat {(activeSession?.seatId || lockedTargetSeat)}</span>
             </div>
             <div className="flex justify-between items-center text-zinc-700">
               <span>Ticket ID:</span>
@@ -165,37 +173,25 @@ export default function CustomerSeatPage() {
           </div>
 
           <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">
-            To prevent cross-table ordering errors, you cannot place orders from Seat {seatNumber} until your meal at Seat {activeSession.seatId} is concluded.
+            To prevent cross-table ordering errors, you cannot place orders from Seat {seatNumber} until your meal at Seat {(activeSession?.seatId || lockedTargetSeat)} is concluded.
           </p>
         </div>
 
-        {/* Action Buttons: Return to active seat */}
+          {/* Action Buttons: Return to active seat (NO fresh order bypass allowed) */}
         <div className="w-full flex flex-col gap-2.5 pb-4">
           <Link
-            href={`/seat/${activeSession.seatId}/tracking`}
+            href={`/seat/${(activeSession?.seatId || lockedTargetSeat)}/tracking`}
             className="w-full border-2 border-black bg-black text-white py-3.5 text-xs font-black uppercase tracking-wider text-center rounded-xl flex items-center justify-center gap-2 cursor-pointer active:opacity-80 shadow-md"
           >
-            <span>Return to Seat {activeSession.seatId} Order</span>
+            <span>Return to Seat {(activeSession?.seatId || lockedTargetSeat)} Order</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
-          <button
-            type="button"
-            onClick={() => {
-              clearActiveDiningSession();
-              setActiveSession(null);
-              router.push(`/seat/${chairId}/menu`);
-            }}
-            className="w-full border-2 border-amber-600 bg-amber-500 hover:bg-amber-400 text-slate-950 py-3.5 text-xs font-black uppercase tracking-wider text-center rounded-xl cursor-pointer active:opacity-90 shadow-sm flex items-center justify-center gap-2"
-          >
-            <span>Start Fresh Order at Seat {seatNumber} →</span>
-          </button>
-
           <Link
-            href={`/seat/${activeSession.seatId}/bill`}
+            href={`/seat/${(activeSession?.seatId || lockedTargetSeat)}/bill`}
             className="w-full border border-black bg-white text-black py-2.5 text-xs font-black uppercase tracking-wider text-center rounded-xl cursor-pointer active:bg-zinc-100"
           >
-            Pay Seat ${activeSession.seatId} Bill
+            Pay Seat {(activeSession?.seatId || lockedTargetSeat)} Bill
           </Link>
         </div>
       </div>
