@@ -327,18 +327,18 @@ export default function KitchenDisplayPage() {
     }
   };
 
-  // Bump individual dish stage sequentially (Kitchen workflow: RECEIVED -> PREPARING -> READY -> SERVED)
+  // Bump individual dish stage sequentially (Kitchen workflow: RECEIVED -> PREPARING -> READY)
   const handleBumpItem = async (itemId: string, currentStage: string) => {
     let nextStage: string = 'COOKING';
     if (currentStage === 'QUEUED') nextStage = 'COOKING';
     else if (currentStage === 'COOKING') nextStage = 'READY';
-    else if (currentStage === 'READY') nextStage = 'SERVED';
+    else if (currentStage === 'READY') return; // Kitchen authority stops at READY; waitstaff serves at the table
 
     await handleSetItemStage(itemId, nextStage);
   };
 
   // Bump entire order for that specific column in one atomic action
-  const handleBumpAll = async (order: any, nextStage: 'COOKING' | 'READY' | 'SERVED') => {
+  const handleBumpAll = async (order: any, nextStage: 'COOKING' | 'READY') => {
     try {
       const itemIds = new Set((order.items || []).map((it: any) => it.id));
       const chairId = order.seat?.seatNumber
@@ -638,7 +638,6 @@ export default function KitchenDisplayPage() {
                     columnStage="READY"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
-                    onBumpAll={() => handleBumpAll(order, 'SERVED')}
                   />
                 ))
               )}
@@ -868,23 +867,17 @@ function TicketCard({
               )}
 
               {columnStage === 'READY' && (
-                <button
-                  type="button"
-                  onClick={() => onBumpItem(item.id, 'READY')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border-2 border-emerald-500/60 font-black text-xs transition-all active:scale-95 cursor-pointer shadow-sm group"
-                  title="Check to mark served / plated"
-                >
-                  <Square className="w-4 h-4 stroke-[2.5] group-hover:hidden" />
-                  <CheckSquare className="w-4 h-4 stroke-[2.5] hidden group-hover:block" />
-                  <span className="text-[11px] uppercase tracking-wider font-extrabold">Serve ✓</span>
-                </button>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider cursor-default select-none">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Ready</span>
+                </div>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Card Footer Master Bump Button (matches sketch: Mark all dishes are cooking/ready/served) */}
+      {/* Card Footer Master Bump Button (matches sketch: Mark all dishes are cooking/ready) */}
       {columnStage === 'RECEIVED' && onBumpAll && (
         <button
           type="button"
@@ -904,17 +897,6 @@ function TicketCard({
         >
           <span>Mark All Ready ({totalItems} Items)</span>
           <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      )}
-
-      {columnStage === 'READY' && onBumpAll && (
-        <button
-          type="button"
-          onClick={onBumpAll}
-          className="w-full py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-        >
-          <span>Mark All Served ({totalItems} Items)</span>
-          <CheckCircle2 className="w-3.5 h-3.5" />
         </button>
       )}
     </div>
