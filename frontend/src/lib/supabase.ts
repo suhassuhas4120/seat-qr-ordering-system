@@ -1349,8 +1349,6 @@ export const realtimeBridge = {
           (o.order.ticket_number && tNum.split(/[•,\s]+/).some((part) => part.trim() === o.order.ticket_number));
         if (isTargetChair && isTargetTicket) {
           o.items.forEach((it) => {
-            if (hasUpdatedLocally) return;
-
             const isExactMatch = Boolean(
               (targetItemId && it.id && it.id === targetItemId) ||
               (itemIdOrKey && it.id && it.id === itemIdOrKey) ||

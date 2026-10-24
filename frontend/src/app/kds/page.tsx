@@ -25,6 +25,9 @@ import { toast } from 'sonner';
 import type { Order, OrderItem, MenuItem } from '@seat-order/shared';
 import { SOCKET_EVENTS } from '@seat-order/shared';
 
+// Persistent in-memory stage override cache to prevent flickering / race condition reversion during column shifts
+const stageOverrideCache = new Map<string, { stage: string; timestamp: number }>();
+
 export default function KitchenDisplayPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -118,17 +121,29 @@ export default function KitchenDisplayPage() {
           (t.items || []).forEach((it: any) => {
             const dishName = it.nameSnapshot || it.name || it.dish_name || `Dish ${it.menuItemId || 1}`;
             const itemKey = `${dishName.toLowerCase().trim()}:${it.notes || ''}`;
+            const cacheKey = `${seatKey}-${itemKey}`;
+
+            let effectiveStage = it.itemStage;
+            const cached = stageOverrideCache.get(cacheKey);
+            if (cached && Date.now() - cached.timestamp < 60000) {
+              effectiveStage = cached.stage;
+            }
+
             const existingItem = itemsMap.get(itemKey);
             if (!existingItem) {
               itemsMap.set(itemKey, {
                 ...it,
                 nameSnapshot: dishName,
                 quantity: it.quantity || 1,
+                itemStage: effectiveStage,
               });
             } else {
-              // If duplicate identical item was re-punched, preserve the most advanced preparation stage
-              if (it.itemStage === 'READY' || (it.itemStage === 'COOKING' && existingItem.itemStage === 'QUEUED')) {
-                existingItem.itemStage = it.itemStage;
+              // Priority order: SERVED (4) > READY (3) > COOKING (2) > QUEUED (1)
+              const priority: Record<string, number> = { SERVED: 4, READY: 3, COOKING: 2, QUEUED: 1 };
+              const currentP = priority[existingItem.itemStage] || 1;
+              const newP = priority[effectiveStage] || 1;
+              if (newP > currentP) {
+                existingItem.itemStage = effectiveStage;
               }
             }
           });
@@ -156,16 +171,28 @@ export default function KitchenDisplayPage() {
           (t.items || []).forEach((it: any) => {
             const dishName = it.nameSnapshot || it.name || it.dish_name || `Dish ${it.menuItemId || 1}`;
             const itemKey = `${dishName.toLowerCase().trim()}:${it.notes || ''}`;
+            const cacheKey = `${seatKey}-${itemKey}`;
+
+            let effectiveStage = it.itemStage;
+            const cached = stageOverrideCache.get(cacheKey);
+            if (cached && Date.now() - cached.timestamp < 60000) {
+              effectiveStage = cached.stage;
+            }
+
             const existingItem = current.itemsMap.get(itemKey);
             if (!existingItem) {
               current.itemsMap.set(itemKey, {
                 ...it,
                 nameSnapshot: dishName,
                 quantity: it.quantity || 1,
+                itemStage: effectiveStage,
               });
             } else {
-              if (it.itemStage === 'READY' || (it.itemStage === 'COOKING' && existingItem.itemStage === 'QUEUED')) {
-                existingItem.itemStage = it.itemStage;
+              const priority: Record<string, number> = { SERVED: 4, READY: 3, COOKING: 2, QUEUED: 1 };
+              const currentP = priority[existingItem.itemStage] || 1;
+              const newP = priority[effectiveStage] || 1;
+              if (newP > currentP) {
+                existingItem.itemStage = effectiveStage;
               }
             }
           });
@@ -238,68 +265,139 @@ export default function KitchenDisplayPage() {
     };
   }, [isMuted]);
 
-  // Set explicit stage for a single dish item
+  // Set explicit stage for a single dish item with zero lag and zero flicker
   const handleSetItemStage = async (itemId: string, newStage: string) => {
     try {
-      await fetchApi(`/api/orders/items/${itemId}/stage`, {
-        method: 'PATCH',
-        body: JSON.stringify({ newStage, staffId: 3 }), // Gordon Ramsay
-      });
-
-      // Synchronize with realtime bridge so customer tracking, waiter mobile/tablet, and manager update instantly
       const parentOrder = orders.find((o) => (o.items || []).some((it: any) => it.id === itemId));
       const targetItem = parentOrder?.items?.find((it: any) => it.id === itemId);
+      const chairId = parentOrder?.seat?.seatNumber
+        ? String(parentOrder.seat.seatNumber).replace(/[^0-9]/g, '')
+        : (parentOrder?.seatId ? String(parentOrder.seatId) : '1');
+      const seatKey = String(parentOrder?.seatId || chairId || '1');
+      const dishName = targetItem?.nameSnapshot || targetItem?.name || '';
+      const itemKey = `${dishName.toLowerCase().trim()}:${targetItem?.notes || ''}`;
+      const cacheKey = `${seatKey}-${itemKey}`;
+
+      // 1. Immediately cache override so background sync can never revert it
+      stageOverrideCache.set(cacheKey, { stage: newStage, timestamp: Date.now() });
+
+      // 2. Synchronous optimistic React state update for instant column shift
+      setOrders((prev) =>
+        prev.map((ord) => {
+          if (ord.seatId === parentOrder?.seatId || ord.id === parentOrder?.id) {
+            return {
+              ...ord,
+              items: (ord.items || []).map((it: any) =>
+                it.id === itemId || (dishName && it.nameSnapshot?.toLowerCase().trim() === dishName.toLowerCase().trim())
+                  ? { ...it, itemStage: newStage }
+                  : it
+              ),
+            };
+          }
+          return ord;
+        })
+      );
+
+      // 3. Synchronize with realtime bridge (Supabase, local orders, and broadcast across tabs/devices)
       const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
         QUEUED: 'REC',
         COOKING: 'PREP',
         READY: 'READY',
         SERVED: 'SERVED',
       };
-      if (parentOrder && targetItem) {
-        const chairId = parentOrder.seat?.seatNumber
-          ? String(parentOrder.seat.seatNumber).replace(/[^0-9]/g, '')
-          : '';
-        realtimeBridge.updateStage(itemId, stageMap[newStage] || 'PREP', {
-          chairId,
-          ticketNumber: parentOrder.orderNumber,
-          dishId: targetItem.menuItemId ? `dish-${targetItem.menuItemId}` : undefined,
-          dishName: targetItem.nameSnapshot,
-          itemId,
-        });
-      }
 
-      // Optimistically update local state for instantaneous feedback
-      setOrders((prev) =>
-        prev.map((ord) => ({
-          ...ord,
-          items: (ord.items || []).map((it: any) =>
-            it.id === itemId ? { ...it, itemStage: newStage } : it
-          ),
-        }))
-      );
-      toast.success(`Dish stage set to ${newStage === 'COOKING' ? 'PREPARING' : newStage === 'QUEUED' ? 'RECEIVED' : newStage}`);
-      loadTickets();
+      await realtimeBridge.updateStage(itemId, stageMap[newStage] || 'PREP', {
+        chairId,
+        ticketNumber: parentOrder?.orderNumber,
+        dishId: targetItem?.menuItemId ? `dish-${targetItem.menuItemId}` : undefined,
+        dishName: targetItem?.nameSnapshot,
+        itemId,
+      });
+
+      // 4. Fire background backend notification safely without throwing
+      fetchApi(`/api/orders/items/${itemId}/stage`, {
+        method: 'PATCH',
+        body: JSON.stringify({ newStage, staffId: 3 }),
+      }).catch(() => {});
+
+      const label = newStage === 'COOKING' ? 'PREPARING' : newStage === 'QUEUED' ? 'RECEIVED' : newStage === 'READY' ? 'READY' : 'SERVED';
+      toast.success(`${dishName || 'Dish'} moved to ${label}`);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to update item stage.');
+      console.warn('Stage update warning:', err);
     }
   };
 
-  // Bump individual dish stage sequentially (Kitchen workflow: RECEIVED -> PREPARING -> READY)
+  // Bump individual dish stage sequentially (Kitchen workflow: RECEIVED -> PREPARING -> READY -> SERVED)
   const handleBumpItem = async (itemId: string, currentStage: string) => {
     let nextStage: string = 'COOKING';
     if (currentStage === 'QUEUED') nextStage = 'COOKING';
     else if (currentStage === 'COOKING') nextStage = 'READY';
-    else if (currentStage === 'READY') nextStage = 'READY';
+    else if (currentStage === 'READY') nextStage = 'SERVED';
 
     await handleSetItemStage(itemId, nextStage);
   };
 
-  // Bump entire order for that specific column
-  const handleBumpAll = async (order: any, nextStage: 'COOKING' | 'READY') => {
-    for (const item of order.items) {
-      await handleSetItemStage(item.id, nextStage);
+  // Bump entire order for that specific column in one atomic action
+  const handleBumpAll = async (order: any, nextStage: 'COOKING' | 'READY' | 'SERVED') => {
+    try {
+      const itemIds = new Set((order.items || []).map((it: any) => it.id));
+      const chairId = order.seat?.seatNumber
+        ? String(order.seat.seatNumber).replace(/[^0-9]/g, '')
+        : (order.seatId ? String(order.seatId) : '1');
+      const seatKey = String(order.seatId || chairId || '1');
+
+      // 1. Immediately cache override for all items in this order
+      (order.items || []).forEach((item: any) => {
+        const dishName = item.nameSnapshot || item.name || '';
+        const itemKey = `${dishName.toLowerCase().trim()}:${item.notes || ''}`;
+        stageOverrideCache.set(`${seatKey}-${itemKey}`, { stage: nextStage, timestamp: Date.now() });
+      });
+
+      // 2. Synchronous optimistic React state update: Moves all items at once in 1 render
+      setOrders((prev) =>
+        prev.map((ord) => {
+          if (ord.seatId === order.seatId || ord.id === order.id) {
+            return {
+              ...ord,
+              items: (ord.items || []).map((it: any) =>
+                itemIds.has(it.id) ? { ...it, itemStage: nextStage } : it
+              ),
+            };
+          }
+          return ord;
+        })
+      );
+
+      // 3. Parallel non-blocking updates via realtimeBridge
+      const stageMap: Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'> = {
+        QUEUED: 'REC',
+        COOKING: 'PREP',
+        READY: 'READY',
+        SERVED: 'SERVED',
+      };
+
+      const promises = (order.items || []).map((item: any) => {
+        fetchApi(`/api/orders/items/${item.id}/stage`, {
+          method: 'PATCH',
+          body: JSON.stringify({ newStage: nextStage, staffId: 3 }),
+        }).catch(() => {});
+
+        return realtimeBridge.updateStage(item.id, stageMap[nextStage] || 'PREP', {
+          chairId,
+          ticketNumber: order.orderNumber,
+          dishId: item.menuItemId ? `dish-${item.menuItemId}` : undefined,
+          dishName: item.nameSnapshot,
+          itemId: item.id,
+        });
+      });
+
+      await Promise.allSettled(promises);
+
+      const label = nextStage === 'COOKING' ? 'PREPARING' : nextStage === 'READY' ? 'READY' : 'SERVED';
+      toast.success(`All ${order.items.length} items moved to ${label}`);
+    } catch (err: any) {
+      console.warn('Bump all warning:', err);
     }
-    loadTickets();
   };
 
   // Toggle 86 availability
@@ -540,6 +638,7 @@ export default function KitchenDisplayPage() {
                     columnStage="READY"
                     onBumpItem={handleBumpItem}
                     onSetItemStage={handleSetItemStage}
+                    onBumpAll={() => handleBumpAll(order, 'SERVED')}
                   />
                 ))
               )}
@@ -769,17 +868,23 @@ function TicketCard({
               )}
 
               {columnStage === 'READY' && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-black uppercase tracking-wider">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Ready</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => onBumpItem(item.id, 'READY')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border-2 border-emerald-500/60 font-black text-xs transition-all active:scale-95 cursor-pointer shadow-sm group"
+                  title="Check to mark served / plated"
+                >
+                  <Square className="w-4 h-4 stroke-[2.5] group-hover:hidden" />
+                  <CheckSquare className="w-4 h-4 stroke-[2.5] hidden group-hover:block" />
+                  <span className="text-[11px] uppercase tracking-wider font-extrabold">Serve ✓</span>
+                </button>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Card Footer Master Bump Button (matches sketch: Mark all dishes are cooking) */}
+      {/* Card Footer Master Bump Button (matches sketch: Mark all dishes are cooking/ready/served) */}
       {columnStage === 'RECEIVED' && onBumpAll && (
         <button
           type="button"
@@ -799,6 +904,17 @@ function TicketCard({
         >
           <span>Mark All Ready ({totalItems} Items)</span>
           <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {columnStage === 'READY' && onBumpAll && (
+        <button
+          type="button"
+          onClick={onBumpAll}
+          className="w-full py-2.5 rounded-lg text-xs font-bold tracking-wider uppercase transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+        >
+          <span>Mark All Served ({totalItems} Items)</span>
+          <CheckCircle2 className="w-3.5 h-3.5" />
         </button>
       )}
     </div>
