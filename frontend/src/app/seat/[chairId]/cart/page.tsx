@@ -3,17 +3,30 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Heart, Minus, Plus, Bell, ShoppingBag, ArrowRight } from 'lucide-react';
+import {
+  ChevronLeft,
+  Minus,
+  Plus,
+  Bell,
+  ShoppingBag,
+  ArrowRight,
+  Trash2,
+  Edit3,
+  Loader2,
+  Sparkles,
+  MessageSquare,
+  AlertCircle,
+} from 'lucide-react';
 import { useCart } from '../../../../lib/context/CartContext';
 import CustomerBottomNav from '../../../../components/navigation/CustomerBottomNav';
 import { useHardwareBack } from '../../../../lib/hooks/useHardwareBack';
 import { realtimeBridge, OrderItemRecord } from '../../../../lib/supabase';
-import { 
-  setActiveDiningSession, 
+import {
+  setActiveDiningSession,
   getActiveDiningSession,
   clearActiveDiningSession,
-  getDeviceToken, 
-  isDeviceLockedToDifferentSeat 
+  getDeviceToken,
+  isDeviceLockedToDifferentSeat,
 } from '../../../../lib/session/diningSession';
 import { getMenuItemById } from '../../../../lib/data/menuData';
 
@@ -22,6 +35,8 @@ export default function CustomerCartPage() {
   const router = useRouter();
   const chairId = (params?.chairId as string) || '12';
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tableNote, setTableNote] = useState('');
+  const [activeSessionInfo, setActiveSessionInfo] = useState<any>(null);
 
   // Anti-Cheat & Seat Occupancy Guard on mount
   useEffect(() => {
@@ -41,6 +56,18 @@ export default function CustomerCartPage() {
       }
     }
     checkOccupancy();
+
+    // Check existing dining session
+    const currentSession = getActiveDiningSession();
+    const cleanChair = chairId.replace(/[^0-9]/g, '');
+    const cleanSessionSeat = (currentSession?.seatId || '').replace(/[^0-9]/g, '');
+    if (
+      currentSession &&
+      (cleanSessionSeat === cleanChair || currentSession.seatId === chairId) &&
+      currentSession.paymentStatus === 'unpaid'
+    ) {
+      setActiveSessionInfo(currentSession);
+    }
   }, [chairId, router]);
 
   // Device hardware back button & swipe back: return to menu
@@ -54,10 +81,12 @@ export default function CustomerCartPage() {
     return Object.keys(items).filter((id) => (items[id]?.quantity || 0) > 0);
   }, [items]);
 
-  // Slidable suggestions to complement meal
-  const extraItems = ['5', '6', '8', '10', '13', '14'].filter((id) => !activeItemIds.includes(id));
+  // Slidable military hotel suggestions to complement meal
+  const extraItems = ['dish-18', 'dish-21', 'dish-13', 'dish-5', 'dish-6', 'dish-10'].filter(
+    (id) => !activeItemIds.includes(id) && !activeItemIds.includes(id.replace(/^dish-/, ''))
+  );
 
-  // Compute live subtotal, GST (5%), and total
+  // Compute live subtotal, GST (5%), and total with add-ons surcharge
   const subtotal = useMemo(() => {
     return activeItemIds.reduce((sum, id) => {
       const entry = items[id];
@@ -70,6 +99,12 @@ export default function CustomerCartPage() {
 
   const gstAmount = Math.round(subtotal * 0.05);
   const grandTotal = subtotal + gstAmount;
+
+  const handleClearCart = () => {
+    if (window.confirm('Clear all dishes from your dining tray?')) {
+      clearCart();
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (isSubmitting || activeItemIds.length === 0) return;
@@ -89,6 +124,9 @@ export default function CustomerCartPage() {
         }
         if (cartEntry?.specialInstructions) {
           notesParts.push(`Note: ${cartEntry.specialInstructions}`);
+        }
+        if (tableNote.trim()) {
+          notesParts.push(`Table Request: ${tableNote.trim()}`);
         }
         const notes = notesParts.length > 0 ? notesParts.join(' • ') : undefined;
         const uniqueId = `item-${chairId}-${id}-${nowTs}-${idx}`;
@@ -140,7 +178,8 @@ export default function CustomerCartPage() {
         clearActiveDiningSession();
       }
 
-      if (typeof window !== 'undefined') {
+      // Only clear cached dispatched tickets if this is a fresh new session
+      if (!isSameSession && typeof window !== 'undefined') {
         const cleanC = chairId.replace(/[^0-9]/g, '');
         try {
           localStorage.removeItem(`thoogudeepa_ticket_dispatched_${chairId}`);
@@ -203,6 +242,22 @@ export default function CustomerCartPage() {
             addons: oi.addons,
           }));
 
+      // Preserve existing items if this is an additional ordering round
+      let finalItems = authoritativeItems;
+      if (isSameSession && (!tab.items || tab.items.length === 0) && existingSession?.items?.length) {
+        const mappedPrev = existingSession.items.map((it) => ({
+          id: it.id,
+          dish_id: it.dish_id || it.id,
+          title: it.title || 'Dish',
+          quantity: it.quantity,
+          price: it.price,
+          stage: it.stage || ('PLACED' as const),
+          notes: it.notes || '',
+          addons: it.addons || [],
+        }));
+        finalItems = [...mappedPrev, ...authoritativeItems];
+      }
+
       const storedCustName = typeof window !== 'undefined'
         ? (sessionStorage.getItem(`thoogudeepa_customer_name_${chairId}`) || localStorage.getItem(`thoogudeepa_customer_name_${chairId}`) || undefined)
         : undefined;
@@ -217,7 +272,7 @@ export default function CustomerCartPage() {
         totalAmount: authoritativeTotal,
         deviceToken,
         customerName: isSameSession ? (existingSession.customerName || storedCustName) : storedCustName,
-        items: authoritativeItems,
+        items: finalItems,
       });
 
       // Clear tray after dispatch and reset any previous bill requests for fresh ordering
@@ -266,15 +321,48 @@ export default function CustomerCartPage() {
             </span>
           </div>
 
-          {/* Right Notification Bell */}
-          <Link
-            href={`/seat/${chairId}/assistant?from=${encodeURIComponent(`/seat/${chairId}/cart`)}`}
-            className="w-10 h-10 border border-[rgba(220,226,222,0.8)] rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-[#FFFEFC] text-[#244436] shadow-2xs"
-            aria-label="Assistant & Call Waiter"
-          >
-            <Bell className="w-5 h-5" />
-          </Link>
+          {/* Right Action: Call Waiter or Clear Cart */}
+          <div className="flex items-center gap-2">
+            {activeItemIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearCart}
+                className="w-10 h-10 border border-red-200 rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-red-50 text-red-600 shadow-2xs"
+                title="Clear Tray"
+                aria-label="Clear Tray"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <Link
+              href={`/seat/${chairId}/assistant?from=${encodeURIComponent(`/seat/${chairId}/cart`)}`}
+              className="w-10 h-10 border border-[rgba(220,226,222,0.8)] rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-[#FFFEFC] text-[#244436] shadow-2xs"
+              aria-label="Assistant & Call Waiter"
+            >
+              <Bell className="w-5 h-5" />
+            </Link>
+          </div>
         </header>
+
+        {/* Existing Active Tab Banner (if customer is adding more dishes to their table) */}
+        {activeSessionInfo && (
+          <div className="w-full flex items-center justify-between bg-emerald-50/90 border border-emerald-200 rounded-2xl px-3.5 py-2.5 text-xs shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+              <div className="flex flex-col">
+                <span className="font-bold text-[#1A2621]">
+                  Active Meal Tab #{activeSessionInfo.ticketNumber || `ORD-${chairId}`}
+                </span>
+                <span className="text-[10px] text-[#5A6860]">
+                  Running balance: ₹{activeSessionInfo.totalAmount || 0}
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
+              Round 2 Ordering
+            </span>
+          </div>
+        )}
 
         {/* Empty State Banner (Displayed when activeItemIds is 0) */}
         {activeItemIds.length === 0 ? (
@@ -282,7 +370,9 @@ export default function CustomerCartPage() {
             <div className="w-16 h-16 rounded-full border border-[rgba(220,226,222,0.9)] flex items-center justify-center bg-[#F9F8F5]">
               <ShoppingBag className="w-8 h-8 text-[#5A6860]" />
             </div>
-            <span className="text-sm font-black uppercase tracking-wider text-[#1A2621]">Your Tray is Empty</span>
+            <span className="text-sm font-black uppercase tracking-wider text-[#1A2621]">
+              Your Tray is Empty
+            </span>
             <p className="text-xs text-[#5A6860] max-w-xs">
               Explore authentic donne biryani, sizzling kebabs, and country curries from the menu.
             </p>
@@ -296,53 +386,99 @@ export default function CustomerCartPage() {
         ) : (
           /* Active Cart Items List */
           <div className="w-full flex flex-col gap-3.5">
+            <div className="w-full flex items-center justify-between text-xs font-bold text-[#5A6860]">
+              <span>Dishes Selected ({activeItemIds.length})</span>
+              <Link
+                href={`/seat/${chairId}/menu`}
+                className="text-xs text-[#244436] font-bold hover:underline"
+              >
+                + Add More Dishes
+              </Link>
+            </div>
+
             {activeItemIds.map((itemId) => {
               const qty = getItemQuantity(itemId) || 1;
               const dish = getMenuItemById(itemId);
+              const entry = items[itemId];
+              const addOnsCost = entry?.addOnsCost || 0;
+              const lineItemTotal = (dish.price + addOnsCost) * qty;
 
               return (
                 <div
                   key={itemId}
                   className="w-full border border-[rgba(220,226,222,0.8)] rounded-2xl p-3 flex items-center justify-between bg-[#FFFEFC] shadow-[0_4px_16px_-4px_rgba(36,68,54,0.05)] gap-3"
                 >
-                  {/* Circular Image Container */}
-                  <div className="w-16 h-16 rounded-full border border-[rgba(220,226,222,0.9)] overflow-hidden flex items-center justify-center shrink-0 bg-[#fbf9f5] shadow-2xs p-0.5">
+                  {/* Clickable Circular Image Container leading to customization */}
+                  <Link
+                    href={`/seat/${chairId}/item/${itemId}`}
+                    className="w-16 h-16 rounded-full border border-[rgba(220,226,222,0.9)] overflow-hidden flex items-center justify-center shrink-0 bg-[#fbf9f5] shadow-2xs p-0.5 hover:scale-105 transition-transform"
+                    title="Edit dish customization"
+                  >
                     <img
                       src={dish.imageUrl}
                       alt={dish.title}
                       className="w-full h-full object-cover object-center rounded-full"
                       loading="lazy"
                     />
-                  </div>
+                  </Link>
 
-                  {/* Title and Price Section */}
-                  <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs font-bold text-[#1A2621] truncate">
-                      {dish.title}
-                    </span>
-                    {items[itemId]?.selectedOption && (
+                  {/* Title and Customization Details Section */}
+                  <div className="flex-1 flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {/* FSSAI Official Dietary Indicator */}
+                      <span
+                        className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center shrink-0 p-0.5 ${
+                          dish.isVegetarian
+                            ? 'border-emerald-600 bg-emerald-50/60'
+                            : 'border-red-600 bg-red-50/60'
+                        }`}
+                        title={dish.isVegetarian ? 'Vegetarian' : 'Non-Vegetarian'}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            dish.isVegetarian ? 'bg-emerald-600' : 'bg-red-600'
+                          }`}
+                        />
+                      </span>
+
+                      <Link
+                        href={`/seat/${chairId}/item/${itemId}`}
+                        className="text-xs font-bold text-[#1A2621] truncate hover:text-[#244436] hover:underline flex items-center gap-1"
+                        title="Click to customize"
+                      >
+                        <span className="truncate">{dish.title}</span>
+                        <Edit3 className="w-3 h-3 text-[#5A6860] shrink-0 opacity-60" />
+                      </Link>
+                    </div>
+
+                    {entry?.selectedOption && (
                       <span className="text-[10px] font-semibold text-[#244436] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 w-fit">
-                        {items[itemId].selectedOption}
+                        {entry.selectedOption}
                       </span>
                     )}
-                    {items[itemId]?.addOns && items[itemId].addOns!.length > 0 && (
+
+                    {entry?.addOns && entry.addOns.length > 0 && (
                       <span className="text-[10px] text-[#5A6860] line-clamp-1">
-                        + {items[itemId].addOns!.join(', ')}
+                        + {entry.addOns.join(', ')}
                       </span>
                     )}
-                    {items[itemId]?.specialInstructions && (
+
+                    {entry?.specialInstructions && (
                       <span className="text-[10px] italic text-amber-800 line-clamp-1">
-                        Note: &ldquo;{items[itemId].specialInstructions}&rdquo;
+                        Note: &ldquo;{entry.specialInstructions}&rdquo;
                       </span>
                     )}
-                    <span className="text-xs font-black text-[#244436] mt-0.5">
-                      ₹ {(dish.price + (items[itemId]?.addOnsCost || 0)) * qty}
-                      {(items[itemId]?.addOnsCost || 0) > 0 && (
-                        <span className="text-[10px] text-[#5A6860] font-normal ml-1">
-                          (₹{dish.price + (items[itemId]?.addOnsCost || 0)} ea)
+
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-xs font-black text-[#244436]">
+                        ₹ {lineItemTotal}
+                      </span>
+                      {addOnsCost > 0 && (
+                        <span className="text-[10px] text-[#5A6860] font-medium">
+                          (₹{dish.price + addOnsCost} ea)
                         </span>
                       )}
-                    </span>
+                    </div>
                   </div>
 
                   {/* Stepper Pill */}
@@ -373,12 +509,34 @@ export default function CustomerCartPage() {
           </div>
         )}
 
+        {/* General Kitchen & Table Request Input */}
+        {activeItemIds.length > 0 && (
+          <div className="w-full flex flex-col gap-1.5 border border-[rgba(220,226,222,0.8)] rounded-2xl p-3 bg-[#FFFEFC] shadow-2xs">
+            <label
+              htmlFor="table-note"
+              className="text-xs font-black uppercase tracking-wider text-[#1A2621] flex items-center gap-1.5"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-[#244436]" />
+              <span>Table Request / Kitchen Note</span>
+            </label>
+            <input
+              id="table-note"
+              type="text"
+              value={tableNote}
+              onChange={(e) => setTableNote(e.target.value.slice(0, 100))}
+              placeholder="e.g. Serve all dishes together, bring water first..."
+              className="w-full text-xs p-2.5 rounded-xl border border-[rgba(220,226,222,0.9)] bg-[#FAF8F5] text-[#1A2621] placeholder:text-[#8A968F] focus:outline-hidden focus:border-[#244436] focus:bg-white"
+            />
+          </div>
+        )}
+
         {/* Horizontal Slidable Recommendations */}
         {extraItems.length > 0 && (
           <div className="w-full flex flex-col gap-2 pt-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#1A2621]">
-                Recommended Complements
+              <span className="text-xs font-bold uppercase tracking-wider text-[#1A2621] flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#DD6B28]" />
+                <span>Recommended Complements</span>
               </span>
             </div>
 
@@ -392,18 +550,37 @@ export default function CustomerCartPage() {
                     key={extraId}
                     className="w-36 shrink-0 border border-[rgba(220,226,222,0.8)] rounded-2xl p-3 flex flex-col items-center text-center bg-[#FFFEFC] shadow-[0_4px_16px_-4px_rgba(36,68,54,0.05)]"
                   >
-                    <div className="w-14 h-14 rounded-full border border-[rgba(220,226,222,0.9)] overflow-hidden flex items-center justify-center mb-1.5 bg-zinc-100 shadow-2xs">
+                    <Link
+                      href={`/seat/${chairId}/item/${extraId}`}
+                      className="w-14 h-14 rounded-full border border-[rgba(220,226,222,0.9)] overflow-hidden flex items-center justify-center mb-1.5 bg-zinc-100 shadow-2xs hover:scale-105 transition-transform"
+                    >
                       <img
                         src={dish.imageUrl}
                         alt={dish.title}
                         className="w-full h-full object-cover"
                         loading="lazy"
                       />
+                    </Link>
+
+                    <div className="w-full flex items-center justify-center gap-1">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-[2px] border flex items-center justify-center shrink-0 p-0.5 ${
+                          dish.isVegetarian
+                            ? 'border-emerald-600 bg-emerald-50'
+                            : 'border-red-600 bg-red-50'
+                        }`}
+                      >
+                        <span
+                          className={`w-1 h-1 rounded-full ${
+                            dish.isVegetarian ? 'bg-emerald-600' : 'bg-red-600'
+                          }`}
+                        />
+                      </span>
+                      <span className="text-xs font-bold truncate text-[#1A2621]">
+                        {dish.title}
+                      </span>
                     </div>
 
-                    <span className="text-xs font-bold truncate w-full text-[#1A2621]">
-                      {dish.title}
-                    </span>
                     <span className="text-[11px] font-black text-[#244436] mt-0.5">
                       ₹ {dish.price}
                     </span>
@@ -444,7 +621,7 @@ export default function CustomerCartPage() {
 
         {/* Live Bill Breakdown */}
         {activeItemIds.length > 0 && (
-          <div className="w-full flex flex-col gap-2.5 border-t border-[rgba(220,226,222,0.8)] pt-4 text-xs font-semibold bg-[#FFFEFC] p-4 rounded-2xl border shadow-[0_4px_20px_-4px_rgba(36,68,54,0.05)]">
+          <div className="w-full flex flex-col gap-2.5 border border-[rgba(220,226,222,0.8)] text-xs font-semibold bg-[#FFFEFC] p-4 rounded-2xl shadow-[0_4px_20px_-4px_rgba(36,68,54,0.05)]">
             <div className="w-full flex items-center justify-between text-[#5A6860]">
               <span>Subtotal ({activeItemIds.length} dishes)</span>
               <span className="font-bold text-[#1A2621]">₹ {subtotal}</span>
@@ -468,7 +645,7 @@ export default function CustomerCartPage() {
             type="button"
             disabled={isSubmitting}
             onClick={handlePlaceOrder}
-            className="w-full bg-gradient-to-r from-[#244436] via-[#2d5242] to-[#DD6B28] text-white py-3.5 px-5 rounded-2xl flex items-center justify-between shadow-lg cursor-pointer active:scale-[0.99] transition-all disabled:opacity-50 hover:shadow-xl"
+            className="w-full bg-gradient-to-r from-[#244436] via-[#2d5242] to-[#DD6B28] text-white py-3.5 px-5 rounded-2xl flex items-center justify-between shadow-lg cursor-pointer active:scale-[0.99] transition-all disabled:opacity-60 hover:shadow-xl"
           >
             <div className="flex flex-col items-start">
               <span className="text-[10px] font-bold tracking-widest uppercase text-emerald-100">
@@ -481,9 +658,18 @@ export default function CustomerCartPage() {
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-black tracking-wider uppercase">
-                {isSubmitting ? 'Sending to Kitchen...' : 'Send to Kitchen'}
+                {isSubmitting ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Sending to Kitchen...</span>
+                  </span>
+                ) : activeSessionInfo ? (
+                  'Add Dishes to Active Tab'
+                ) : (
+                  'Send to Kitchen'
+                )}
               </span>
-              <ArrowRight className="w-4 h-4" />
+              {!isSubmitting && <ArrowRight className="w-4 h-4" />}
             </div>
           </button>
         </div>
