@@ -85,6 +85,16 @@ export function ScreenM10Menu86Stock() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (realtimeBridge.getPromosAsync) {
+      realtimeBridge.getPromosAsync().then((rules) => {
+        if (rules && Array.isArray(rules) && rules.length > 0) {
+          setPromos(rules.filter((p: PromoRule) => !['pr-0', 'pr-1', 'pr-2'].includes(p.id)));
+        }
+      });
+    }
+  }, []);
+
   // Save promos whenever updated
   const updatePromos = useCallback((newPromos: PromoRule[]) => {
     setPromos(newPromos);

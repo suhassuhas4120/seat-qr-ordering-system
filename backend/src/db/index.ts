@@ -29,6 +29,7 @@ export interface DatabaseState {
   payments: Payment[];
   users: StaffUser[];
   serviceAlerts: any[];
+  promos?: any[];
 }
 
 class InDatabase {
@@ -41,6 +42,7 @@ class InDatabase {
     payments: [],
     users: [],
     serviceAlerts: [],
+    promos: [],
   };
 
   private isWriting = false;
@@ -56,6 +58,7 @@ class InDatabase {
         const raw = fs.readFileSync(STATE_FILE, 'utf-8');
         this.data = JSON.parse(raw);
         if (!this.data.serviceAlerts) this.data.serviceAlerts = [];
+        if (!this.data.promos) this.data.promos = [];
         console.log(`📦 Loaded existing database state from ${STATE_FILE}`);
         this.ensureTakeawaySeat();
         return;

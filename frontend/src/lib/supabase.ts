@@ -158,6 +158,7 @@ export type KDSCallbacks = {
   onCustomerPaidUpi?: (data: { chairId: string; rawChairId?: string; normChairId?: string; amount?: number; ticketNumber?: string }) => void;
   onBillSettled?: (data: { chairId: string; rawChairId?: string; normChairId?: string; amount?: number; paymentMethod?: string; ticketNumber?: string }) => void;
   onCashHandover?: (data: { id: string; staffId: string; staffName: string; amount: number; timestamp: string; receivedBy: string }) => void;
+  onPromosUpdated?: (rules: any[]) => void;
   onClearAll?: () => void;
 };
 
@@ -2426,7 +2427,7 @@ export const realtimeBridge = {
     }
   },
 
-  // Get promotional campaigns
+  // Get promotional campaigns (synchronous cache)
   getPromos(): any[] {
     if (typeof window === 'undefined') return [];
     try {
@@ -2435,6 +2436,23 @@ export const realtimeBridge = {
     } catch {
       return [];
     }
+  },
+
+  // Get promotional campaigns asynchronously with backend REST sync
+  async getPromosAsync(): Promise<any[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`${getBackendUrl()}/api/promos`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            localStorage.setItem('thoogudeepa_v2_promos', JSON.stringify(data));
+            return data;
+          }
+        }
+      } catch {}
+    }
+    return this.getPromos();
   },
 
   // Save promotional campaigns
@@ -2448,6 +2466,11 @@ export const realtimeBridge = {
           rules,
         });
       }
+      fetch(`${getBackendUrl()}/api/promos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rules),
+      }).catch(() => {});
     } catch {}
   },
 
@@ -2820,6 +2843,10 @@ export const realtimeBridge = {
         } else if (data.type === 'AVAILABILITY_CHANGE') {
           activeKdsSubscribers.forEach((cb) => {
             if (cb.onAvailabilityChange) cb.onAvailabilityChange({ dishId: data.dishId, isAvailable: data.isAvailable });
+          });
+        } else if (data.type === 'PROMOS_UPDATED') {
+          activeKdsSubscribers.forEach((cb) => {
+            if (cb.onPromosUpdated) cb.onPromosUpdated(data.rules);
           });
         } else if (data.type === 'CLEAR_ALL_ORDERS') {
           activeKdsSubscribers.forEach((cb) => {

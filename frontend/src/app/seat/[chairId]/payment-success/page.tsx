@@ -103,6 +103,10 @@ function PaymentSuccessContent() {
     realtimeBridge.settleBill(chairId, modeParam, finalAmount);
     clearActiveDiningSession();
     clearCart();
+    try {
+      localStorage.removeItem(`thoogudeepa_applied_promo_${chairId}`);
+      sessionStorage.removeItem(`thoogudeepa_applied_promo_${chairId}`);
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chairId, modeParam, amountParam, tipParam]);
 

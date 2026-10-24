@@ -500,6 +500,20 @@ app.get('/api/manager/stats', async () => {
   };
 });
 
+// 14. Manager Promotional Campaigns & Offers
+app.get('/api/promos', async () => {
+  return (db.data as any).promos || [];
+});
+
+app.post('/api/promos', async (req, reply) => {
+  const body = req.body as any;
+  if (Array.isArray(body)) {
+    (db.data as any).promos = body;
+    db.saveState();
+  }
+  return reply.send({ success: true, count: ((db.data as any).promos || []).length });
+});
+
 // Start Server
 const PORT = Number(process.env.PORT) || 4000;
 const HOST = '0.0.0.0';

@@ -18,6 +18,8 @@ import {
   Loader2,
   Printer,
   Sparkles,
+  X,
+  Check,
 } from 'lucide-react';
 import { useHardwareBack } from '../../../../lib/hooks/useHardwareBack';
 import {
@@ -87,27 +89,152 @@ export default function OrderSummaryBillPage() {
   const normalizeSeatId = (id?: string | null) =>
     (id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
 
-  const handleApplyPromo = () => {
+  // Restore applied promo across page refreshes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = `thoogudeepa_applied_promo_${chairId}`;
+    const savedPromoRaw = localStorage.getItem(storageKey) || sessionStorage.getItem(storageKey);
+    if (!savedPromoRaw) return;
+
+    try {
+      const saved = JSON.parse(savedPromoRaw);
+      if (saved && saved.code) {
+        setPromoCode(saved.code);
+        realtimeBridge.getPromosAsync().then((managerPromos) => {
+          const matched = managerPromos.find(
+            (p: any) => p.code && p.code.trim().toUpperCase() === saved.code.trim().toUpperCase()
+          );
+          if (matched && matched.isActive) {
+            const minBill = Number(matched.minBillAmount) || 0;
+            if (itemsSubtotal > 0 && minBill > 0 && itemsSubtotal < minBill) {
+              setDiscountAmount(0);
+              setPromoMessage({
+                text: `Min order of ₹${minBill} required for ${matched.code}. (Current: ₹${itemsSubtotal})`,
+                isError: true,
+              });
+              localStorage.removeItem(storageKey);
+              sessionStorage.removeItem(storageKey);
+              return;
+            }
+            const percent = Number(matched.discountPercent) || 0;
+            const disc = Math.round((itemsSubtotal * percent) / 100);
+            setDiscountAmount(disc);
+            setPromoMessage({
+              text: `Code ${matched.code} applied! ${percent}% off (saved ₹${disc})`,
+              isError: false,
+            });
+          } else {
+            setDiscountAmount(0);
+            localStorage.removeItem(storageKey);
+            sessionStorage.removeItem(storageKey);
+          }
+        });
+      }
+    } catch {}
+  }, [chairId, itemsSubtotal]);
+
+  const handleApplyPromo = async () => {
     const code = promoCode.trim().toUpperCase();
     if (!code) {
       setPromoMessage({ text: 'Please enter a coupon code', isError: true });
       return;
     }
-    if (code === 'DONNE10') {
-      const disc = Math.round(itemsSubtotal * 0.1);
-      setDiscountAmount(disc);
-      setPromoMessage({ text: `Code DONNE10 applied! 10% off (saved ₹${disc})`, isError: false });
-    } else if (code === 'MILITARY50') {
-      const disc = Math.min(50, itemsSubtotal);
-      setDiscountAmount(disc);
-      setPromoMessage({ text: `Code MILITARY50 applied! Flat ₹50 off`, isError: false });
-    } else if (code === 'FESTIVE') {
-      const disc = Math.round(itemsSubtotal * 0.15);
-      setDiscountAmount(disc);
-      setPromoMessage({ text: `Code FESTIVE applied! 15% off (saved ₹${disc})`, isError: false });
-    } else {
+
+    const storageKey = `thoogudeepa_applied_promo_${chairId}`;
+
+    // Strictly validate against promotional campaigns configured by the Manager
+    const managerPromos = await realtimeBridge.getPromosAsync();
+    const matchedPromo = managerPromos.find(
+      (p: any) => p.code && p.code.trim().toUpperCase() === code
+    );
+
+    if (!matchedPromo) {
       setDiscountAmount(0);
-      setPromoMessage({ text: 'Invalid coupon. Try DONNE10 or MILITARY50', isError: true });
+      setPromoMessage({
+        text: `Invalid coupon "${code}". Only active manager offers are accepted.`,
+        isError: true,
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(storageKey);
+        sessionStorage.removeItem(storageKey);
+      }
+      return;
+    }
+
+    if (!matchedPromo.isActive) {
+      setDiscountAmount(0);
+      setPromoMessage({
+        text: `Offer code "${code}" is currently paused or inactive.`,
+        isError: true,
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(storageKey);
+        sessionStorage.removeItem(storageKey);
+      }
+      return;
+    }
+
+    // Check date validity if configured by manager
+    if (matchedPromo.startDate && matchedPromo.endDate) {
+      const today = new Date().toISOString().split('T')[0];
+      if (today < matchedPromo.startDate || today > matchedPromo.endDate) {
+        setDiscountAmount(0);
+        setPromoMessage({
+          text: `Offer code "${code}" has expired or is not yet active.`,
+          isError: true,
+        });
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(storageKey);
+          sessionStorage.removeItem(storageKey);
+        }
+        return;
+      }
+    }
+
+    // Check minimum bill amount requirement
+    const minBill = Number(matchedPromo.minBillAmount) || 0;
+    if (minBill > 0 && itemsSubtotal < minBill) {
+      setDiscountAmount(0);
+      setPromoMessage({
+        text: `Min order of ₹${minBill} required for ${code}. (Current: ₹${itemsSubtotal})`,
+        isError: true,
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(storageKey);
+        sessionStorage.removeItem(storageKey);
+      }
+      return;
+    }
+
+    // Calculate percentage discount from manager configuration
+    const percent = Number(matchedPromo.discountPercent) || 0;
+    const disc = Math.round((itemsSubtotal * percent) / 100);
+    setDiscountAmount(disc);
+    setPromoMessage({
+      text: `Code ${matchedPromo.code} applied! ${percent}% off (saved ₹${disc})`,
+      isError: false,
+    });
+
+    if (typeof window !== 'undefined') {
+      const payload = JSON.stringify({
+        code: matchedPromo.code,
+        discountPercent: percent,
+        minBillAmount: minBill,
+        title: matchedPromo.title,
+      });
+      localStorage.setItem(storageKey, payload);
+      sessionStorage.setItem(storageKey, payload);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoCode('');
+    setDiscountAmount(0);
+    setPromoMessage(null);
+    if (typeof window !== 'undefined') {
+      const storageKey = `thoogudeepa_applied_promo_${chairId}`;
+      localStorage.removeItem(storageKey);
+      sessionStorage.removeItem(storageKey);
     }
   };
 
@@ -409,6 +536,29 @@ export default function OrderSummaryBillPage() {
           );
         }
       },
+      onPromosUpdated: (rules) => {
+        const storageKey = `thoogudeepa_applied_promo_${chairId}`;
+        const savedPromoRaw = typeof window !== 'undefined' ? (localStorage.getItem(storageKey) || sessionStorage.getItem(storageKey)) : null;
+        if (savedPromoRaw) {
+          try {
+            const saved = JSON.parse(savedPromoRaw);
+            const matched = rules.find((p: any) => p.code && p.code.trim().toUpperCase() === saved.code.trim().toUpperCase());
+            if (matched && matched.isActive) {
+              const percent = Number(matched.discountPercent) || 0;
+              const disc = Math.round((itemsSubtotalRef.current * percent) / 100);
+              setDiscountAmount(disc);
+              setPromoMessage({ text: `Code ${matched.code} applied! ${percent}% off (saved ₹${disc})`, isError: false });
+            } else {
+              setDiscountAmount(0);
+              setPromoMessage({ text: `Applied code "${saved.code}" was paused or removed by manager.`, isError: true });
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem(storageKey);
+                sessionStorage.removeItem(storageKey);
+              }
+            }
+          } catch {}
+        }
+      },
     });
 
     return () => unsub();
@@ -644,26 +794,38 @@ export default function OrderSummaryBillPage() {
                     setPromoCode(e.target.value);
                     if (promoMessage) setPromoMessage(null);
                   }}
-                  placeholder="Enter Coupon (e.g. DONNE10)"
+                  placeholder="Enter Manager Promo Code"
                   className="w-full text-xs font-bold outline-none bg-transparent text-[#1A2621] uppercase placeholder:normal-case placeholder:font-normal placeholder:text-zinc-400"
                 />
               </div>
-              <button
-                type="button"
-                onClick={handleApplyPromo}
-                className="px-4 py-2 border border-[#244436]/30 bg-[#244436] text-white text-xs font-bold rounded-xl uppercase tracking-wider cursor-pointer active:opacity-80 transition-all hover:bg-[#1a3328]"
-              >
-                Apply
-              </button>
+              {discountAmount > 0 ? (
+                <button
+                  type="button"
+                  onClick={handleRemovePromo}
+                  className="px-3 py-2 border border-red-200 bg-red-50 text-red-700 text-xs font-bold rounded-xl uppercase tracking-wider cursor-pointer active:opacity-80 transition-all hover:bg-red-100 flex items-center gap-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Remove</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  className="px-4 py-2 border border-[#244436]/30 bg-[#244436] text-white text-xs font-bold rounded-xl uppercase tracking-wider cursor-pointer active:opacity-80 transition-all hover:bg-[#1a3328]"
+                >
+                  Apply
+                </button>
+              )}
             </div>
 
             {promoMessage && (
               <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 ${
                   promoMessage.isError ? 'text-red-700 bg-red-50' : 'text-emerald-700 bg-emerald-50'
                 }`}
               >
-                {promoMessage.text}
+                {!promoMessage.isError && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                <span>{promoMessage.text}</span>
               </span>
             )}
           </div>
