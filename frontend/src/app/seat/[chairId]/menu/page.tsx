@@ -71,6 +71,55 @@ function CustomerMenuContent() {
     return realtimeBridge.getDishAvailability ? realtimeBridge.getDishAvailability() : {};
   });
 
+  // 3. Scroll Position & Filter Restoration when returning from Item Details
+  useEffect(() => {
+    try {
+      const savedScroll = sessionStorage.getItem(`thoogudeepa_menu_scroll_${chairId}`);
+      const lastItemId = sessionStorage.getItem(`thoogudeepa_menu_last_item_${chairId}`);
+      const savedCat = sessionStorage.getItem(`thoogudeepa_menu_cat_${chairId}`);
+      const savedVeg = sessionStorage.getItem(`thoogudeepa_menu_veg_${chairId}`);
+
+      if (savedCat) setSelectedCategory(savedCat);
+      if (savedVeg === 'true') setVegOnlyFilter(true);
+
+      if (savedScroll || lastItemId) {
+        // Double frame delay to allow DOM nodes and filtered dishes to hydrate
+        const timer = setTimeout(() => {
+          if (lastItemId) {
+            const cleanId = lastItemId.replace(/^dish-/, '');
+            const cardEl =
+              document.getElementById(`dish-card-${lastItemId}`) ||
+              document.getElementById(`dish-card-${cleanId}`) ||
+              document.getElementById(`dish-card-dish-${cleanId}`);
+            if (cardEl) {
+              cardEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+              return;
+            }
+          }
+          if (savedScroll) {
+            const y = parseInt(savedScroll, 10);
+            if (!isNaN(y) && y > 0) {
+              window.scrollTo({ top: y, behavior: 'auto' });
+            }
+          }
+        }, 120);
+
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, [chairId]);
+
+  // Keep live scroll position synchronized in session storage
+  useEffect(() => {
+    const handleScroll = () => {
+      try {
+        sessionStorage.setItem(`thoogudeepa_menu_scroll_${chairId}`, String(window.scrollY));
+      } catch {}
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [chairId]);
+
   // Calculate live subtotal for floating action bar
   const cartSubtotal = useMemo(() => {
     const activeItemIds = Object.keys(items).filter((id) => (items[id]?.quantity || 0) > 0);
@@ -266,6 +315,7 @@ function CustomerMenuContent() {
               return (
                 <div
                   key={item.id}
+                  id={`dish-card-${item.id}`}
                   className={`relative rounded-3xl pt-20 sm:pt-22 pb-3.5 px-3 flex flex-col items-center text-center bg-gradient-to-b from-[#FAF8F5] via-[#F2EFE8] to-[#E5ECE5] border border-[#DCE4DC] shadow-[0_12px_28px_-6px_rgba(50,70,55,0.1)] transition-all ${
                     !available ? 'opacity-60 grayscale-[30%]' : 'hover:shadow-[0_16px_34px_-6px_rgba(50,70,55,0.15)]'
                   }`}
@@ -274,6 +324,14 @@ function CustomerMenuContent() {
                   <Link
                     href={`/seat/${chairId}/item/${item.id}`}
                     prefetch={false}
+                    onClick={() => {
+                      try {
+                        sessionStorage.setItem(`thoogudeepa_menu_scroll_${chairId}`, String(window.scrollY));
+                        sessionStorage.setItem(`thoogudeepa_menu_last_item_${chairId}`, item.id);
+                        sessionStorage.setItem(`thoogudeepa_menu_cat_${chairId}`, selectedCategory);
+                        sessionStorage.setItem(`thoogudeepa_menu_veg_${chairId}`, String(vegOnlyFilter));
+                      } catch {}
+                    }}
                     className="w-full flex flex-col items-center cursor-pointer active:opacity-75"
                   >
                     {/* Circular Image Container */}

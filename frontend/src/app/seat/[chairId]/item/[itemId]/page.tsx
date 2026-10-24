@@ -86,9 +86,17 @@ export default function ItemCustomizationPage() {
     );
   };
 
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(`/seat/${chairId}/menu`);
+    }
+  };
+
   const handleAddToCart = () => {
     addItemWithDetails(itemId, quantity, selectedOption, selectedAddOns);
-    router.push(`/seat/${chairId}/menu`);
+    handleBack();
   };
 
   return (
@@ -97,14 +105,15 @@ export default function ItemCustomizationPage() {
       <div className="w-full flex flex-col gap-6">
         {/* Top Header */}
         <header className="w-full flex items-center justify-between py-2">
-          {/* Back Button to Menu */}
-          <Link
-            href={`/seat/${chairId}/menu`}
+          {/* Back Button to Menu with Scroll Position Preservation */}
+          <button
+            type="button"
+            onClick={handleBack}
             className="w-10 h-10 border border-[rgba(220,226,222,0.8)] rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-[#FFFEFC] text-[#1A2621] shadow-2xs"
             aria-label="Back to Menu"
           >
             <ChevronLeft className="w-5 h-5" />
-          </Link>
+          </button>
 
           {/* Title Space */}
           <div className="text-center font-black text-sm uppercase tracking-wider text-[#1A2621]">
