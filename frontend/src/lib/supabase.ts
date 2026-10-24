@@ -2540,6 +2540,39 @@ export const realtimeBridge = {
     }
   },
 
+  // Sync settled bills with Fastify backend database
+  async syncSettledBillsWithBackend(): Promise<any[]> {
+    if (typeof window === 'undefined') return this.getSettledBills();
+    try {
+      const backendUrl = getBackendUrl();
+      if (!backendUrl) return this.getSettledBills();
+      const res = await safeFetchWithTimeout(`${backendUrl}/api/payments/settled`, {}, 2000);
+      if (res.ok) {
+        const serverBills = await res.json();
+        if (Array.isArray(serverBills) && serverBills.length > 0) {
+          const localList = this.getSettledBills();
+          const merged = [...localList];
+          serverBills.forEach((sb: any) => {
+            const exists = merged.some(
+              (lb) => lb.invoiceNumber === sb.invoiceNumber || (lb.timestamp && lb.timestamp === sb.timestamp)
+            );
+            if (!exists) {
+              merged.push(sb);
+            }
+          });
+          merged.sort((a, b) => {
+            const tA = new Date(a.timestamp || a.formattedDate || 0).getTime();
+            const tB = new Date(b.timestamp || b.formattedDate || 0).getTime();
+            return tB - tA;
+          });
+          localStorage.setItem('thoogudeepa_v2_settled_bills_history', JSON.stringify(merged.slice(0, 100)));
+          return merged;
+        }
+      }
+    } catch {}
+    return this.getSettledBills();
+  },
+
   // Get cash handover receipts to manager till safe
   getCashHandovers(): Array<{
     id: string;

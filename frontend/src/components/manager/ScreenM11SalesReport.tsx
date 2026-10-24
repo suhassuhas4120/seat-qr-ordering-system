@@ -87,25 +87,33 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionStatusFilter, setTransactionStatusFilter] = useState<'ALL' | 'PAID' | 'UNPAID'>('ALL');
 
-  // 1. Reactive settled bills history from live persistent store
+  // 1. Reactive settled bills history from live persistent store & backend database
   const [settledBills, setSettledBills] = useState<any[]>(() => {
     return realtimeBridge.getSettledBills ? realtimeBridge.getSettledBills() : [];
   });
 
-  const reloadData = useCallback(() => {
-    if (realtimeBridge.getSettledBills) {
+  const reloadData = useCallback(async () => {
+    if (realtimeBridge.syncSettledBillsWithBackend) {
+      const synced = await realtimeBridge.syncSettledBillsWithBackend();
+      setSettledBills(synced);
+    } else if (realtimeBridge.getSettledBills) {
       setSettledBills(realtimeBridge.getSettledBills());
     }
   }, []);
 
-  // Listen to realtime billing settlements
+  // Listen to realtime billing settlements & periodic re-sync
   useEffect(() => {
     reloadData();
+    const intervalTimer = setInterval(reloadData, 3500);
+
     const unsub = realtimeBridge.subscribeKDS({
       onBillSettled: () => reloadData(),
+      onNewOrder: () => reloadData(),
+      onStageChange: () => reloadData(),
       onClearAll: () => reloadData(),
     });
     return () => {
+      clearInterval(intervalTimer);
       if (typeof unsub === 'function') unsub();
     };
   }, [reloadData]);
@@ -153,6 +161,18 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
   const realSettledSum = useMemo(() => {
     return filteredSettledList.reduce((acc, b) => acc + (b.grandTotal || 0), 0);
   }, [filteredSettledList]);
+
+  // Active dining tables/orders currently open on the floor
+  const activeDiningSum = useMemo(() => {
+    return liveOrders.reduce((acc, lo) => {
+      const amt =
+        lo.order?.total_amount ||
+        (lo.items
+          ? lo.items.reduce((sum, it) => sum + (it.price || 0) * (it.quantity || 1), 0)
+          : 0);
+      return acc + amt;
+    }, 0);
+  }, [liveOrders]);
 
   const totalSalesAmount = realSettledSum;
 
@@ -332,93 +352,128 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
 
   // 4. Comparison Table Graph Points (Current vs Previous Comparison mapped from real settlement times)
   const comparisonData: ComparisonDataPoint[] = useMemo(() => {
-    const totalRealSales = filteredSettledList.reduce((acc, b) => acc + (b.grandTotal || 0), 0);
-    // Baseline represents the expected shift benchmark (~88% of current sales when active, or standard 25k baseline)
-    const baselineShiftTarget = totalRealSales > 0 ? Math.round(totalRealSales * 0.88) : 25000;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 86400000;
 
     if (graphMode === 'MONTH') {
       const weekBuckets = [0, 0, 0, 0];
-      filteredSettledList.forEach((bill) => {
+      const prevWeekBuckets = [0, 0, 0, 0];
+
+      const thirtyDaysAgo = startOfToday - 29 * 86400000;
+      const sixtyDaysAgo = startOfToday - 59 * 86400000;
+
+      realSettledList.forEach((bill) => {
+        const bTime = bill.timestamp
+          ? new Date(bill.timestamp).getTime()
+          : bill.formattedDate
+          ? new Date(bill.formattedDate).getTime()
+          : startOfToday + 1000;
+        const billTime = isNaN(bTime) ? startOfToday + 1000 : bTime;
         const slot = getWeekSlotIndex(bill.formattedDate || bill.timestamp);
-        weekBuckets[slot] += bill.grandTotal || 0;
+
+        if (billTime >= thirtyDaysAgo) {
+          weekBuckets[slot] += bill.grandTotal || 0;
+        } else if (billTime >= sixtyDaysAgo && billTime < thirtyDaysAgo) {
+          prevWeekBuckets[slot] += bill.grandTotal || 0;
+        }
       });
 
-      const weekWeights = [0.22, 0.24, 0.26, 0.28];
       return [
         {
           timeLabel: 'Week 1',
           currentSales: weekBuckets[0],
-          previousSales: Math.round(baselineShiftTarget * weekWeights[0]),
-          label: `Week 1: Current ₹${weekBuckets[0].toLocaleString('en-IN')} (Target ₹${Math.round(baselineShiftTarget * weekWeights[0]).toLocaleString('en-IN')})`,
+          previousSales: prevWeekBuckets[0],
+          label: `Week 1: Current ₹${weekBuckets[0].toLocaleString('en-IN')}${prevWeekBuckets[0] > 0 ? ` (Prior ₹${prevWeekBuckets[0].toLocaleString('en-IN')})` : ''}`,
         },
         {
           timeLabel: 'Week 2',
           currentSales: weekBuckets[1],
-          previousSales: Math.round(baselineShiftTarget * weekWeights[1]),
-          label: `Week 2: Current ₹${weekBuckets[1].toLocaleString('en-IN')} (Target ₹${Math.round(baselineShiftTarget * weekWeights[1]).toLocaleString('en-IN')})`,
+          previousSales: prevWeekBuckets[1],
+          label: `Week 2: Current ₹${weekBuckets[1].toLocaleString('en-IN')}${prevWeekBuckets[1] > 0 ? ` (Prior ₹${prevWeekBuckets[1].toLocaleString('en-IN')})` : ''}`,
         },
         {
           timeLabel: 'Week 3',
           currentSales: weekBuckets[2],
-          previousSales: Math.round(baselineShiftTarget * weekWeights[2]),
-          label: `Week 3: Current ₹${weekBuckets[2].toLocaleString('en-IN')} (Target ₹${Math.round(baselineShiftTarget * weekWeights[2]).toLocaleString('en-IN')})`,
+          previousSales: prevWeekBuckets[2],
+          label: `Week 3: Current ₹${weekBuckets[2].toLocaleString('en-IN')}${prevWeekBuckets[2] > 0 ? ` (Prior ₹${prevWeekBuckets[2].toLocaleString('en-IN')})` : ''}`,
         },
         {
           timeLabel: 'Week 4',
           currentSales: weekBuckets[3],
-          previousSales: Math.round(baselineShiftTarget * weekWeights[3]),
-          label: `Week 4: Current ₹${weekBuckets[3].toLocaleString('en-IN')} (Target ₹${Math.round(baselineShiftTarget * weekWeights[3]).toLocaleString('en-IN')})`,
+          previousSales: prevWeekBuckets[3],
+          label: `Week 4: Current ₹${weekBuckets[3].toLocaleString('en-IN')}${prevWeekBuckets[3] > 0 ? ` (Prior ₹${prevWeekBuckets[3].toLocaleString('en-IN')})` : ''}`,
         },
       ];
     }
 
     if (graphMode === 'WEEK') {
       const dayBuckets = [0, 0, 0, 0, 0, 0, 0];
-      filteredSettledList.forEach((bill) => {
+      const prevDayBuckets = [0, 0, 0, 0, 0, 0, 0];
+
+      const sevenDaysAgo = startOfToday - 6 * 86400000;
+      const fourteenDaysAgo = startOfToday - 13 * 86400000;
+
+      realSettledList.forEach((bill) => {
+        const bTime = bill.timestamp
+          ? new Date(bill.timestamp).getTime()
+          : bill.formattedDate
+          ? new Date(bill.formattedDate).getTime()
+          : startOfToday + 1000;
+        const billTime = isNaN(bTime) ? startOfToday + 1000 : bTime;
         const slot = getDaySlotIndex(bill.formattedDate || bill.timestamp);
-        dayBuckets[slot] += bill.grandTotal || 0;
+
+        if (billTime >= sevenDaysAgo) {
+          dayBuckets[slot] += bill.grandTotal || 0;
+        } else if (billTime >= fourteenDaysAgo && billTime < sevenDaysAgo) {
+          prevDayBuckets[slot] += bill.grandTotal || 0;
+        }
       });
 
-      const dayWeights = [0.10, 0.11, 0.12, 0.13, 0.18, 0.20, 0.16];
       const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return dayLabels.map((name, idx) => {
-        const prev = Math.round(baselineShiftTarget * dayWeights[idx]);
-        return {
-          timeLabel: name,
-          currentSales: dayBuckets[idx],
-          previousSales: prev,
-          label: `${name}: Current ₹${dayBuckets[idx].toLocaleString('en-IN')} (Prior ₹${prev.toLocaleString('en-IN')})`,
-        };
-      });
+      return dayLabels.map((name, idx) => ({
+        timeLabel: name,
+        currentSales: dayBuckets[idx],
+        previousSales: prevDayBuckets[idx],
+        label: `${name}: This Week ₹${dayBuckets[idx].toLocaleString('en-IN')}${prevDayBuckets[idx] > 0 ? ` (Last Week ₹${prevDayBuckets[idx].toLocaleString('en-IN')})` : ''}`,
+      }));
     }
 
     // Default: Time mode (Hourly distribution of real settlements)
     const timeSlots = ['11 AM', '01 PM', '03 PM', '05 PM', '06 PM', '08:30 PM', '10 PM', '11 PM', '12 AM'];
     const timeBuckets = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-    const hourWeights = [0.06, 0.22, 0.08, 0.05, 0.10, 0.26, 0.15, 0.06, 0.02];
+    const prevTimeBuckets = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-    filteredSettledList.forEach((bill) => {
+    realSettledList.forEach((bill) => {
+      const bTime = bill.timestamp
+        ? new Date(bill.timestamp).getTime()
+        : bill.formattedDate
+        ? new Date(bill.formattedDate).getTime()
+        : startOfToday + 1000;
+      const billTime = isNaN(bTime) ? startOfToday + 1000 : bTime;
       const idx = getTimeSlotIndex(bill.formattedTime);
-      timeBuckets[idx] += bill.grandTotal || 0;
+
+      if (billTime >= startOfToday) {
+        timeBuckets[idx] += bill.grandTotal || 0;
+      } else if (billTime >= startOfYesterday && billTime < startOfToday) {
+        prevTimeBuckets[idx] += bill.grandTotal || 0;
+      }
     });
 
-    return timeSlots.map((slot, idx) => {
-      const prev = Math.round(baselineShiftTarget * hourWeights[idx]);
-      return {
-        timeLabel: slot,
-        currentSales: timeBuckets[idx],
-        previousSales: prev,
-        label: `${slot} — Current ₹${timeBuckets[idx].toLocaleString('en-IN')} (Benchmark ₹${prev.toLocaleString('en-IN')})`,
-      };
-    });
-  }, [graphMode, filteredSettledList]);
+    return timeSlots.map((slot, idx) => ({
+      timeLabel: slot,
+      currentSales: timeBuckets[idx],
+      previousSales: prevTimeBuckets[idx],
+      label: `${slot} — Today ₹${timeBuckets[idx].toLocaleString('en-IN')}${prevTimeBuckets[idx] > 0 ? ` (Yesterday ₹${prevTimeBuckets[idx].toLocaleString('en-IN')})` : ''}`,
+    }));
+  }, [graphMode, realSettledList]);
 
-  // Overall growth / performance metric
+  // Overall growth / performance metric (strictly based on real past comparisons)
   const totalCurrentInGraph = comparisonData.reduce((acc, p) => acc + p.currentSales, 0);
   const totalPreviousInGraph = comparisonData.reduce((acc, p) => acc + p.previousSales, 0);
   const growthPercent = totalPreviousInGraph > 0
     ? Math.round(((totalCurrentInGraph - totalPreviousInGraph) / totalPreviousInGraph) * 100)
-    : (totalCurrentInGraph > 0 ? 100 : 0);
+    : null;
 
   // SVG Chart Geometry
   const chartHeight = 210;
@@ -444,7 +499,7 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
     });
   }, [comparisonData, maxVal, minVal, chartWidth, chartHeight, paddingX, paddingY]);
 
-  // SVG paths for current and previous lines
+  // SVG paths for current and previous lines (previous line only plotted if real previous data exists)
   const currentPathD = useMemo(() => {
     if (plottedPoints.length === 0) return '';
     return plottedPoints.reduce((acc, curr, idx) => {
@@ -462,12 +517,12 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
   }, [currentPathD, plottedPoints, chartHeight, paddingY]);
 
   const previousPathD = useMemo(() => {
-    if (plottedPoints.length === 0) return '';
+    if (plottedPoints.length === 0 || totalPreviousInGraph === 0) return '';
     return plottedPoints.reduce((acc, curr, idx) => {
       if (idx === 0) return `M ${curr.x} ${curr.yPrevious}`;
       return `${acc} L ${curr.x} ${curr.yPrevious}`;
     }, '');
-  }, [plottedPoints]);
+  }, [plottedPoints, totalPreviousInGraph]);
 
   // 5. Recent Transactions Feed
   const recentTransactions: TransactionRow[] = useMemo(() => {
@@ -757,16 +812,28 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
             {periodLabel} Sales and Revenue Report
           </h3>
           <p className="text-xs text-slate-500 font-bold mt-0.5">
-            Consolidated register receipts and dining revenue
+            Realtime verified register receipts &amp; active dining revenue
           </p>
         </div>
-        <div className="text-right">
-          <div className="text-xs font-black text-slate-500 uppercase tracking-wider">
-            Total Amount :
+        <div className="flex flex-wrap items-center gap-6 text-right">
+          <div>
+            <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              Settled Receipts ({filteredSettledList.length})
+            </div>
+            <div className="text-2xl md:text-3xl font-black text-emerald-700 tracking-tight">
+              ₹ {realSettledSum.toLocaleString('en-IN')}.00
+            </div>
           </div>
-          <div className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-            ₹ {totalSalesAmount.toLocaleString('en-IN')}.00
-          </div>
+          {activeFilter === 'TODAY' && activeDiningSum > 0 && (
+            <div className="border-l border-slate-200 pl-6 text-left">
+              <div className="text-[10px] font-black text-amber-600 uppercase tracking-wider">
+                Active Dining ({liveOrders.length} tables)
+              </div>
+              <div className="text-xl md:text-2xl font-black text-amber-700 tracking-tight">
+                ₹ {activeDiningSum.toLocaleString('en-IN')}.00
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -828,10 +895,16 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
                       ? 'Weekly (Day Breakdown)'
                       : 'Today (Sales vs time)'}
                   </span>
-                  <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-md flex items-center">
-                    <TrendingUp className="h-3 w-3 mr-0.5 inline" />
-                    +{growthPercent}%
-                  </span>
+                  {growthPercent !== null ? (
+                    <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-md flex items-center">
+                      <TrendingUp className="h-3 w-3 mr-0.5 inline" />
+                      {growthPercent >= 0 ? `+${growthPercent}%` : `${growthPercent}%`} vs prior
+                    </span>
+                  ) : (
+                    <span className="text-xs font-black text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.2 rounded-md flex items-center">
+                      {totalCurrentInGraph > 0 ? `₹${totalCurrentInGraph.toLocaleString('en-IN')} Live` : 'Awaiting Settlements'}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -884,7 +957,9 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
               <span className="flex items-center gap-1.5">
                 <span className="inline-block w-4 h-0.5 border-t-2 border-dashed border-indigo-500"></span>
                 <span className="text-slate-500">
-                  Prior Baseline
+                  {totalPreviousInGraph > 0
+                    ? (graphMode === 'MONTH' ? 'Prior Month' : graphMode === 'WEEK' ? 'Prior Week' : 'Yesterday')
+                    : 'Prior Period (No past history)'}
                 </span>
               </span>
             </div>
@@ -943,16 +1018,18 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
                 {/* Translucent Area Under Current Curve */}
                 <path d={currentAreaD} fill="url(#currentGrad)" />
 
-                {/* Previous Period Dashed Comparison Line */}
-                <path
-                  d={previousPathD}
-                  fill="none"
-                  stroke="#6366F1"
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                {/* Previous Period Dashed Comparison Line (only if real prior period data exists) */}
+                {totalPreviousInGraph > 0 && previousPathD && (
+                  <path
+                    d={previousPathD}
+                    fill="none"
+                    stroke="#6366F1"
+                    strokeWidth="2"
+                    strokeDasharray="4 4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
 
                 {/* Primary Trend Line for Current Period */}
                 <path
@@ -972,14 +1049,16 @@ export function ScreenM11SalesReport({ liveOrders = [] }: ScreenM11SalesReportPr
                     onMouseEnter={() => setHoveredPoint(pt)}
                     onMouseLeave={() => setHoveredPoint(null)}
                   >
-                    <circle
-                      cx={pt.x}
-                      cy={pt.yPrevious}
-                      r={3}
-                      fill="#FFFFFF"
-                      stroke="#6366F1"
-                      strokeWidth="1.5"
-                    />
+                    {totalPreviousInGraph > 0 && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.yPrevious}
+                        r={3}
+                        fill="#FFFFFF"
+                        stroke="#6366F1"
+                        strokeWidth="1.5"
+                      />
+                    )}
                     <circle
                       cx={pt.x}
                       cy={pt.yCurrent}

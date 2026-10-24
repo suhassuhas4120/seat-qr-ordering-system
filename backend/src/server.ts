@@ -381,6 +381,44 @@ app.post('/api/payments/process', async (req, reply) => {
   }
 });
 
+// 9B. Realtime Settled Payments Audit History for Manager Sales Report
+app.get('/api/payments/settled', async () => {
+  const payments = (db.data.payments || []).filter((p) => p.status === 'SUCCESS');
+  return payments.map((p) => {
+    const seatOrders = db.data.orders.filter((o) => o.sessionId === p.sessionId || o.seatId === p.seatId);
+    const items: any[] = [];
+    seatOrders.forEach((o) => {
+      o.items.forEach((it) => {
+        items.push({
+          name: it.nameSnapshot,
+          quantity: it.quantity,
+          price: it.priceSnapshot,
+          totalPrice: it.priceSnapshot * it.quantity,
+        });
+      });
+    });
+
+    const isTk = p.seatId === 0;
+    const tableNum = Math.ceil((p.seatId || 1) / 4);
+    const completedDate = p.completedAt ? new Date(p.completedAt) : new Date();
+
+    return {
+      invoiceNumber: p.gatewayPaymentId || `INV-${p.id.slice(0, 8).toUpperCase()}`,
+      tableName: isTk ? 'TK-01' : `T-${String(tableNum).padStart(2, '0')}`,
+      seatLabel: isTk ? 'Seat 0 (Parcel)' : `Chair ${p.seatId}`,
+      seatNumber: p.seatId,
+      subtotal: p.subtotal,
+      totalTax: p.taxAmount,
+      grandTotal: p.finalAmount,
+      method: p.gateway,
+      timestamp: p.completedAt || new Date().toISOString(),
+      formattedDate: completedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      formattedTime: completedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      items,
+    };
+  });
+});
+
 // 10. Webhook endpoint for Razorpay / Stripe
 app.post('/api/payments/webhook', async (req, reply) => {
   const { seatId, gateway, paymentId } = req.body as any;
