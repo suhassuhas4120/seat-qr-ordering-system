@@ -17,6 +17,7 @@ import {
   RefreshCw,
   CreditCard,
   User,
+  Package,
 } from 'lucide-react';
 import { realtimeBridge, OrderRecord, OrderItemRecord, ServiceAlertRecord } from '@/lib/supabase';
 
@@ -43,7 +44,7 @@ export function ScreenM2Floor100({
   onSelectTableForBilling,
 }: ScreenM2Floor100Props) {
   const [selectedSeatNum, setSelectedSeatNum] = useState<number>(1); // Default to Seat 01
-  const [selectedZone, setSelectedZone] = useState<number | 'ALL'>('ALL');
+  const [selectedZone, setSelectedZone] = useState<number | 'ALL' | 'PARCEL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'VACANT' | 'OCCUPIED' | 'BILLING' | 'ALERT'>('ALL');
   const [printKotNotice, setPrintKotNotice] = useState<string | null>(null);
   const [vacatedSeats, setVacatedSeats] = useState<Map<string, number>>(new Map());
@@ -73,17 +74,35 @@ export function ScreenM2Floor100({
     return () => unsub();
   }, [onRefresh]);
 
-  // Generate 100 Individual Seats Data
+  // Generate 100 Individual Seats Data + Seat 0 (Parcel Counter)
   const seatGrid = useMemo(() => {
     const list = [];
-    for (let i = 1; i <= 100; i++) {
-      const chairId = i < 10 ? `0${i}` : `${i}`;
-      const unpadded = String(i);
+    for (let i = 0; i <= 100; i++) {
+      const isTakeawaySeat = i === 0;
+      const chairId = isTakeawaySeat ? '00' : (i < 10 ? `0${i}` : `${i}`);
+      const unpadded = isTakeawaySeat ? '0' : String(i);
 
       // Match live orders specifically for this seat
       const rawMatchingLiveOrders = liveOrders.filter((o) => {
-        if (o.order.status === 'completed' || o.order.status === 'cancelled') return false;
-        const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
+        if (o.order.status === 'completed' || o.order.status === 'cancelled' || (o.order.status as string) === 'PAID') return false;
+        const chairRaw = (o.order.chair_id || '').trim();
+        const oIsTk =
+          chairRaw === '0' ||
+          chairRaw === '00' ||
+          chairRaw === 'TK-00' ||
+          chairRaw === 'TK-01' ||
+          chairRaw.toLowerCase().includes('takeaway') ||
+          chairRaw.toLowerCase().includes('parcel') ||
+          (o.order as any).seat_id === 0;
+
+        if (isTakeawaySeat) {
+          return oIsTk;
+        }
+
+        // Dining seats 1 to 100 must NEVER match a takeaway/parcel order!
+        if (oIsTk) return false;
+
+        const oChair = chairRaw.replace(/[^0-9]/g, '');
         return oChair === chairId || oChair === unpadded || Number(oChair) === i;
       });
 
@@ -98,7 +117,15 @@ export function ScreenM2Floor100({
             seatNumber: i,
             chairId,
             status: 'vacant' as const,
-            waiterName: i <= 25 ? 'Ramesh Kumar (Zone 1)' : i <= 50 ? 'Suresh M (Zone 2)' : i <= 75 ? 'Anand Kumar (Zone 3)' : 'Deepa Naik (Zone 4)',
+            waiterName: isTakeawaySeat
+              ? 'Takeaway Parcel Counter'
+              : i <= 25
+              ? 'Ramesh Kumar (Zone 1)'
+              : i <= 50
+              ? 'Suresh M (Zone 2)'
+              : i <= 75
+              ? 'Anand Kumar (Zone 3)'
+              : 'Deepa Naik (Zone 4)',
             liveOrders: [],
             liveItems: [],
             alert: undefined,
@@ -144,6 +171,9 @@ export function ScreenM2Floor100({
 
       // Match alerts for this seat
       const activeAlert = alerts.find((a) => {
+        if (isTakeawaySeat) {
+          return a.seatNumber === '0' || a.seatNumber === '00' || a.seatNumber.toLowerCase().includes('parcel') || a.seatNumber.toLowerCase().includes('takeaway');
+        }
         const clean = a.seatNumber.replace(/[^0-9]/g, '');
         return clean === chairId || clean === unpadded || Number(clean) === i;
       });
@@ -169,10 +199,15 @@ export function ScreenM2Floor100({
         status = 'vacant';
       }
 
-      let waiterName = 'Ramesh Kumar (Zone 1)';
-      if (i >= 26 && i <= 50) waiterName = 'Suresh M (Zone 2)';
-      else if (i >= 51 && i <= 75) waiterName = 'Anand Kumar (Zone 3)';
-      else if (i >= 76 && i <= 100) waiterName = 'Deepa Naik (Zone 4)';
+      let waiterName = isTakeawaySeat
+        ? 'Takeaway Parcel Counter'
+        : i <= 25
+        ? 'Ramesh Kumar (Zone 1)'
+        : i <= 50
+        ? 'Suresh M (Zone 2)'
+        : i <= 75
+        ? 'Anand Kumar (Zone 3)'
+        : 'Deepa Naik (Zone 4)';
 
       let total = 0;
       if (allLiveItems.length > 0) {
@@ -239,7 +274,7 @@ export function ScreenM2Floor100({
 
   // Top KPIs
   const totalOccupiedSeats = useMemo(() => {
-    return seatGrid.filter((s) => s.status !== 'vacant').length;
+    return seatGrid.filter((s) => s.seatNumber > 0 && s.status !== 'vacant').length;
   }, [seatGrid]);
   const guestsSeatedCount = totalOccupiedSeats; // Current active seats occupied
   const occupancyPercentage = Math.round((totalOccupiedSeats / 100) * 100);
@@ -295,7 +330,7 @@ export function ScreenM2Floor100({
   const handlePosBill = () => {
     if (!activeSelectedSeat) return;
     if (onSelectTableForBilling) {
-      onSelectTableForBilling(`Seat-${activeSelectedSeat.chairId}`);
+      onSelectTableForBilling(activeSelectedSeat.seatNumber === 0 ? 'Seat-00' : `Seat-${activeSelectedSeat.chairId}`);
     }
   };
 
@@ -407,6 +442,7 @@ export function ScreenM2Floor100({
             <div className="flex flex-wrap items-center gap-1">
               {[
                 { id: 'ALL', label: 'All 100' },
+                { id: 'PARCEL', label: '📦 Parcel (Seat 0)' },
                 { id: 1, label: 'Z1 (01-25)' },
                 { id: 2, label: 'Z2 (26-50)' },
                 { id: 3, label: 'Z3 (51-75)' },
@@ -451,11 +487,12 @@ export function ScreenM2Floor100({
             </div>
           </div>
 
-          {/* 100 Seats Matrix Tiles */}
+          {/* 100 Seats Matrix Tiles + Seat 0 Parcel Tile */}
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-[540px] overflow-y-auto no-scrollbar p-1">
             {seatGrid
               .filter((s) => {
                 if (selectedZone !== 'ALL') {
+                  if (selectedZone === 'PARCEL' && s.seatNumber !== 0) return false;
                   if (selectedZone === 1 && (s.seatNumber < 1 || s.seatNumber > 25)) return false;
                   if (selectedZone === 2 && (s.seatNumber < 26 || s.seatNumber > 50)) return false;
                   if (selectedZone === 3 && (s.seatNumber < 51 || s.seatNumber > 75)) return false;
@@ -498,6 +535,41 @@ export function ScreenM2Floor100({
                 if (isSelected) {
                   borderCls = 'border-[#9C3D1E] ring-3 ring-[#9C3D1E]/40 scale-105 z-10';
                   bgCls = 'bg-orange-50/80';
+                }
+
+                if (seat.seatNumber === 0) {
+                  return (
+                    <div
+                      key={seat.seatNumber}
+                      onClick={() => {
+                        setSelectedSeatNum(0);
+                      }}
+                      className={`${bgCls} ${borderCls} border-2 rounded-xl p-2 h-20 flex flex-col justify-between hover:shadow-md transition cursor-pointer select-none col-span-2 sm:col-span-2 bg-gradient-to-br from-amber-50 to-orange-50`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-xs text-amber-900 flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          <span>Seat 0 (Parcel)</span>
+                        </span>
+                        <span className="text-[8px] font-black px-1 rounded bg-amber-200 text-amber-900">
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      {seat.status !== 'vacant' ? (
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] font-black text-emerald-800 truncate">
+                            ₹{seat.runningTotal}
+                          </div>
+                          <div className="text-[8px] text-amber-800 font-bold truncate">
+                            Active Takeaway
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[9px] text-amber-700/70 font-bold">Counter Ready</div>
+                      )}
+                    </div>
+                  );
                 }
 
                 return (
@@ -548,12 +620,12 @@ export function ScreenM2Floor100({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-[#9C3D1E] text-white font-black text-base flex items-center justify-center shadow-xs">
-                  #{activeSelectedSeat?.chairId || '01'}
+                  {activeSelectedSeat?.seatNumber === 0 ? <Package className="h-5 w-5" /> : `#${activeSelectedSeat?.chairId || '01'}`}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-black text-base text-slate-900">
-                      Seat #{activeSelectedSeat?.chairId || '01'}
+                      {activeSelectedSeat?.seatNumber === 0 ? 'Seat 0 • Takeaway Parcel Counter' : `Seat #${activeSelectedSeat?.chairId || '01'}`}
                     </h3>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium">

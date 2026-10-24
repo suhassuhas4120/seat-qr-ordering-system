@@ -37,14 +37,17 @@ export function normalizeSeatIdentity(raw: unknown): NormalizedSeatIdentity {
   if (
     rawStr === '0' ||
     rawStr === '00' ||
+    rawStr.toUpperCase() === 'TK-00' ||
     rawStr.toUpperCase() === 'TK-01' ||
-    rawStr.toUpperCase().includes('TAKEAWAY')
+    rawStr.toUpperCase().includes('TK') ||
+    rawStr.toUpperCase().includes('TAKEAWAY') ||
+    rawStr.toUpperCase().includes('PARCEL')
   ) {
     return {
       seatId: 0,
       chairId: '0',
       paddedChairId: '00',
-      label: 'TAKEAWAY (TK-01)',
+      label: 'Seat 0 (Parcel)',
       isTakeaway: true,
     };
   }

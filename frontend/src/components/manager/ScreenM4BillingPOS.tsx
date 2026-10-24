@@ -61,10 +61,17 @@ export function ScreenM4BillingPOS({
   liveOrders = [],
   onSettled,
 }: ScreenM4BillingPOSProps) {
-  // Normalize clean seat identifier (e.g. '17', '04', '01' or 'TK-01')
+  // Normalize clean seat identifier (e.g. '00', '17', '04', '01')
   const initialSeatNormalized = useMemo(() => {
-    if (selectedSeatId === 'TK-01' || selectedSeatId?.toLowerCase().includes('takeaway')) {
-      return 'TK-01';
+    if (
+      selectedSeatId === '0' ||
+      selectedSeatId === '00' ||
+      selectedSeatId === 'TK-00' ||
+      selectedSeatId === 'TK-01' ||
+      selectedSeatId?.toLowerCase().includes('takeaway') ||
+      selectedSeatId?.toLowerCase().includes('parcel')
+    ) {
+      return '00';
     }
     const clean = selectedSeatId?.replace(/[^0-9]/g, '') || '17';
     return clean.padStart(2, '0');
@@ -86,13 +93,26 @@ export function ScreenM4BillingPOS({
   const [lastSettledReceiptSnapshot, setLastSettledReceiptSnapshot] = useState<SettledReceiptSnapshot | null>(null);
   const [isPunchingKot, setIsPunchingKot] = useState<boolean>(false);
 
-  const isTakeaway = activeSeat === 'TK-01' || activeSeat.toLowerCase().includes('takeaway');
-  const seatDisplayTitle = isTakeaway ? 'Takeaway Parcel #01' : `Seat #${activeSeat}`;
+  const isTakeaway =
+    activeSeat === '00' ||
+    activeSeat === '0' ||
+    activeSeat === 'TK-00' ||
+    activeSeat === 'TK-01' ||
+    activeSeat.toLowerCase().includes('takeaway') ||
+    activeSeat.toLowerCase().includes('parcel');
+  const seatDisplayTitle = isTakeaway ? 'Seat 0 • Takeaway Parcel' : `Seat #${activeSeat}`;
 
   // Sync when selectedSeatId prop changes from Screen 2
   useEffect(() => {
-    if (selectedSeatId === 'TK-01' || selectedSeatId?.toLowerCase().includes('takeaway')) {
-      setActiveSeat('TK-01');
+    if (
+      selectedSeatId === '0' ||
+      selectedSeatId === '00' ||
+      selectedSeatId === 'TK-00' ||
+      selectedSeatId === 'TK-01' ||
+      selectedSeatId?.toLowerCase().includes('takeaway') ||
+      selectedSeatId?.toLowerCase().includes('parcel')
+    ) {
+      setActiveSeat('00');
       setSettledSuccess(false);
       return;
     }
@@ -108,11 +128,20 @@ export function ScreenM4BillingPOS({
     liveOrders.forEach((o) => {
       if (o.order.status === 'completed' || o.order.status === 'cancelled') return;
       const chairRaw = (o.order.chair_id || '').trim();
-      if (chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel')) {
-        set.add('TK-01');
+      const oIsTk =
+        chairRaw === '0' ||
+        chairRaw === '00' ||
+        chairRaw === 'TK-00' ||
+        chairRaw === 'TK-01' ||
+        chairRaw.toLowerCase().includes('takeaway') ||
+        chairRaw.toLowerCase().includes('parcel') ||
+        (o.order as any).seat_id === 0;
+
+      if (oIsTk) {
+        set.add('00');
       } else {
         const chairNum = chairRaw.replace(/[^0-9]/g, '');
-        if (chairNum) {
+        if (chairNum && chairNum !== '0' && chairNum !== '00') {
           set.add(chairNum.padStart(2, '0'));
         }
       }
@@ -122,16 +151,29 @@ export function ScreenM4BillingPOS({
 
   // Real placed kitchen orders strictly for this seat
   const placedOrders = useMemo<BillItem[]>(() => {
-    const isTk = activeSeat === 'TK-01' || activeSeat.toLowerCase().includes('takeaway');
-    const unpadded = activeSeat.replace(/^0+/, '') || '1';
+    const isTk = isTakeaway;
+    const unpadded = activeSeat.replace(/^0+/, '') || '0';
     const num = parseInt(unpadded, 10);
 
     const matchingLive = liveOrders.filter((o) => {
       if (o.order.status === 'completed' || o.order.status === 'cancelled' || (o.order.status as string) === 'PAID') return false;
       const chairRaw = (o.order.chair_id || '').trim();
+      const oIsTk =
+        chairRaw === '0' ||
+        chairRaw === '00' ||
+        chairRaw === 'TK-00' ||
+        chairRaw === 'TK-01' ||
+        chairRaw.toLowerCase().includes('takeaway') ||
+        chairRaw.toLowerCase().includes('parcel') ||
+        (o.order as any).seat_id === 0;
+
       if (isTk) {
-        return chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel') || (o.order as any).seat_id === 0;
+        return oIsTk;
       }
+
+      // For dining seats 1 to 100, NEVER match takeaway orders!
+      if (oIsTk) return false;
+
       const oChair = chairRaw.replace(/[^0-9]/g, '');
       const oSeatId = (o.order as any).seat_id;
       return oChair === activeSeat || oChair === unpadded || Number(oChair) === num || oSeatId === num;
@@ -155,7 +197,7 @@ export function ScreenM4BillingPOS({
               name: it.dish_name,
               price: it.price,
               qty: it.quantity,
-              seatNumber: isTk ? 'TK-01' : num,
+              seatNumber: isTk ? 'Seat 0 (Parcel)' : num,
               stage: it.stage || 'SERVED',
               isDraft: false,
             });
@@ -164,7 +206,7 @@ export function ScreenM4BillingPOS({
       }
     });
     return list;
-  }, [liveOrders, activeSeat]);
+  }, [liveOrders, activeSeat, isTakeaway]);
 
   // Draft items pending KOT punch or immediate settlement
   const draftItems = seatDraftMap[activeSeat] || [];
@@ -177,11 +219,18 @@ export function ScreenM4BillingPOS({
   // Switching active seat
   const handleSwitchSeat = (seatId: string) => {
     const clean = seatId.trim();
-    if (clean === 'TK-01' || clean.toLowerCase().includes('takeaway')) {
-      setActiveSeat('TK-01');
+    if (
+      clean === '0' ||
+      clean === '00' ||
+      clean === 'TK-00' ||
+      clean === 'TK-01' ||
+      clean.toLowerCase().includes('takeaway') ||
+      clean.toLowerCase().includes('parcel')
+    ) {
+      setActiveSeat('00');
       setSettledSuccess(false);
       if (onSelectSeatId) {
-        onSelectSeatId('TK-01');
+        onSelectSeatId('00');
       }
       return;
     }
@@ -210,7 +259,7 @@ export function ScreenM4BillingPOS({
             name: dish.title,
             price: dish.price,
             qty: 1,
-            seatNumber: isTakeaway ? 'TK-01' : parseInt(activeSeat, 10) || 17,
+            seatNumber: isTakeaway ? 'Seat 0 (Parcel)' : parseInt(activeSeat, 10) || 17,
             stage: 'DRAFT',
             isDraft: true,
           },
@@ -244,9 +293,22 @@ export function ScreenM4BillingPOS({
     setIsPunchingKot(true);
 
     const num = parseInt(activeSeat, 10);
-    const unpadded = activeSeat.replace(/^0+/, '') || '1';
+    const unpadded = activeSeat.replace(/^0+/, '') || '0';
     const activeOrderForSeat = liveOrders.find((lo) => {
-      const c = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+      const chairRaw = (lo.order.chair_id || '').trim();
+      const oIsTk =
+        chairRaw === '0' ||
+        chairRaw === '00' ||
+        chairRaw === 'TK-00' ||
+        chairRaw === 'TK-01' ||
+        chairRaw.toLowerCase().includes('takeaway') ||
+        chairRaw.toLowerCase().includes('parcel') ||
+        (lo.order as any).seat_id === 0;
+
+      if (isTakeaway) return oIsTk;
+      if (oIsTk) return false;
+
+      const c = chairRaw.replace(/[^0-9]/g, '');
       return c === activeSeat || c === unpadded || Number(c) === num;
     });
     const existingTicket = activeOrderForSeat?.order?.ticket_number;
@@ -256,8 +318,8 @@ export function ScreenM4BillingPOS({
 
     const newOrderRecord: OrderRecord = {
       ticket_number: ticketNumber,
-      chair_id: isTakeaway ? 'TK-01' : activeSeat,
-      seat_label: seatDisplayTitle,
+      chair_id: isTakeaway ? '00' : activeSeat,
+      seat_label: isTakeaway ? 'Seat 0 (Parcel)' : seatDisplayTitle,
       status: 'pending',
       total_amount: draftItems.reduce((sum, it) => sum + it.price * it.qty, 0),
       device_token: 'manager-pos',
@@ -268,8 +330,8 @@ export function ScreenM4BillingPOS({
       const rawDishId = foundDish ? String(foundDish.id) : String(idx + 1);
       const cleanDishId = rawDishId.startsWith('dish-') ? rawDishId : `dish-${rawDishId}`;
       return {
-        chair_id: isTakeaway ? 'TK-01' : activeSeat,
-        seat_label: seatDisplayTitle,
+        chair_id: isTakeaway ? '00' : activeSeat,
+        seat_label: isTakeaway ? 'Seat 0 (Parcel)' : seatDisplayTitle,
         dish_id: cleanDishId,
         dish_name: it.name,
         quantity: it.qty,
@@ -331,9 +393,22 @@ export function ScreenM4BillingPOS({
     // If there were any unpunched draft items, complete their order record
     if (draftItems.length > 0) {
       const num = parseInt(activeSeat, 10);
-      const unpadded = activeSeat.replace(/^0+/, '') || '1';
+      const unpadded = activeSeat.replace(/^0+/, '') || '0';
       const activeOrderForSeat = liveOrders.find((lo) => {
-        const c = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+        const chairRaw = (lo.order.chair_id || '').trim();
+        const oIsTk =
+          chairRaw === '0' ||
+          chairRaw === '00' ||
+          chairRaw === 'TK-00' ||
+          chairRaw === 'TK-01' ||
+          chairRaw.toLowerCase().includes('takeaway') ||
+          chairRaw.toLowerCase().includes('parcel') ||
+          (lo.order as any).seat_id === 0;
+
+        if (isTakeaway) return oIsTk;
+        if (oIsTk) return false;
+
+        const c = chairRaw.replace(/[^0-9]/g, '');
         return c === activeSeat || c === unpadded || Number(c) === num;
       });
       const existingTicket = activeOrderForSeat?.order?.ticket_number;
@@ -343,8 +418,8 @@ export function ScreenM4BillingPOS({
 
       const newOrderRecord: OrderRecord = {
         ticket_number: ticketNumber,
-        chair_id: isTakeaway ? 'TK-01' : activeSeat,
-        seat_label: seatDisplayTitle,
+        chair_id: isTakeaway ? '00' : activeSeat,
+        seat_label: isTakeaway ? 'Seat 0 (Parcel)' : seatDisplayTitle,
         status: 'completed',
         total_amount: draftItems.reduce((sum, it) => sum + it.price * it.qty, 0),
         device_token: 'manager-pos',
@@ -355,8 +430,8 @@ export function ScreenM4BillingPOS({
         const rawDishId = foundDish ? String(foundDish.id) : String(idx + 1);
         const cleanDishId = rawDishId.startsWith('dish-') ? rawDishId : `dish-${rawDishId}`;
         return {
-          chair_id: isTakeaway ? 'TK-01' : activeSeat,
-          seat_label: seatDisplayTitle,
+          chair_id: isTakeaway ? '00' : activeSeat,
+          seat_label: isTakeaway ? 'Seat 0 (Parcel)' : seatDisplayTitle,
           dish_id: cleanDishId,
           dish_name: it.name,
           quantity: it.qty,
@@ -369,7 +444,7 @@ export function ScreenM4BillingPOS({
     }
 
     // Authoritative bill settlement
-    await realtimeBridge.settleBill(activeSeat, paymentMethod, grandTotal);
+    await realtimeBridge.settleBill(isTakeaway ? '00' : activeSeat, paymentMethod, grandTotal);
 
     // Clear drafts for this seat
     setSeatDraftMap((prev) => {
@@ -442,7 +517,7 @@ export function ScreenM4BillingPOS({
           {/* Dedicated Takeaway Parcel Desk Quick Button */}
           <button
             type="button"
-            onClick={() => handleSwitchSeat('TK-01')}
+            onClick={() => handleSwitchSeat('00')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs shrink-0 ${
               isTakeaway
                 ? 'bg-amber-600 text-white ring-2 ring-amber-300'
@@ -450,7 +525,7 @@ export function ScreenM4BillingPOS({
             }`}
           >
             <Package className="h-3.5 w-3.5 text-amber-500" />
-            <span>Takeaway Parcel</span>
+            <span>Seat 0 (Parcel)</span>
           </button>
 
           {/* Direct Dropdown for Takeaway + Any of the 100 Seats */}
@@ -465,11 +540,11 @@ export function ScreenM4BillingPOS({
             </label>
             <select
               id="seat-dropdown-pos"
-              value={activeSeat}
+              value={isTakeaway ? '00' : activeSeat}
               onChange={(e) => handleSwitchSeat(e.target.value)}
               className="bg-transparent text-xs font-black font-mono text-[#9C3D1E] outline-none cursor-pointer pr-1"
             >
-              <option value="TK-01">📦 Takeaway / Parcel Desk (TK-01)</option>
+              <option value="00">📦 Seat 0 • Takeaway Parcel {liveOccupiedSeats.has('00') ? '• Active Order' : ''}</option>
               {ALL_100_SEATS.map((numStr) => {
                 const hasOrder = liveOccupiedSeats.has(numStr);
                 return (
@@ -1001,7 +1076,7 @@ export function ScreenM4BillingPOS({
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {[
                   { id: 'ALL', label: 'All 100' },
-                  { id: 'TAKEAWAY', label: '📦 Takeaway' },
+                  { id: 'TAKEAWAY', label: '📦 Seat 0 (Parcel)' },
                   { id: 'Z1', label: 'Z1 (01-25)' },
                   { id: 'Z2', label: 'Z2 (26-50)' },
                   { id: 'Z3', label: 'Z3 (51-75)' },
@@ -1012,7 +1087,7 @@ export function ScreenM4BillingPOS({
                     type="button"
                     onClick={() => {
                       if (z.id === 'TAKEAWAY') {
-                        handleSwitchSeat('TK-01');
+                        handleSwitchSeat('00');
                         setSeatPickerModalOpen(false);
                       } else {
                         setModalZoneFilter(z.id as any);

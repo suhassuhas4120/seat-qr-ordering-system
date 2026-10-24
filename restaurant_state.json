@@ -2,8 +2,8 @@
   "seats": [
     {
       "id": 0,
-      "seatNumber": "TK-01",
-      "zone": "COUNTER_A",
+      "seatNumber": "Seat 0 (Parcel)",
+      "zone": "TAKEAWAY",
       "currentStatus": "VACANT",
       "epochHash": "6d6f866e777ed540",
       "activeSessionId": null,

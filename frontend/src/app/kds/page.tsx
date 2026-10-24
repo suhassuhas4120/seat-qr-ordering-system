@@ -56,8 +56,18 @@ export default function KitchenDisplayPage() {
 
           bridgeOrders.forEach((bo) => {
             if (!existingTickets.has(bo.order.ticket_number) && !existingIds.has(bo.order.id)) {
-              const rawChair = String(bo.order.chair_id || '01');
-              const cleanSeat = Number(rawChair.replace(/[^0-9]/g, '')) || 1;
+              const rawChair = String(bo.order.chair_id || '');
+              const isTk =
+                rawChair === '0' ||
+                rawChair === '00' ||
+                rawChair === 'TK-00' ||
+                rawChair === 'TK-01' ||
+                rawChair.toUpperCase().includes('TK') ||
+                rawChair.toLowerCase().includes('takeaway') ||
+                rawChair.toLowerCase().includes('parcel') ||
+                (bo.order as any).seat_id === 0;
+
+              const cleanSeat = isTk ? 0 : (Number(rawChair.replace(/[^0-9]/g, '')) || 1);
               tickets.push({
                 id: bo.order.id,
                 orderNumber: bo.order.ticket_number,
@@ -67,8 +77,8 @@ export default function KitchenDisplayPage() {
                 placedAt: new Date().toISOString(),
                 seat: {
                   id: cleanSeat,
-                  seatNumber: `S${String(cleanSeat).padStart(3, '0')}`,
-                  zone: 'COUNTER_A',
+                  seatNumber: isTk ? 'Seat 0 (Parcel)' : `S${String(cleanSeat).padStart(3, '0')}`,
+                  zone: isTk ? 'TAKEAWAY' : 'COUNTER_A',
                   currentStatus: 'OCCUPIED',
                 },
                 items: (bo.items || []).map((it) => ({
@@ -108,10 +118,21 @@ export default function KitchenDisplayPage() {
       }>();
 
       tickets.forEach((t) => {
-        const rawChair = String(t.seatId || t.seat?.id || t.seat?.seatNumber || '01');
-        const isTk = String(t.seat?.seatNumber || rawChair).toUpperCase().includes('TK');
+        const rawChair = String(t.seatId ?? t.seat?.id ?? t.seat?.seatNumber ?? '');
+        const isTk =
+          rawChair === '0' ||
+          rawChair === '00' ||
+          rawChair === 'TK-00' ||
+          rawChair === 'TK-01' ||
+          String(t.seat?.seatNumber || '').toLowerCase().includes('parcel') ||
+          String(t.seat?.seatNumber || '').toLowerCase().includes('takeaway') ||
+          String(t.seat?.zone || '').toUpperCase() === 'TAKEAWAY' ||
+          String(t.orderNumber || '').startsWith('TK-') ||
+          t.seatId === 0 ||
+          t.seat?.id === 0;
+
         const cleanSeatNum = isTk ? 0 : (Number(rawChair.replace(/[^0-9]/g, '')) || 1);
-        const seatKey = isTk ? 'TK-01' : String(cleanSeatNum);
+        const seatKey = isTk ? 'SEAT-00' : String(cleanSeatNum);
 
         const current = seatOrderMap.get(seatKey);
         const ticketNum = t.orderNumber || t.id;
@@ -158,7 +179,7 @@ export default function KitchenDisplayPage() {
             placedAt: t.placedAt || new Date().toISOString(),
             seat: t.seat || {
               id: cleanSeatNum,
-              seatNumber: isTk ? 'TK-01' : `S${String(cleanSeatNum).padStart(3, '0')}`,
+              seatNumber: isTk ? 'Seat 0 (Parcel)' : `S${String(cleanSeatNum).padStart(3, '0')}`,
               zone: isTk ? 'TAKEAWAY' : 'COUNTER_A',
               currentStatus: 'OCCUPIED',
             },
@@ -810,7 +831,11 @@ function TicketCard({
       {/* Ticket Header */}
       <div className={`p-2.5 rounded-lg ${headerBg} flex items-center justify-between mb-3`}>
         <div>
-          <span className="text-sm font-black text-white">Seat #{order.seat?.seatNumber}</span>
+          <span className="text-sm font-black text-white">
+            {order.seat?.seatNumber === 'Seat 0 (Parcel)' || order.seat?.seatNumber === '0' || order.seat?.seatNumber === '00' || order.seatId === 0 || order.seat?.id === 0
+              ? '📦 Seat 0 (Parcel)'
+              : `Seat #${order.seat?.seatNumber}`}
+          </span>
           <span className="text-[10px] text-slate-400 ml-2">({order.seat?.zone || 'Dining Floor'})</span>
         </div>
         <div className="text-right">

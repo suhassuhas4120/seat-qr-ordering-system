@@ -923,8 +923,18 @@ export const realtimeBridge = {
     try {
       const deviceToken = order.device_token || '';
       const generatedId = `ord-${Date.now()}`;
-      const cleanChair = order.chair_id.replace(/[^0-9]/g, '');
-      const cleanSeatId = Number(cleanChair) || 1;
+      const rawChairStr = String(order.chair_id || '').trim();
+      const isTakeaway =
+        rawChairStr === '0' ||
+        rawChairStr === '00' ||
+        rawChairStr === 'TK-00' ||
+        rawChairStr === 'TK-01' ||
+        rawChairStr.toLowerCase().includes('takeaway') ||
+        rawChairStr.toLowerCase().includes('parcel') ||
+        (order as any).seat_id === 0;
+
+      const cleanSeatId = isTakeaway ? 0 : (Number(rawChairStr.replace(/[^0-9]/g, '')) || 1);
+      const cleanChair = isTakeaway ? '00' : (rawChairStr.replace(/[^0-9]/g, '') || '01');
 
       // Detect role
       let role: 'CUSTOMER' | 'WAITER_MOBILE' | 'WAITER_TABLET' | 'MANAGER' = 'CUSTOMER';
@@ -1215,22 +1225,29 @@ export const realtimeBridge = {
   async releaseSeat(chairId: string): Promise<boolean> {
     try {
       const rawStr = String(chairId || '').trim();
-      const numStr = rawStr.replace(/[^0-9]/g, '').replace(/^0+/, '');
-      if (!rawStr && !numStr) return true;
-      const paddedStr = numStr ? numStr.padStart(2, '0') : '00';
-      const possibleChairs = [
-        rawStr,
-        numStr,
-        paddedStr,
-        `Seat ${numStr}`,
-        `Seat ${paddedStr}`,
-        `Chair ${numStr}`,
-        `Chair ${paddedStr}`,
-        `SEAT ${numStr}`,
-        `SEAT ${paddedStr}`,
-        'TK-01',
-        'Takeaway',
-      ];
+      const isTk =
+        rawStr === '0' ||
+        rawStr === '00' ||
+        rawStr === 'TK-00' ||
+        rawStr === 'TK-01' ||
+        rawStr.toLowerCase().includes('takeaway') ||
+        rawStr.toLowerCase().includes('parcel');
+      const numStr = isTk ? '0' : rawStr.replace(/[^0-9]/g, '').replace(/^0+/, '');
+      if (!isTk && !rawStr && !numStr) return true;
+      const paddedStr = isTk ? '00' : (numStr ? numStr.padStart(2, '0') : '01');
+      const possibleChairs = isTk
+        ? ['0', '00', 'TK-00', 'TK-01', 'Takeaway', 'Takeaway Parcel', 'Seat 0', 'Seat 00', 'SEAT 0', 'SEAT 00']
+        : [
+            rawStr,
+            numStr,
+            paddedStr,
+            `Seat ${numStr}`,
+            `Seat ${paddedStr}`,
+            `Chair ${numStr}`,
+            `Chair ${paddedStr}`,
+            `SEAT ${numStr}`,
+            `SEAT ${paddedStr}`,
+          ];
 
       // Remove from local occupancy registry
       const map = getLocalOccupancyMap();
@@ -1828,7 +1845,15 @@ export const realtimeBridge = {
             if (ro.order.id && seenRemoteOrderIds.has(ro.order.id)) return false;
             if (ro.order.ticket_number && seenRemoteTickets.has(ro.order.ticket_number)) return false;
 
-            const roChair = (ro.order.chair_id || '').replace(/[^0-9]/g, '');
+            const isTkRo =
+              ro.order.chair_id === '0' ||
+              ro.order.chair_id === '00' ||
+              ro.order.chair_id === 'TK-00' ||
+              ro.order.chair_id === 'TK-01' ||
+              (ro.order.chair_id || '').toLowerCase().includes('takeaway') ||
+              (ro.order.chair_id || '').toLowerCase().includes('parcel') ||
+              (ro.order as any).seat_id === 0;
+            const roChair = isTkRo ? '00' : (ro.order.chair_id || '').replace(/[^0-9]/g, '');
             const roItemsSig = ro.items.map((i) => `${(i.dish_name || i.dish_id || '').toLowerCase().trim()}:${i.quantity}`).sort().join('|');
             const seatKey = `${roChair}-${roItemsSig}`;
             if (seenSeatItemSigs.has(seatKey)) return false;
@@ -1847,7 +1872,15 @@ export const realtimeBridge = {
             if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
             if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
 
-            const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+            const isTkLo =
+              lo.order.chair_id === '0' ||
+              lo.order.chair_id === '00' ||
+              lo.order.chair_id === 'TK-00' ||
+              lo.order.chair_id === 'TK-01' ||
+              (lo.order.chair_id || '').toLowerCase().includes('takeaway') ||
+              (lo.order.chair_id || '').toLowerCase().includes('parcel') ||
+              (lo.order as any).seat_id === 0;
+            const loChair = isTkLo ? '00' : (lo.order.chair_id || '').replace(/[^0-9]/g, '');
             const loItemsSig = (lo.items || []).map((i) => `${(i.dish_name || i.dish_id || '').toLowerCase().trim()}:${i.quantity}`).sort().join('|');
             const seatKey = `${loChair}-${loItemsSig}`;
             if (seenSeatItemSigs.has(seatKey)) return false;
@@ -2367,11 +2400,20 @@ export const realtimeBridge = {
 
   async settleBill(chairId: string, paymentMethod: string, amount: number, meta?: { ticketNumber?: string }): Promise<boolean> {
     const rawChair = String(chairId || '').trim();
-    const cleanNum = rawChair.replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
-    const cleanChair = cleanNum.padStart(2, '0');
+    const isTk =
+      rawChair === '0' ||
+      rawChair === '00' ||
+      rawChair === 'TK-00' ||
+      rawChair === 'TK-01' ||
+      rawChair.toLowerCase().includes('takeaway') ||
+      rawChair.toLowerCase().includes('parcel');
+    const cleanNum = isTk ? '0' : (rawChair.replace(/[^0-9]/g, '').replace(/^0+/, '') || '1');
+    const cleanChair = isTk ? '00' : cleanNum.padStart(2, '0');
     const padded = cleanChair;
     const unpadded = cleanNum;
-    const possibleChairs = [rawChair, cleanChair, padded, unpadded, `Seat ${cleanChair}`, `Seat ${padded}`, `Seat ${unpadded}`];
+    const possibleChairs = isTk
+      ? ['0', '00', 'TK-00', 'TK-01', 'Takeaway', 'Takeaway Parcel', 'Seat 0', 'Seat 00']
+      : [rawChair, cleanChair, padded, unpadded, `Seat ${cleanChair}`, `Seat ${padded}`, `Seat ${unpadded}`];
 
     // 1. Release seat in local registry and clear bill requests
     await this.releaseSeat(chairId);
@@ -2395,7 +2437,7 @@ export const realtimeBridge = {
     // 2. Mark order completed in Supabase
     if (supabase) {
       try {
-        const seatNum = Number(cleanNum) || 1;
+        const seatNum = isTk ? 0 : (Number(cleanNum) || 1);
         await supabase
           .from('orders')
           .update({ status: 'PAID', updated_at: new Date().toISOString() })
