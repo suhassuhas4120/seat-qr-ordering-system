@@ -254,11 +254,12 @@ export function ScreenM4BillingPOS({
 
     const newOrderItems: OrderItemRecord[] = draftItems.map((it, idx) => {
       const foundDish = MENU_ITEMS.find((m) => m.title === it.name || (m as any).name === it.name);
-      const dishNum = foundDish ? foundDish.id : (idx + 1);
+      const rawDishId = foundDish ? String(foundDish.id) : String(idx + 1);
+      const cleanDishId = rawDishId.startsWith('dish-') ? rawDishId : `dish-${rawDishId}`;
       return {
         chair_id: isTakeaway ? 'TK-01' : activeSeat,
         seat_label: seatDisplayTitle,
-        dish_id: `dish-${dishNum}`,
+        dish_id: cleanDishId,
         dish_name: it.name,
         quantity: it.qty,
         price: it.price,
@@ -329,11 +330,12 @@ export function ScreenM4BillingPOS({
 
       const newOrderItems: OrderItemRecord[] = draftItems.map((it, idx) => {
         const foundDish = MENU_ITEMS.find((m) => m.title === it.name || (m as any).name === it.name);
-        const dishNum = foundDish ? foundDish.id : (idx + 1);
+        const rawDishId = foundDish ? String(foundDish.id) : String(idx + 1);
+        const cleanDishId = rawDishId.startsWith('dish-') ? rawDishId : `dish-${rawDishId}`;
         return {
           chair_id: isTakeaway ? 'TK-01' : activeSeat,
           seat_label: seatDisplayTitle,
-          dish_id: `dish-${dishNum}`,
+          dish_id: cleanDishId,
           dish_name: it.name,
           quantity: it.qty,
           price: it.price,

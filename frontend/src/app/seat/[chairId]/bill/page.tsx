@@ -324,28 +324,6 @@ export default function OrderSummaryBillPage() {
     const cleanChair = chairId.replace(/[^0-9]/g, '');
     const normChair = normalizeSeatId(chairId);
 
-    // Restore stored waiter called and mode from sessionStorage/localStorage
-    if (typeof window !== 'undefined') {
-      try {
-        const storedCalled =
-          sessionStorage.getItem(`thoogudeepa_waiter_called_${chairId}`) ||
-          sessionStorage.getItem(`thoogudeepa_waiter_called_${normChair}`) ||
-          localStorage.getItem(`thoogudeepa_waiter_called_${chairId}`) ||
-          localStorage.getItem(`thoogudeepa_waiter_called_${normChair}`);
-        if (storedCalled === 'true') {
-          setWaiterCalled(true);
-        }
-        const storedMode =
-          sessionStorage.getItem(`thoogudeepa_waiter_mode_${chairId}`) ||
-          sessionStorage.getItem(`thoogudeepa_waiter_mode_${normChair}`) ||
-          localStorage.getItem(`thoogudeepa_waiter_mode_${chairId}`) ||
-          localStorage.getItem(`thoogudeepa_waiter_mode_${normChair}`);
-        if (storedMode === 'qr' || storedMode === 'cash') {
-          setWaiterSelectedMode(storedMode);
-        }
-      } catch {}
-    }
-
     // Join dedicated seat room for real-time socket events
     try {
       const socket = getSocket();
@@ -354,11 +332,11 @@ export default function OrderSummaryBillPage() {
       }
     } catch {}
 
-    // Check server authoritative bill mode
+    // Check server authoritative bill mode (the single source of truth for waiter bill mode)
     realtimeBridge.getSeatBillMode(cleanChair || normChair || chairId).then((bm) => {
       if (bm.active) {
         setWaiterCalled(true);
-        if (bm.mode) {
+        if (bm.mode === 'qr' || bm.mode === 'cash') {
           setWaiterSelectedMode(bm.mode);
         }
       } else {
@@ -469,6 +447,34 @@ export default function OrderSummaryBillPage() {
     });
 
     const unsub = realtimeBridge.subscribeKDS({
+      onNewOrder: (data) => {
+        const targetNorm = normalizeSeatId(data.order?.chair_id);
+        const currentNorm = normalizeSeatId(chairId);
+        if (targetNorm === currentNorm || data.order?.chair_id === chairId || data.order?.chair_id === cleanChair) {
+          realtimeBridge.getOrderForSeat(cleanChair || chairId).then((res) => {
+            if (res.order && res.items.length > 0) {
+              const syncedItems = res.items.map((it, idx) => ({
+                id: it.id || `item-${chairId}-${idx}`,
+                title: it.dish_name,
+                quantity: it.quantity,
+                price: it.price,
+              }));
+              const updated: ActiveDiningSession = {
+                seatId: chairId,
+                ticketNumber: res.order.ticket_number || '',
+                orderId: res.order.id || '',
+                orderStatus: 'pending',
+                paymentStatus: 'unpaid',
+                orderedAt: Date.now(),
+                totalAmount: res.order.total_amount || syncedItems.reduce((acc, it) => acc + it.price * it.quantity, 0),
+                items: syncedItems,
+              };
+              setSession(updated);
+              setActiveDiningSession(updated);
+            }
+          });
+        }
+      },
       onBillModeActive: (data) => {
         const targetNorm = normalizeSeatId(data.normChairId || data.chairId || data.rawChairId);
         const currentNorm = normalizeSeatId(chairId);

@@ -4,7 +4,6 @@ import { getSocket } from './socket';
 import { SOCKET_EVENTS, normalizeSeatIdentity } from '@seat-order/shared';
 
 export function getBackendUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const host = window.location.hostname;
     if (host !== 'localhost' && host !== '127.0.0.1') {
@@ -12,6 +11,7 @@ export function getBackendUrl(): string {
       return `${proto}//${host}:4000`;
     }
   }
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   return 'http://localhost:4000';
 }
 
@@ -925,7 +925,7 @@ export const realtimeBridge = {
           }),
         });
 
-        if (res.status === 409) {
+        if (res.status === 409 && role === 'CUSTOMER') {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || 'SEAT_ALREADY_OCCUPIED: Seat is currently occupied by another customer.');
         }
@@ -941,7 +941,7 @@ export const realtimeBridge = {
         }
         processedOrderIds.add(generatedId);
       } catch (e: any) {
-        if (e?.message?.includes('SEAT_ALREADY_OCCUPIED') || e?.message?.includes('ACTIVE_SESSION_EXISTS')) {
+        if (role === 'CUSTOMER' && (e?.message?.includes('SEAT_ALREADY_OCCUPIED') || e?.message?.includes('ACTIVE_SESSION_EXISTS'))) {
           throw e;
         }
         console.warn('Backend order placement warning:', e);
@@ -976,33 +976,22 @@ export const realtimeBridge = {
       // 4. Remote Supabase insertion if connected (strictly matching authoritative backend data)
       if (supabase) {
         try {
-          const { data: orderData, error: orderErr } = await supabase
+          const { error: orderErr } = await supabase
             .from('orders')
-            .insert({
+            .upsert({
+              id: backendOrderId,
+              seat_id: cleanSeatId,
               ticket_number: backendTicketNumber,
-              chair_id: order.chair_id,
-              seat_label: order.seat_label,
-              status: order.status || 'pending',
+              status: 'PLACED',
               total_amount: order.total_amount,
-            })
-            .select('id')
-            .single();
+              currency: 'INR',
+              items_payload: confirmedItems,
+            }, { onConflict: 'id' });
 
-          if (!orderErr && orderData) {
-            processedOrderIds.add(orderData.id);
-            const itemsToInsert = confirmedItems.map((it) => ({
-              order_id: orderData.id,
-              chair_id: it.chair_id,
-              seat_label: it.seat_label,
-              dish_id: it.dish_id,
-              dish_name: it.dish_name,
-              quantity: it.quantity,
-              price: it.price,
-              stage: 'REC' as const,
-              notes: it.notes || '',
-              addons: ['PLACED'],
-            }));
-            await supabase.from('order_items').insert(itemsToInsert);
+          if (!orderErr) {
+            processedOrderIds.add(backendOrderId);
+          } else {
+            console.warn('Supabase sync warning:', orderErr);
           }
         } catch (supabaseErr) {
           console.warn('Supabase sync warning:', supabaseErr);
@@ -1725,15 +1714,9 @@ export const realtimeBridge = {
             return true;
           });
 
-          // Normalized chair IDs present in remote orders (strips non-digits and leading zeros)
-          const remoteChairs = new Set(
-            dedupedRemoteOrders.map((ro) => (ro.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0')
-          );
           const remoteTickets = new Set(dedupedRemoteOrders.map((ro) => ro.order.ticket_number));
           const remoteOrderIds = new Set(dedupedRemoteOrders.map((ro) => ro.order.id));
           const validLocalOrders = localOrders.filter((lo) => {
-            const loChairNorm = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
-            if (remoteChairs.has(loChairNorm)) return false;
             if (!lo.order?.id || !lo.order?.ticket_number) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
             if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
@@ -1863,14 +1846,9 @@ export const realtimeBridge = {
           // Merge backend orders with any local orders not yet on backend
           const backendIds = new Set(dedupedBackendOrders.map((bo) => bo.order.id));
           const backendTickets = new Set(dedupedBackendOrders.map((bo) => bo.order.ticket_number));
-          const backendChairNums = new Set(
-            dedupedBackendOrders.map((bo) => (bo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0')
-          );
 
           const pendingLocals = localOrders.filter((lo) => {
-            const loNum = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
-            if (backendChairNums.has(loNum)) return false;
-            if (backendIds.has(lo.order.id) || backendTickets.has(lo.order.ticket_number)) return false;
+            if (backendIds.has(lo.order.id) || (lo.order.ticket_number && backendTickets.has(lo.order.ticket_number))) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
             return true;
           });

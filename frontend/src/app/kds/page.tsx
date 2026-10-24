@@ -33,13 +33,62 @@ export default function KitchenDisplayPage() {
   const [viewMode, setViewMode] = useState<'KANBAN' | 'ITEMS' | 'BATCH'>('KANBAN');
   const [itemFilter, setItemFilter] = useState<'ALL' | 'QUEUED' | 'COOKING' | 'READY' | 'SERVED'>('ALL');
 
-  // Load active tickets
+  // Load active tickets with hybrid backend + realtimeBridge resilience
   const loadTickets = async () => {
     try {
-      const tickets = await fetchApi<any[]>('/api/kds/tickets');
+      let tickets: any[] = [];
+      try {
+        const res = await fetchApi<any[]>('/api/kds/tickets');
+        if (Array.isArray(res)) tickets = res;
+      } catch (e) {
+        console.warn('Backend /api/kds/tickets fetch warning:', e);
+      }
+
+      // Merge with realtimeBridge active orders for complete hybrid resilience
+      try {
+        const bridgeOrders = await realtimeBridge.getActiveOrders();
+        if (bridgeOrders && bridgeOrders.length > 0) {
+          const existingTickets = new Set(tickets.map((t) => t.orderNumber || t.id));
+          const existingIds = new Set(tickets.map((t) => t.id));
+
+          bridgeOrders.forEach((bo) => {
+            if (!existingTickets.has(bo.order.ticket_number) && !existingIds.has(bo.order.id)) {
+              const rawChair = String(bo.order.chair_id || '01');
+              const cleanSeat = Number(rawChair.replace(/[^0-9]/g, '')) || 1;
+              tickets.push({
+                id: bo.order.id,
+                orderNumber: bo.order.ticket_number,
+                seatId: cleanSeat,
+                overallStage: bo.order.status === 'completed' ? 'SERVED' : 'PLACED',
+                totalAmount: bo.order.total_amount || 0,
+                placedAt: new Date().toISOString(),
+                seat: {
+                  id: cleanSeat,
+                  seatNumber: `S${String(cleanSeat).padStart(3, '0')}`,
+                  zone: 'COUNTER_A',
+                  currentStatus: 'OCCUPIED',
+                },
+                items: (bo.items || []).map((it) => ({
+                  id: it.id,
+                  orderId: bo.order.id,
+                  menuItemId: Number(it.dish_id?.replace(/[^0-9]/g, '')) || 1,
+                  nameSnapshot: it.dish_name,
+                  priceSnapshot: it.price,
+                  quantity: it.quantity,
+                  notes: it.notes || null,
+                  itemStage: it.stage === 'SERVED' ? 'SERVED' : it.stage === 'READY' ? 'READY' : it.stage === 'PREP' ? 'COOKING' : 'QUEUED',
+                })),
+              });
+            }
+          });
+        }
+      } catch (bridgeErr) {
+        console.warn('realtimeBridge ticket merge warning:', bridgeErr);
+      }
+
       setOrders(tickets);
     } catch (err: any) {
-      toast.error('Failed to load kitchen tickets.');
+      console.warn('Failed to load kitchen tickets:', err);
     }
   };
 
