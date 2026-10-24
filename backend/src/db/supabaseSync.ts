@@ -11,9 +11,21 @@ export const isSupabaseConfigured = Boolean(
   !supabaseUrl.includes('placeholder')
 );
 
-class SupabaseSyncService {
+export interface OutboxItem {
+  id: string;
+  type: 'ORDER' | 'STAGE' | 'PAYMENT' | 'SEAT' | 'AUDIT' | 'ALERT';
+  payload: any;
+  attempts: number;
+  createdAt: number;
+  lastAttemptAt?: number;
+}
+
+class SupabaseOutboxSyncService {
   private client: SupabaseClient | null = null;
-  private isEnabled = false;
+  public isEnabled = false;
+  private queue: OutboxItem[] = [];
+  private isProcessing = false;
+  private maxRetries = 5;
 
   constructor() {
     if (isSupabaseConfigured) {
@@ -35,126 +47,178 @@ class SupabaseSyncService {
   }
 
   /**
-   * Asynchronously mirrors an order to Supabase Postgres.
-   * Completely non-blocking — local requests respond at sub-millisecond speeds.
+   * Enqueue mutation task into background outbox.
+   * Completely non-blocking (0.01ms latency).
    */
-  public async syncOrder(order: Order): Promise<void> {
+  private enqueue(type: OutboxItem['type'], payload: any) {
     if (!this.isEnabled || !this.client) return;
 
-    try {
-      const { error } = await this.client
-        .from('orders')
-        .upsert({
-          id: order.id,
-          seat_id: order.seatId,
-          session_id: order.sessionId,
-          status: order.overallStage,
-          total_amount: order.items.reduce((sum, item) => sum + (item.priceSnapshot * item.quantity), 0),
-          currency: 'INR',
-          created_at: order.placedAt,
-          items_payload: order.items,
-        }, { onConflict: 'id' });
+    this.queue.push({
+      id: `outbox-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      type,
+      payload,
+      attempts: 0,
+      createdAt: Date.now(),
+    });
 
-      if (error) {
-        console.warn(`[SupabaseSync] Failed to sync order ${order.id}:`, error.message);
+    this.processQueue();
+  }
+
+  private async processQueue() {
+    if (this.isProcessing || this.queue.length === 0) return;
+    this.isProcessing = true;
+
+    while (this.queue.length > 0) {
+      const item = this.queue[0];
+      try {
+        await this.dispatchItem(item);
+        this.queue.shift(); // Success, remove from front
+      } catch (err: any) {
+        item.attempts += 1;
+        item.lastAttemptAt = Date.now();
+        console.warn(`[SupabaseOutbox] Task ${item.type} attempt ${item.attempts} failed:`, err?.message || err);
+
+        if (item.attempts >= this.maxRetries) {
+          console.error(`[SupabaseOutbox] Dropping task ${item.type} after ${this.maxRetries} failed attempts.`);
+          this.queue.shift();
+        } else {
+          // Pause queue execution with exponential backoff before next retry
+          await new Promise((res) => setTimeout(res, Math.min(10000, 1000 * Math.pow(2, item.attempts))));
+          break;
+        }
       }
-    } catch (err: any) {
-      console.warn(`[SupabaseSync] Error syncing order ${order.id}:`, err?.message || err);
     }
+
+    this.isProcessing = false;
   }
 
-  /**
-   * Asynchronously updates dish stage in cloud database.
-   */
-  public async syncItemStage(orderId: string, itemId: string, stage: string): Promise<void> {
-    if (!this.isEnabled || !this.client) return;
+  private async dispatchItem(item: OutboxItem) {
+    if (!this.client) return;
 
-    try {
-      const { error } = await this.client
-        .from('order_item_events')
-        .insert({
-          order_id: orderId,
-          item_id: itemId,
-          stage,
-          recorded_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        console.warn(`[SupabaseSync] Failed to log stage event:`, error.message);
+    switch (item.type) {
+      case 'ORDER': {
+        const order: Order = item.payload;
+        const total = order.items.reduce((sum, it) => sum + (it.priceSnapshot * it.quantity), 0);
+        await this.client
+          .from('orders')
+          .upsert({
+            id: order.id,
+            seat_id: order.seatId,
+            session_id: order.sessionId,
+            ticket_number: order.orderNumber,
+            status: order.overallStage,
+            total_amount: total,
+            currency: 'INR',
+            created_at: order.placedAt,
+            items_payload: order.items,
+          }, { onConflict: 'id' });
+        break;
       }
-    } catch (err: any) {
-      console.warn(`[SupabaseSync] Error logging stage:`, err?.message || err);
-    }
-  }
-
-  /**
-   * Asynchronously mirrors financial settlement to Supabase.
-   */
-  public async syncPayment(payment: Payment): Promise<void> {
-    if (!this.isEnabled || !this.client) return;
-
-    try {
-      const { error } = await this.client
-        .from('payments')
-        .upsert({
-          id: payment.id,
-          order_id: payment.sessionId, // linked to session
-          amount: payment.finalAmount,
-          method: payment.gateway,
-          status: payment.status,
-          transaction_ref: payment.gatewayPaymentId || null,
-          staff_id: payment.staffId ? String(payment.staffId) : null,
-          created_at: payment.completedAt || new Date().toISOString(),
-        }, { onConflict: 'id' });
-
-      if (error) {
-        console.warn(`[SupabaseSync] Failed to sync payment ${payment.id}:`, error.message);
+      case 'STAGE': {
+        const { orderId, itemId, stage } = item.payload;
+        await this.client
+          .from('order_item_events')
+          .insert({
+            order_id: orderId,
+            item_id: itemId,
+            stage,
+            recorded_at: new Date().toISOString(),
+          });
+        break;
       }
-    } catch (err: any) {
-      console.warn(`[SupabaseSync] Error syncing payment ${payment.id}:`, err?.message || err);
+      case 'PAYMENT': {
+        const payment: Payment = item.payload;
+        await this.client
+          .from('payments')
+          .upsert({
+            id: payment.id,
+            session_id: payment.sessionId,
+            seat_id: payment.seatId,
+            subtotal: payment.subtotal || 0,
+            tax_amount: payment.taxAmount || 0,
+            final_amount: payment.finalAmount,
+            method: payment.gateway,
+            status: payment.status,
+            transaction_ref: payment.gatewayPaymentId || null,
+            settled_by_role: payment.settledByRole,
+            staff_id: payment.staffId ? Number(payment.staffId) : null,
+            created_at: payment.completedAt || new Date().toISOString(),
+          }, { onConflict: 'id' });
+        break;
+      }
+      case 'SEAT': {
+        const seat: Seat = item.payload;
+        await this.client
+          .from('seats')
+          .upsert({
+            id: seat.id,
+            seat_number: seat.seatNumber,
+            zone: seat.zone,
+            current_status: seat.currentStatus,
+            active_order_total: seat.activeOrderTotal || 0,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
+        break;
+      }
+      case 'ALERT': {
+        const alert = item.payload;
+        await this.client
+          .from('service_alerts')
+          .upsert({
+            id: alert.id,
+            seat_id: Number(alert.chairId) || 0,
+            alert_type: alert.type || 'customer_call',
+            title: alert.title,
+            message: alert.message,
+            bill_amount: alert.billAmount || 0,
+            is_urgent: Boolean(alert.isUrgent),
+            is_resolved: Boolean(alert.isResolved),
+            created_at: alert.createdAt ? new Date(alert.createdAt).toISOString() : new Date().toISOString(),
+          }, { onConflict: 'id' });
+        break;
+      }
+      case 'AUDIT': {
+        const { type, payload } = item.payload;
+        await this.client
+          .from('audit_logs')
+          .insert({
+            event_type: type,
+            payload,
+            created_at: new Date().toISOString(),
+          });
+        break;
+      }
     }
   }
 
-  /**
-   * Asynchronously records an audit log entry.
-   */
-  public async syncAuditLog(type: string, payload: any): Promise<void> {
-    if (!this.isEnabled || !this.client) return;
-
-    try {
-      await this.client
-        .from('audit_logs')
-        .insert({
-          event_type: type,
-          payload,
-          created_at: new Date().toISOString(),
-        });
-    } catch {
-      // Silently ignore cloud audit log failures
-    }
+  // Public non-blocking trigger APIs
+  public syncOrder(order: Order): void {
+    this.enqueue('ORDER', order);
   }
 
-  /**
-   * Syncs seat live state.
-   */
-  public async syncSeat(seat: Seat): Promise<void> {
-    if (!this.isEnabled || !this.client) return;
+  public syncItemStage(orderId: string, itemId: string, stage: string): void {
+    this.enqueue('STAGE', { orderId, itemId, stage });
+  }
 
-    try {
-      await this.client
-        .from('seats')
-        .upsert({
-          id: seat.id,
-          seat_number: seat.seatNumber,
-          zone: seat.zone,
-          current_status: seat.currentStatus,
-          active_order_total: seat.activeOrderTotal || 0,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'id' });
-    } catch {
-      // Non-blocking
-    }
+  public syncPayment(payment: Payment): void {
+    this.enqueue('PAYMENT', payment);
+  }
+
+  public syncSeat(seat: Seat): void {
+    this.enqueue('SEAT', seat);
+  }
+
+  public syncAlert(alert: any): void {
+    this.enqueue('ALERT', alert);
+  }
+
+  public syncAuditLog(type: string, payload: any): void {
+    this.enqueue('AUDIT', { type, payload });
+  }
+
+  public getQueueLength(): number {
+    return this.queue.length;
   }
 }
 
-export const supabaseSync = new SupabaseSyncService();
+export const supabaseSync = new SupabaseOutboxSyncService();
