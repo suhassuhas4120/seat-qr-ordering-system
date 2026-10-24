@@ -60,9 +60,11 @@ export default function CustomerCartPage() {
   // Compute live subtotal, GST (5%), and total
   const subtotal = useMemo(() => {
     return activeItemIds.reduce((sum, id) => {
-      const qty = items[id]?.quantity || 0;
+      const entry = items[id];
+      const qty = entry?.quantity || 0;
       const dish = getMenuItemById(id);
-      return sum + dish.price * qty;
+      const addOnsCost = entry?.addOnsCost || 0;
+      return sum + (dish.price + addOnsCost) * qty;
     }, 0);
   }, [activeItemIds, items]);
 
@@ -85,8 +87,12 @@ export default function CustomerCartPage() {
         if (cartEntry?.addOns && cartEntry.addOns.length > 0) {
           notesParts.push(`Add-ons: ${cartEntry.addOns.join(', ')}`);
         }
+        if (cartEntry?.specialInstructions) {
+          notesParts.push(`Note: ${cartEntry.specialInstructions}`);
+        }
         const notes = notesParts.length > 0 ? notesParts.join(' • ') : undefined;
         const uniqueId = `item-${chairId}-${id}-${nowTs}-${idx}`;
+        const unitPriceWithAddons = catalogEntry.price + (cartEntry?.addOnsCost || 0);
 
         return {
           id: uniqueId,
@@ -95,7 +101,7 @@ export default function CustomerCartPage() {
           dish_id: id.startsWith('dish-') ? id : `dish-${id}`,
           dish_name: catalogEntry.title,
           quantity: qty,
-          price: catalogEntry.price,
+          price: unitPriceWithAddons,
           stage: 'PLACED' as const,
           notes,
           addons: cartEntry?.addOns,
@@ -314,11 +320,28 @@ export default function CustomerCartPage() {
                     <span className="text-xs font-bold text-[#1A2621] truncate">
                       {dish.title}
                     </span>
-                    <span className="text-[11px] font-medium text-[#5A6860] line-clamp-1">
-                      {dish.description}
-                    </span>
+                    {items[itemId]?.selectedOption && (
+                      <span className="text-[10px] font-semibold text-[#244436] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 w-fit">
+                        {items[itemId].selectedOption}
+                      </span>
+                    )}
+                    {items[itemId]?.addOns && items[itemId].addOns!.length > 0 && (
+                      <span className="text-[10px] text-[#5A6860] line-clamp-1">
+                        + {items[itemId].addOns!.join(', ')}
+                      </span>
+                    )}
+                    {items[itemId]?.specialInstructions && (
+                      <span className="text-[10px] italic text-amber-800 line-clamp-1">
+                        Note: &ldquo;{items[itemId].specialInstructions}&rdquo;
+                      </span>
+                    )}
                     <span className="text-xs font-black text-[#244436] mt-0.5">
-                      ₹ {dish.price}
+                      ₹ {(dish.price + (items[itemId]?.addOnsCost || 0)) * qty}
+                      {(items[itemId]?.addOnsCost || 0) > 0 && (
+                        <span className="text-[10px] text-[#5A6860] font-normal ml-1">
+                          (₹{dish.price + (items[itemId]?.addOnsCost || 0)} ea)
+                        </span>
+                      )}
                     </span>
                   </div>
 

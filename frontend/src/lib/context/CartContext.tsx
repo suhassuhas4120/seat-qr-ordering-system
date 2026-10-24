@@ -7,6 +7,8 @@ export interface CartEntry {
   quantity: number;
   selectedOption?: string;
   addOns?: string[];
+  addOnsCost?: number;
+  specialInstructions?: string;
 }
 
 interface CartContextType {
@@ -17,7 +19,9 @@ interface CartContextType {
     itemId: string,
     quantity: number,
     selectedOption?: string,
-    addOns?: string[]
+    addOns?: string[],
+    specialInstructions?: string,
+    addOnsCost?: number
   ) => void;
   clearCart: () => void;
   totalItemCount: number;
@@ -114,7 +118,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     itemId: string,
     quantity: number,
     selectedOption?: string,
-    addOns?: string[]
+    addOns?: string[],
+    specialInstructions?: string,
+    addOnsCost?: number
   ) => {
     setItems((prev) => {
       const currentQty = prev[itemId]?.quantity || 0;
@@ -123,8 +129,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         [itemId]: {
           itemId,
           quantity: currentQty + quantity,
-          selectedOption,
-          addOns,
+          selectedOption: selectedOption || prev[itemId]?.selectedOption,
+          addOns: addOns || prev[itemId]?.addOns,
+          specialInstructions: specialInstructions || prev[itemId]?.specialInstructions,
+          addOnsCost: addOnsCost !== undefined ? addOnsCost : (prev[itemId]?.addOnsCost || 0),
         },
       };
     });
