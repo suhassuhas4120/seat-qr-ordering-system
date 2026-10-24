@@ -36,11 +36,6 @@ export default function LiveOrderTrackingPage() {
 
   const seatNumber = chairId.replace(/[^0-9]/g, '') || chairId;
 
-  const handleOrderAgain = () => {
-    clearActiveDiningSession();
-    router.push(`/seat/${chairId}/menu`);
-  };
-
   const [session, setSession] = useState<ActiveDiningSession | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [itemStages, setItemStages] = useState<Record<string, 'PLACED' | 'REC' | 'PREP' | 'READY' | 'SERVED'>>({});
@@ -478,14 +473,6 @@ export default function LiveOrderTrackingPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleOrderAgain}
-              className="text-[11px] font-black uppercase tracking-wider text-amber-900 bg-amber-400 hover:bg-amber-300 border border-amber-500 px-2.5 py-1 rounded-xl cursor-pointer transition-colors shadow-2xs active:scale-95"
-              title="Start a new meal session"
-            >
-              Order Again
-            </button>
             <div className="border border-[#244436]/20 px-2.5 py-1 rounded-xl text-xs font-bold bg-[#FFFEFC] text-[#244436] shadow-2xs">
               Seat {seatNumber}
             </div>
@@ -555,19 +542,7 @@ export default function LiveOrderTrackingPage() {
             <div className="w-full flex flex-col gap-4">
               {trackingDishes.map((dish, idx) => {
                 const cleanDishNum = (dish.dish_id || dish.id || '').replace(/^dish-/, '');
-                const dishDetails = getMenuItemById(cleanDishNum) || {
-                  id: cleanDishNum,
-                  name: dish.title || 'Dish',
-                  kannadaName: '',
-                  price: dish.price || 150,
-                  category: 'biryani' as const,
-                  dietary: 'non_veg' as const,
-                  description: '',
-                  prepTimeMinutes: 15,
-                  imageUrl: '/images/dishes/chicken-donne-biryani.jpg',
-                  isAvailable: true,
-                  isBestseller: false,
-                };
+                const dishDetails = getMenuItemById(cleanDishNum);
 
                 // Determine this item's specific stage
                 const tNum = session?.ticketNumber || '';
@@ -654,6 +629,22 @@ export default function LiveOrderTrackingPage() {
 
                         <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-1.5">
+                            {/* FSSAI Dietary Badge */}
+                            <span
+                              className={`w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center shrink-0 p-0.5 ${
+                                dishDetails.isVegetarian
+                                  ? 'border-emerald-600 bg-emerald-50/60'
+                                  : 'border-red-600 bg-red-50/60'
+                              }`}
+                              title={dishDetails.isVegetarian ? 'Vegetarian' : 'Non-Vegetarian'}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  dishDetails.isVegetarian ? 'bg-emerald-600' : 'bg-red-600'
+                                }`}
+                              />
+                            </span>
+
                             <span className="w-5 h-5 rounded-md bg-[#244436] text-white text-[10px] font-black flex items-center justify-center shrink-0">
                               {dish.quantity}x
                             </span>
@@ -661,6 +652,14 @@ export default function LiveOrderTrackingPage() {
                               {dish.title}
                             </h3>
                           </div>
+
+                          {/* Customization Details & Notes if present */}
+                          {dish.notes && (
+                            <span className="text-[10px] text-[#5A6860] line-clamp-1 italic bg-[#F9F8F5] px-1.5 py-0.5 rounded border border-[rgba(220,226,222,0.6)] mt-0.5 w-fit">
+                              {dish.notes}
+                            </span>
+                          )}
+
                           <span className="text-[11px] font-bold text-[#5A6860] mt-0.5">
                             ₹ {dish.price * dish.quantity}
                           </span>
@@ -767,20 +766,25 @@ export default function LiveOrderTrackingPage() {
             <div className="flex items-center gap-2">
               <Link
                 href={`/seat/${chairId}/bill`}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:opacity-90 cursor-pointer text-center shadow-md hover:shadow-lg transition-all"
+                className="px-5 py-2.5 bg-gradient-to-r from-[#244436] to-[#DD6B28] text-white text-xs font-black uppercase tracking-wider rounded-xl active:opacity-90 cursor-pointer text-center shadow-md hover:shadow-lg transition-all"
               >
-                Pay Bill
+                Pay Bill &rarr;
               </Link>
             </div>
           ) : (
-            <button
-              type="button"
-              disabled
-              className="px-6 py-2.5 bg-zinc-200 text-zinc-400 border border-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl cursor-not-allowed select-none text-center shadow-none opacity-80"
-              title="Pay Bill will be enabled once all dishes are served at your table"
-            >
-              Pay Bill
-            </button>
+            <div className="flex flex-col items-end">
+              <button
+                type="button"
+                disabled
+                className="px-5 py-2 bg-zinc-200 text-zinc-500 border border-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl cursor-not-allowed select-none text-center shadow-none opacity-90"
+                title="Pay Bill will be enabled once all dishes are served at your table"
+              >
+                In Kitchen Prep
+              </button>
+              <span className="text-[9px] text-[#8C7A6B] font-medium mt-0.5">
+                Bill unlocks when served
+              </span>
+            </div>
           )}
         </div>
       )}
