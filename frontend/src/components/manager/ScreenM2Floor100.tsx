@@ -46,7 +46,7 @@ export function ScreenM2Floor100({
   const [selectedZone, setSelectedZone] = useState<number | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'VACANT' | 'OCCUPIED' | 'BILLING' | 'ALERT'>('ALL');
   const [printKotNotice, setPrintKotNotice] = useState<string | null>(null);
-  const [vacatedSeats, setVacatedSeats] = useState<Set<string>>(new Set());
+  const [vacatedSeats, setVacatedSeats] = useState<Map<string, number>>(new Map());
   const [shiftSales, setShiftSales] = useState<number>(() => {
     if (typeof window !== 'undefined' && realtimeBridge.getSettledBills) {
       const settled = realtimeBridge.getSettledBills();
@@ -80,26 +80,33 @@ export function ScreenM2Floor100({
       const chairId = i < 10 ? `0${i}` : `${i}`;
       const unpadded = String(i);
 
-      if (vacatedSeats.has(chairId) || vacatedSeats.has(unpadded)) {
-        list.push({
-          seatNumber: i,
-          chairId,
-          status: 'vacant' as const,
-          waiterName: i <= 25 ? 'Ramesh Kumar (Zone 1)' : i <= 50 ? 'Suresh M (Zone 2)' : i <= 75 ? 'Anand Kumar (Zone 3)' : 'Deepa Naik (Zone 4)',
-          liveOrders: [],
-          liveItems: [],
-          alert: undefined,
-          runningTotal: 0,
-        });
-        continue;
-      }
-
       // Match live orders specifically for this seat
       const rawMatchingLiveOrders = liveOrders.filter((o) => {
         if (o.order.status === 'completed' || o.order.status === 'cancelled') return false;
         const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
         return oChair === chairId || oChair === unpadded || Number(oChair) === i;
       });
+
+      const vacateTime = vacatedSeats.get(chairId) || vacatedSeats.get(unpadded);
+      if (vacateTime) {
+        const hasNewerOrder = rawMatchingLiveOrders.some((o) => {
+          const t = o.order.created_at ? new Date(o.order.created_at).getTime() : 0;
+          return t > vacateTime;
+        });
+        if (!hasNewerOrder) {
+          list.push({
+            seatNumber: i,
+            chairId,
+            status: 'vacant' as const,
+            waiterName: i <= 25 ? 'Ramesh Kumar (Zone 1)' : i <= 50 ? 'Suresh M (Zone 2)' : i <= 75 ? 'Anand Kumar (Zone 3)' : 'Deepa Naik (Zone 4)',
+            liveOrders: [],
+            liveItems: [],
+            alert: undefined,
+            runningTotal: 0,
+          });
+          continue;
+        }
+      }
 
       const hasAuth = rawMatchingLiveOrders.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
       const activeSeatOrders = hasAuth
@@ -263,10 +270,11 @@ export function ScreenM2Floor100({
     if (!activeSelectedSeat) return;
     if (confirm(`Confirm vacate Seat #${activeSelectedSeat.chairId}?`)) {
       await realtimeBridge.releaseSeat(activeSelectedSeat.chairId);
+      const now = Date.now();
       setVacatedSeats((prev) => {
-        const next = new Set(prev);
-        next.add(activeSelectedSeat.chairId);
-        next.add(String(activeSelectedSeat.seatNumber));
+        const next = new Map(prev);
+        next.set(activeSelectedSeat.chairId, now);
+        next.set(String(activeSelectedSeat.seatNumber), now);
         return next;
       });
       onRefresh();
@@ -424,6 +432,7 @@ export function ScreenM2Floor100({
                 { id: 'ALL', label: 'All' },
                 { id: 'OCCUPIED', label: 'Seated' },
                 { id: 'BILLING', label: 'Billing' },
+                { id: 'ALERT', label: 'Alerts' },
                 { id: 'VACANT', label: 'Vacant' },
               ].map((f) => (
                 <button
@@ -619,9 +628,20 @@ export function ScreenM2Floor100({
                           {it.prepTag}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-500 block mt-1">
-                        Status: <span className="font-bold text-orange-800">{it.stage}</span>
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px]">
+                        <span className="text-slate-400">Status:</span>
+                        <span className={`font-black text-[9px] uppercase px-1.5 py-0.5 rounded ${
+                          it.stage === 'READY'
+                            ? 'text-emerald-800 bg-emerald-100 border border-emerald-300'
+                            : it.stage === 'PREP' || it.stage === 'REC'
+                            ? 'text-amber-900 bg-amber-100 border border-amber-300'
+                            : it.stage === 'SERVED'
+                            ? 'text-slate-700 bg-slate-200 border border-slate-300'
+                            : 'text-blue-800 bg-blue-100 border border-blue-300'
+                        }`}>
+                          {it.stage}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-right shrink-0">
