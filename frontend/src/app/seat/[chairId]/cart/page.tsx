@@ -28,7 +28,7 @@ import {
   getDeviceToken,
   isDeviceLockedToDifferentSeat,
 } from '../../../../lib/session/diningSession';
-import { getMenuItemById } from '../../../../lib/data/menuData';
+import { getMenuItemById, MENU_ITEMS } from '../../../../lib/data/menuData';
 
 export default function CustomerCartPage() {
   const params = useParams();
@@ -81,10 +81,65 @@ export default function CustomerCartPage() {
     return Object.keys(items).filter((id) => (items[id]?.quantity || 0) > 0);
   }, [items]);
 
-  // Slidable military hotel suggestions to complement meal
-  const extraItems = ['dish-18', 'dish-21', 'dish-13', 'dish-5', 'dish-6', 'dish-10'].filter(
-    (id) => !activeItemIds.includes(id) && !activeItemIds.includes(id.replace(/^dish-/, ''))
-  );
+  // Dynamic complements recommendation based on current cart items (strictly zero duplicates)
+  const extraItems = useMemo(() => {
+    // 1. Gather all normalized cart item IDs (both 'dish-X' and 'X')
+    const cartNormalizedSet = new Set<string>();
+    activeItemIds.forEach((id) => {
+      const clean = id.replace(/^dish-/, '');
+      cartNormalizedSet.add(clean);
+      cartNormalizedSet.add(`dish-${clean}`);
+      cartNormalizedSet.add(id);
+    });
+
+    // 2. Analyze contents of the cart
+    const cartDishes = activeItemIds.map((id) => getMenuItemById(id));
+    const hasBiryani = cartDishes.some((d) => d.categoryId === 'cat-biryani');
+    const hasStarter = cartDishes.some((d) => d.categoryId === 'cat-starters');
+    const hasSpecialOrSoup = cartDishes.some((d) => d.categoryId === 'cat-special');
+    const isAllVeg = cartDishes.length > 0 && cartDishes.every((d) => d.isVegetarian);
+
+    // Candidate ranking list
+    let candidatePool: string[] = [];
+
+    if (cartDishes.length === 0) {
+      candidatePool = ['dish-20', 'dish-18', 'dish-22', 'dish-1', 'dish-13', 'dish-3'];
+    } else if (isAllVeg) {
+      candidatePool = ['dish-3', 'dish-4', 'dish-21', 'dish-2'];
+    } else if (hasBiryani && !hasStarter) {
+      candidatePool = ['dish-18', 'dish-13', 'dish-14', 'dish-12', 'dish-7', 'dish-1'];
+    } else if (hasStarter && !hasBiryani) {
+      candidatePool = ['dish-20', 'dish-22', 'dish-21', 'dish-1', 'dish-3'];
+    } else if (hasBiryani && hasStarter && !hasSpecialOrSoup) {
+      candidatePool = ['dish-1', 'dish-2', 'dish-5', 'dish-6', 'dish-12', 'dish-4'];
+    } else {
+      candidatePool = ['dish-18', 'dish-21', 'dish-1', 'dish-13', 'dish-12', 'dish-7', 'dish-3', 'dish-4'];
+    }
+
+    // Filter strictly to items that are NOT already in the cart
+    const filtered = candidatePool.filter((id) => {
+      const clean = id.replace(/^dish-/, '');
+      return !cartNormalizedSet.has(clean) && !cartNormalizedSet.has(`dish-${clean}`) && !cartNormalizedSet.has(id);
+    });
+
+    // If candidate pool has less than 4 items, backfill from other menu items that are not in cart
+    if (filtered.length < 4) {
+      for (const item of MENU_ITEMS) {
+        const clean = item.id.replace(/^dish-/, '');
+        if (
+          !cartNormalizedSet.has(clean) &&
+          !cartNormalizedSet.has(`dish-${clean}`) &&
+          !cartNormalizedSet.has(item.id) &&
+          !filtered.includes(item.id)
+        ) {
+          filtered.push(item.id);
+          if (filtered.length >= 6) break;
+        }
+      }
+    }
+
+    return filtered.slice(0, 6);
+  }, [activeItemIds]);
 
   // Compute live subtotal, GST (5%), and total with add-ons surcharge
   const subtotal = useMemo(() => {
@@ -99,12 +154,6 @@ export default function CustomerCartPage() {
 
   const gstAmount = Math.round(subtotal * 0.05);
   const grandTotal = subtotal + gstAmount;
-
-  const handleClearCart = () => {
-    if (window.confirm('Clear all dishes from your dining tray?')) {
-      clearCart();
-    }
-  };
 
   const handlePlaceOrder = async () => {
     if (isSubmitting || activeItemIds.length === 0) return;
@@ -321,27 +370,14 @@ export default function CustomerCartPage() {
             </span>
           </div>
 
-          {/* Right Action: Call Waiter or Clear Cart */}
-          <div className="flex items-center gap-2">
-            {activeItemIds.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearCart}
-                className="w-10 h-10 border border-red-200 rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-red-50 text-red-600 shadow-2xs"
-                title="Clear Tray"
-                aria-label="Clear Tray"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-            <Link
-              href={`/seat/${chairId}/assistant?from=${encodeURIComponent(`/seat/${chairId}/cart`)}`}
-              className="w-10 h-10 border border-[rgba(220,226,222,0.8)] rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-[#FFFEFC] text-[#244436] shadow-2xs"
-              aria-label="Assistant & Call Waiter"
-            >
-              <Bell className="w-5 h-5" />
-            </Link>
-          </div>
+          {/* Right Action: Call Waiter */}
+          <Link
+            href={`/seat/${chairId}/assistant?from=${encodeURIComponent(`/seat/${chairId}/cart`)}`}
+            className="w-10 h-10 border border-[rgba(220,226,222,0.8)] rounded-xl flex items-center justify-center cursor-pointer active:opacity-70 bg-[#FFFEFC] text-[#244436] shadow-2xs"
+            aria-label="Assistant & Call Waiter"
+          >
+            <Bell className="w-5 h-5" />
+          </Link>
         </header>
 
         {/* Existing Active Tab Banner (if customer is adding more dishes to their table) */}
@@ -481,26 +517,39 @@ export default function CustomerCartPage() {
                     </div>
                   </div>
 
-                  {/* Stepper Pill */}
-                  <div className="flex items-center border border-[#244436] rounded-xl bg-[#244436] text-white px-2 py-1 gap-2 shrink-0 shadow-2xs">
+                  {/* Stepper Pill & Item Delete Button */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center border border-[#244436] rounded-xl bg-[#244436] text-white px-2 py-1 gap-2 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(itemId, Math.max(0, qty - 1))}
+                        className="w-5 h-5 flex items-center justify-center font-bold text-sm cursor-pointer active:opacity-70"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs font-black min-w-[14px] text-center">
+                        {qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(itemId, qty + 1)}
+                        className="w-5 h-5 flex items-center justify-center font-bold text-sm cursor-pointer active:opacity-70"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    {/* Delete Item Icon Button */}
                     <button
                       type="button"
-                      onClick={() => updateQuantity(itemId, Math.max(0, qty - 1))}
-                      className="w-5 h-5 flex items-center justify-center font-bold text-sm cursor-pointer active:opacity-70"
-                      aria-label="Decrease quantity"
+                      onClick={() => updateQuantity(itemId, 0)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-red-500 hover:text-red-700 bg-red-50/80 hover:bg-red-100 border border-red-200/60 cursor-pointer active:scale-95 transition-all shadow-2xs shrink-0"
+                      title={`Remove ${dish.title} from tray`}
+                      aria-label={`Remove ${dish.title}`}
                     >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-xs font-black min-w-[14px] text-center">
-                      {qty}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => updateQuantity(itemId, qty + 1)}
-                      className="w-5 h-5 flex items-center justify-center font-bold text-sm cursor-pointer active:opacity-70"
-                      aria-label="Increase quantity"
-                    >
-                      <Plus className="w-3 h-3" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
