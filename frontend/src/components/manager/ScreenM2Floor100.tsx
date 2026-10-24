@@ -95,14 +95,44 @@ export function ScreenM2Floor100({
       }
 
       // Match live orders specifically for this seat
-      const matchingLiveOrders = liveOrders.filter((o) => {
+      const rawMatchingLiveOrders = liveOrders.filter((o) => {
+        if (o.order.status === 'completed' || o.order.status === 'cancelled') return false;
         const oChair = (o.order.chair_id || '').replace(/[^0-9]/g, '');
         return oChair === chairId || oChair === unpadded || Number(oChair) === i;
       });
 
+      const hasAuth = rawMatchingLiveOrders.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
+      const activeSeatOrders = hasAuth
+        ? rawMatchingLiveOrders.filter((o) => !String(o.order.ticket_number).startsWith('TK-'))
+        : rawMatchingLiveOrders;
+
+      // Deduplicate orders by id and ticket_number
+      const seenOrderIds = new Set<string>();
+      const seenTickets = new Set<string>();
+      const matchingLiveOrders = activeSeatOrders.filter((o) => {
+        if (o.order.id && seenOrderIds.has(o.order.id)) return false;
+        if (o.order.ticket_number && seenTickets.has(o.order.ticket_number)) return false;
+        if (o.order.id) seenOrderIds.add(o.order.id);
+        if (o.order.ticket_number) seenTickets.add(o.order.ticket_number);
+        return true;
+      });
+
       const allLiveItems: OrderItemRecord[] = [];
+      const seenItemKeys = new Set<string>();
       matchingLiveOrders.forEach((o) => {
-        if (o.items) allLiveItems.push(...o.items);
+        if (o.items) {
+          o.items.forEach((it, idx) => {
+            const itemKey = it.id || `${o.order.id || o.order.ticket_number}-${it.dish_id}-${idx}`;
+            if (!seenItemKeys.has(itemKey)) {
+              seenItemKeys.add(itemKey);
+              allLiveItems.push({
+                ...it,
+                id: it.id || itemKey,
+                order_id: it.order_id || o.order.id,
+              });
+            }
+          });
+        }
       });
 
       // Match alerts for this seat
@@ -172,14 +202,23 @@ export function ScreenM2Floor100({
       return [];
     }
 
-    return activeSelectedSeat.liveItems.map((it, idx) => ({
-      id: it.id || `live-${idx}`,
-      name: it.dish_name,
-      quantity: it.quantity,
-      prepTag: '[D]',
-      price: it.price,
-      stage: it.stage || 'PLACED',
-    }));
+    const seenItemKeys = new Set<string>();
+    const list: SeatOrderItem[] = [];
+    activeSelectedSeat.liveItems.forEach((it, idx) => {
+      const key = it.id || `live-${idx}`;
+      if (!seenItemKeys.has(key)) {
+        seenItemKeys.add(key);
+        list.push({
+          id: key,
+          name: it.dish_name,
+          quantity: it.quantity,
+          prepTag: '[D]',
+          price: it.price,
+          stage: it.stage || 'PLACED',
+        });
+      }
+    });
+    return list;
   }, [activeSelectedSeat]);
 
   // Calculate bill total strictly for this seat
@@ -201,11 +240,17 @@ export function ScreenM2Floor100({
   // Active kitchen items count: total items placed order in kitchen
   const activeKitchenItemsCount = useMemo(() => {
     let count = 0;
+    const seenKitchenItemKeys = new Set<string>();
     liveOrders.forEach((o) => {
+      if (o.order.status === 'completed' || o.order.status === 'cancelled') return;
       if (o.items && o.items.length > 0) {
-        o.items.forEach((it) => {
-          if (it.stage !== 'SERVED') {
-            count += it.quantity || 1;
+        o.items.forEach((it, idx) => {
+          const itemKey = it.id || `${o.order.id || o.order.ticket_number}-${it.dish_id}-${idx}`;
+          if (!seenKitchenItemKeys.has(itemKey)) {
+            seenKitchenItemKeys.add(itemKey);
+            if (it.stage !== 'SERVED') {
+              count += it.quantity || 1;
+            }
           }
         });
       }

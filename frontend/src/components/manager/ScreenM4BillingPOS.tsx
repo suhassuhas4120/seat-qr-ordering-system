@@ -105,6 +105,7 @@ export function ScreenM4BillingPOS({
   const liveOccupiedSeats = useMemo(() => {
     const set = new Set<string>();
     liveOrders.forEach((o) => {
+      if (o.order.status === 'completed' || o.order.status === 'cancelled') return;
       const chairRaw = (o.order.chair_id || '').trim();
       if (chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel')) {
         set.add('TK-01');
@@ -125,6 +126,7 @@ export function ScreenM4BillingPOS({
     const num = parseInt(unpadded, 10);
 
     const matchingLive = liveOrders.filter((o) => {
+      if (o.order.status === 'completed' || o.order.status === 'cancelled') return false;
       const chairRaw = (o.order.chair_id || '').trim();
       if (isTk) {
         return chairRaw === 'TK-01' || chairRaw.toLowerCase().includes('takeaway') || chairRaw.toLowerCase().includes('parcel');
@@ -133,9 +135,14 @@ export function ScreenM4BillingPOS({
       return oChair === activeSeat || oChair === unpadded || Number(oChair) === num;
     });
 
+    const hasAuth = matchingLive.some((o) => String(o.order.ticket_number).startsWith('ORD-'));
+    const activeSeatOrders = hasAuth
+      ? matchingLive.filter((o) => !String(o.order.ticket_number).startsWith('TK-'))
+      : matchingLive;
+
     const list: BillItem[] = [];
     const seenItemKeys = new Set<string>();
-    matchingLive.forEach((lo) => {
+    activeSeatOrders.forEach((lo) => {
       if (lo.items) {
         lo.items.forEach((it, idx) => {
           const itemKey = it.id || `${lo.order.id || lo.order.ticket_number}-${it.dish_id}-${idx}`;

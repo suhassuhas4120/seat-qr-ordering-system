@@ -1693,12 +1693,26 @@ export const realtimeBridge = {
             ? remoteOrders.filter((ro) => !String(ro.order.ticket_number).startsWith('TK-'))
             : remoteOrders;
 
-          const remoteChairs = new Set(cleanedRemoteOrders.map((ro) => (ro.order.chair_id || '').replace(/[^0-9]/g, '')));
-          const remoteTickets = new Set(cleanedRemoteOrders.map((ro) => ro.order.ticket_number));
-          const remoteOrderIds = new Set(cleanedRemoteOrders.map((ro) => ro.order.id));
+          // Deduplicate remote orders by unique ticket and order id
+          const seenRemoteTickets = new Set<string>();
+          const seenRemoteOrderIds = new Set<string>();
+          const dedupedRemoteOrders = cleanedRemoteOrders.filter((ro) => {
+            if (ro.order.id && seenRemoteOrderIds.has(ro.order.id)) return false;
+            if (ro.order.ticket_number && seenRemoteTickets.has(ro.order.ticket_number)) return false;
+            if (ro.order.id) seenRemoteOrderIds.add(ro.order.id);
+            if (ro.order.ticket_number) seenRemoteTickets.add(ro.order.ticket_number);
+            return true;
+          });
+
+          // Normalized chair IDs present in remote orders (strips non-digits and leading zeros)
+          const remoteChairs = new Set(
+            dedupedRemoteOrders.map((ro) => (ro.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0')
+          );
+          const remoteTickets = new Set(dedupedRemoteOrders.map((ro) => ro.order.ticket_number));
+          const remoteOrderIds = new Set(dedupedRemoteOrders.map((ro) => ro.order.id));
           const validLocalOrders = localOrders.filter((lo) => {
-            const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
-            if (remoteChairs.has(loChair)) return false;
+            const loChairNorm = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
+            if (remoteChairs.has(loChairNorm)) return false;
             if (!lo.order?.id || !lo.order?.ticket_number) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
             if (hasAuthRemote && String(lo.order.ticket_number).startsWith('TK-')) return false;
@@ -1706,7 +1720,7 @@ export const realtimeBridge = {
             return true;
           });
           const merged = [
-            ...cleanedRemoteOrders,
+            ...dedupedRemoteOrders,
             ...validLocalOrders.map((lo) => ({
               order: lo.order,
               items: this.hydrateOrderItemStages(lo.order, lo.items),
@@ -1814,19 +1828,32 @@ export const realtimeBridge = {
             };
           });
 
+          // Deduplicate backend orders by ticket and order id
+          const seenBackendTickets = new Set<string>();
+          const seenBackendOrderIds = new Set<string>();
+          const dedupedBackendOrders = backendOrders.filter((bo) => {
+            if (bo.order.id && seenBackendOrderIds.has(bo.order.id)) return false;
+            if (bo.order.ticket_number && seenBackendTickets.has(bo.order.ticket_number)) return false;
+            if (bo.order.id) seenBackendOrderIds.add(bo.order.id);
+            if (bo.order.ticket_number) seenBackendTickets.add(bo.order.ticket_number);
+            return true;
+          });
+
           // Merge backend orders with any local orders not yet on backend
-          const backendIds = new Set(backendOrders.map((bo) => bo.order.id));
-          const backendTickets = new Set(backendOrders.map((bo) => bo.order.ticket_number));
-          const backendChairNums = new Set(backendOrders.map((bo) => (bo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '')));
+          const backendIds = new Set(dedupedBackendOrders.map((bo) => bo.order.id));
+          const backendTickets = new Set(dedupedBackendOrders.map((bo) => bo.order.ticket_number));
+          const backendChairNums = new Set(
+            dedupedBackendOrders.map((bo) => (bo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0')
+          );
 
           const pendingLocals = localOrders.filter((lo) => {
-            const loNum = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+            const loNum = (lo.order.chair_id || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
             if (backendChairNums.has(loNum)) return false;
             if (backendIds.has(lo.order.id) || backendTickets.has(lo.order.ticket_number)) return false;
             if (lo.order.status === 'completed' || lo.order.status === 'cancelled') return false;
             return true;
           });
-          const combined = [...backendOrders, ...pendingLocals];
+          const combined = [...dedupedBackendOrders, ...pendingLocals];
 
           setLocalOrdersList(combined);
           return combined;
