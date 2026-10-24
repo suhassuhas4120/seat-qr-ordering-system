@@ -280,11 +280,11 @@
       "seatNumber": "S025",
       "zone": "COUNTER_B",
       "currentStatus": "VACANT",
-      "epochHash": "4d8a53972643f65c",
+      "epochHash": "238adceba4efd072",
       "activeSessionId": null,
       "activeOrderTotal": 0,
       "activeItemCount": 0,
-      "updatedAt": "2026-10-24T18:54:53.569Z"
+      "updatedAt": "2026-10-24T20:43:54.173Z"
     },
     {
       "id": 26,
@@ -1472,6 +1472,42 @@
       "sessionToken": "1fad2771657a6c0114b03d453559ed366530121b400c5428192d2ca10168e2c2",
       "status": "ACTIVE",
       "startedAt": "2026-10-24T18:55:03.697Z"
+    },
+    {
+      "id": "74a478ba-bccd-4c3d-ac5e-c1752da60371",
+      "seatId": 25,
+      "sessionToken": "e3a05f30947277473bd685bf9682415ee87943d6f6561efa3968b234162b00ec",
+      "deviceToken": "device_A",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T19:27:22.528Z",
+      "endedAt": "2026-10-24T19:27:22.594Z"
+    },
+    {
+      "id": "bc80a533-ead2-4ff6-bba3-4ea719c2f5f6",
+      "seatId": 25,
+      "sessionToken": "d97bc52aa3df24b21b1aa2f4163dfccc9289e6a93a0ae8daa89fc0651e21fcc3",
+      "deviceToken": "device_A",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T19:50:55.108Z",
+      "endedAt": "2026-10-24T19:50:55.177Z"
+    },
+    {
+      "id": "6929a98f-47b5-4750-8ea9-a7626f6196b3",
+      "seatId": 25,
+      "sessionToken": "0177c4cb19d9d6ba2f526c4b4cc1a9e1ab842a2056794faa06b2b7e4939bc502",
+      "deviceToken": "device_A",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T20:31:09.400Z",
+      "endedAt": "2026-10-24T20:31:09.467Z"
+    },
+    {
+      "id": "c54cfff7-38af-468c-8fe0-3f975a2eaaf4",
+      "seatId": 25,
+      "sessionToken": "19aad2e22ac4fd8c968e4bc7455c63988db3db661edbd5d554f37659dfbe2a3e",
+      "deviceToken": "device_A",
+      "status": "COMPLETED",
+      "startedAt": "2026-10-24T20:43:54.106Z",
+      "endedAt": "2026-10-24T20:43:54.173Z"
     }
   ],
   "menuCategories": [
@@ -3516,6 +3552,206 @@
         }
       ],
       "totalAmount": 90
+    },
+    {
+      "id": "9a085358-f3e6-4029-85b3-f89ff4a268cf",
+      "sessionId": "74a478ba-bccd-4c3d-ac5e-c1752da60371",
+      "seatId": 25,
+      "orderNumber": "ORD-2528",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T19:27:22.528Z",
+      "items": [
+        {
+          "id": "3cbdb860-e2e2-4e51-973e-193013a3cbd8",
+          "orderId": "9a085358-f3e6-4029-85b3-f89ff4a268cf",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T19:27:22.528Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "4e387272-ac85-4a5d-96fd-8245ee368182",
+      "sessionId": "74a478ba-bccd-4c3d-ac5e-c1752da60371",
+      "seatId": 25,
+      "orderNumber": "ORD-2579",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T19:27:22.579Z",
+      "items": [
+        {
+          "id": "b5e6c5e2-feb5-4067-bc95-25a09fa382bb",
+          "orderId": "4e387272-ac85-4a5d-96fd-8245ee368182",
+          "menuItemId": 4,
+          "nameSnapshot": "Dosa (2pcs)",
+          "priceSnapshot": 50,
+          "quantity": 1,
+          "notes": "Extra Kebab",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T19:27:22.579Z"
+        }
+      ],
+      "totalAmount": 50,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "6fdc024e-2b5d-4da5-a549-a35970068994",
+      "sessionId": "bc80a533-ead2-4ff6-bba3-4ea719c2f5f6",
+      "seatId": 25,
+      "orderNumber": "ORD-5108",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T19:50:55.108Z",
+      "items": [
+        {
+          "id": "7f60e8f2-0521-4f9b-870e-d93e22575608",
+          "orderId": "6fdc024e-2b5d-4da5-a549-a35970068994",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T19:50:55.108Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "4de3a8fa-f6bb-4393-90d6-7d7170a58087",
+      "sessionId": "bc80a533-ead2-4ff6-bba3-4ea719c2f5f6",
+      "seatId": 25,
+      "orderNumber": "ORD-5165",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T19:50:55.165Z",
+      "items": [
+        {
+          "id": "c8cf5c98-a3a8-48ca-9bd8-29b7fad5d3b4",
+          "orderId": "4de3a8fa-f6bb-4393-90d6-7d7170a58087",
+          "menuItemId": 4,
+          "nameSnapshot": "Dosa (2pcs)",
+          "priceSnapshot": 50,
+          "quantity": 1,
+          "notes": "Extra Kebab",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T19:50:55.165Z"
+        }
+      ],
+      "totalAmount": 50,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "fe4208ca-ca31-449f-be09-80402d54fb00",
+      "sessionId": "6929a98f-47b5-4750-8ea9-a7626f6196b3",
+      "seatId": 25,
+      "orderNumber": "ORD-9401",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T20:31:09.401Z",
+      "items": [
+        {
+          "id": "412083f8-7049-4d13-869d-2509c8b2bc62",
+          "orderId": "fe4208ca-ca31-449f-be09-80402d54fb00",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T20:31:09.401Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "d1a4333b-e3c8-4c27-a8ee-4da0a51044b1",
+      "sessionId": "6929a98f-47b5-4750-8ea9-a7626f6196b3",
+      "seatId": 25,
+      "orderNumber": "ORD-9457",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T20:31:09.457Z",
+      "items": [
+        {
+          "id": "a3f12f6e-f1e6-4487-ab36-538b7f165cd1",
+          "orderId": "d1a4333b-e3c8-4c27-a8ee-4da0a51044b1",
+          "menuItemId": 4,
+          "nameSnapshot": "Dosa (2pcs)",
+          "priceSnapshot": 50,
+          "quantity": 1,
+          "notes": "Extra Kebab",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T20:31:09.457Z"
+        }
+      ],
+      "totalAmount": 50,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "0bd87913-a216-4dec-ad2a-ee81e3c09b5e",
+      "sessionId": "c54cfff7-38af-468c-8fe0-3f975a2eaaf4",
+      "seatId": 25,
+      "orderNumber": "ORD-4106",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T20:43:54.106Z",
+      "items": [
+        {
+          "id": "d51b3510-bae1-43af-a484-8d45d2c9edd9",
+          "orderId": "0bd87913-a216-4dec-ad2a-ee81e3c09b5e",
+          "menuItemId": 1,
+          "nameSnapshot": "Kaalu Soup",
+          "priceSnapshot": 120,
+          "quantity": 2,
+          "notes": "Order from Device A",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T20:43:54.106Z"
+        }
+      ],
+      "totalAmount": 240,
+      "deviceToken": "device_A"
+    },
+    {
+      "id": "b1070053-fe0e-4dcd-a11c-dfcc29f6e2a0",
+      "sessionId": "c54cfff7-38af-468c-8fe0-3f975a2eaaf4",
+      "seatId": 25,
+      "orderNumber": "ORD-4164",
+      "overallStage": "PAID",
+      "createdByRole": "CUSTOMER",
+      "waiterId": null,
+      "placedAt": "2026-10-24T20:43:54.164Z",
+      "items": [
+        {
+          "id": "c1f1b311-726d-4b66-83fe-2c3168d99f36",
+          "orderId": "b1070053-fe0e-4dcd-a11c-dfcc29f6e2a0",
+          "menuItemId": 4,
+          "nameSnapshot": "Dosa (2pcs)",
+          "priceSnapshot": 50,
+          "quantity": 1,
+          "notes": "Extra Kebab",
+          "itemStage": "PAID",
+          "updatedAt": "2026-10-24T20:43:54.164Z"
+        }
+      ],
+      "totalAmount": 50,
+      "deviceToken": "device_A"
     }
   ],
   "payments": [
@@ -4088,6 +4324,66 @@
       "settledByRole": "MANAGER",
       "staffId": null,
       "completedAt": "2026-10-24T18:54:53.569Z"
+    },
+    {
+      "id": "ab8b4178-ad07-4b6b-9b58-ff2454ae6a3f",
+      "sessionId": "74a478ba-bccd-4c3d-ac5e-c1752da60371",
+      "seatId": 25,
+      "subtotal": 290,
+      "taxAmount": 14.5,
+      "discountAmount": 0,
+      "finalAmount": 304.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792870042594_80366887",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T19:27:22.594Z"
+    },
+    {
+      "id": "89c75bbb-6f08-469d-a7c7-e7f0c19660b3",
+      "sessionId": "bc80a533-ead2-4ff6-bba3-4ea719c2f5f6",
+      "seatId": 25,
+      "subtotal": 290,
+      "taxAmount": 14.5,
+      "discountAmount": 0,
+      "finalAmount": 304.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792871455177_F05015C4",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T19:50:55.177Z"
+    },
+    {
+      "id": "11280c0d-3911-42d0-9f6c-448d8366731c",
+      "sessionId": "6929a98f-47b5-4750-8ea9-a7626f6196b3",
+      "seatId": 25,
+      "subtotal": 290,
+      "taxAmount": 14.5,
+      "discountAmount": 0,
+      "finalAmount": 304.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792873869467_2EBD667E",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T20:31:09.467Z"
+    },
+    {
+      "id": "c527e27a-c467-4ee9-9dd0-436cab3d1ba3",
+      "sessionId": "c54cfff7-38af-468c-8fe0-3f975a2eaaf4",
+      "seatId": 25,
+      "subtotal": 290,
+      "taxAmount": 14.5,
+      "discountAmount": 0,
+      "finalAmount": 304.5,
+      "gateway": "CASH",
+      "gatewayPaymentId": "PAY_1792874634173_54EFF46B",
+      "status": "SUCCESS",
+      "settledByRole": "MANAGER",
+      "staffId": null,
+      "completedAt": "2026-10-24T20:43:54.173Z"
     }
   ],
   "users": [
