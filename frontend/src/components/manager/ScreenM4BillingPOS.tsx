@@ -243,9 +243,16 @@ export function ScreenM4BillingPOS({
     if (draftItems.length === 0 || isPunchingKot) return;
     setIsPunchingKot(true);
 
-    const ticketNumber = isTakeaway
+    const num = parseInt(activeSeat, 10);
+    const unpadded = activeSeat.replace(/^0+/, '') || '1';
+    const activeOrderForSeat = liveOrders.find((lo) => {
+      const c = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+      return c === activeSeat || c === unpadded || Number(c) === num;
+    });
+    const existingTicket = activeOrderForSeat?.order?.ticket_number;
+    const ticketNumber = existingTicket || (isTakeaway
       ? `TK-${Date.now().toString().slice(-4)}`
-      : `T-${activeSeat}-${Date.now().toString().slice(-3)}`;
+      : `T-${activeSeat}-${Date.now().toString().slice(-3)}`);
 
     const newOrderRecord: OrderRecord = {
       ticket_number: ticketNumber,
@@ -323,9 +330,16 @@ export function ScreenM4BillingPOS({
 
     // If there were any unpunched draft items, complete their order record
     if (draftItems.length > 0) {
-      const ticketNumber = isTakeaway
+      const num = parseInt(activeSeat, 10);
+      const unpadded = activeSeat.replace(/^0+/, '') || '1';
+      const activeOrderForSeat = liveOrders.find((lo) => {
+        const c = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
+        return c === activeSeat || c === unpadded || Number(c) === num;
+      });
+      const existingTicket = activeOrderForSeat?.order?.ticket_number;
+      const ticketNumber = existingTicket || (isTakeaway
         ? `TK-${Date.now().toString().slice(-4)}`
-        : `T-${activeSeat}-${Date.now().toString().slice(-3)}`;
+        : `T-${activeSeat}-${Date.now().toString().slice(-3)}`);
 
       const newOrderRecord: OrderRecord = {
         ticket_number: ticketNumber,

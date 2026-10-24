@@ -1831,7 +1831,7 @@ export const realtimeBridge = {
             if (ro.order.ticket_number && seenRemoteTickets.has(ro.order.ticket_number)) return false;
 
             const roChair = (ro.order.chair_id || '').replace(/[^0-9]/g, '');
-            const roItemsSig = ro.items.map((i) => `${i.dish_name || i.dish_id}:${i.quantity}`).sort().join('|');
+            const roItemsSig = ro.items.map((i) => `${(i.dish_name || i.dish_id || '').toLowerCase().trim()}:${i.quantity}`).sort().join('|');
             const seatKey = `${roChair}-${roItemsSig}`;
             if (seenSeatItemSigs.has(seatKey)) return false;
             seenSeatItemSigs.add(seatKey);
@@ -1850,7 +1850,7 @@ export const realtimeBridge = {
             if (remoteTickets.has(lo.order.ticket_number) || remoteOrderIds.has(lo.order.id)) return false;
 
             const loChair = (lo.order.chair_id || '').replace(/[^0-9]/g, '');
-            const loItemsSig = (lo.items || []).map((i) => `${i.dish_name || i.dish_id}:${i.quantity}`).sort().join('|');
+            const loItemsSig = (lo.items || []).map((i) => `${(i.dish_name || i.dish_id || '').toLowerCase().trim()}:${i.quantity}`).sort().join('|');
             const seatKey = `${loChair}-${loItemsSig}`;
             if (seenSeatItemSigs.has(seatKey)) return false;
             seenSeatItemSigs.add(seatKey);

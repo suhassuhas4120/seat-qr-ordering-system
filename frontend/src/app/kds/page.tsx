@@ -86,20 +86,104 @@ export default function KitchenDisplayPage() {
         console.warn('realtimeBridge ticket merge warning:', bridgeErr);
       }
 
-      // Deduplicate tickets to ensure each seat's order items card is rendered only once (zero duplicates)
-      const dedupedTickets: any[] = [];
-      const seenCardKeys = new Set<string>();
+      // Consolidate tickets strictly by physical seat: Exactly 1 unified card per seat with zero duplicate cards
+      const seatOrderMap = new Map<string, {
+        id: string;
+        orderNumber: string;
+        orderNumbers: Set<string>;
+        seatId: number;
+        overallStage: string;
+        totalAmount: number;
+        placedAt: string;
+        seat: {
+          id: number;
+          seatNumber: string;
+          zone: string;
+          currentStatus: string;
+        };
+        itemsMap: Map<string, any>;
+      }>();
+
       tickets.forEach((t) => {
-        const seatKey = t.seatId || t.seat?.id || 1;
-        const itemsKey = (t.items || []).map((it: any) => `${it.nameSnapshot || it.name || it.menuItemId}:${it.quantity}`).sort().join('|');
-        const uniqueCardId = `${seatKey}-${itemsKey}`;
-        if (!seenCardKeys.has(uniqueCardId)) {
-          seenCardKeys.add(uniqueCardId);
-          dedupedTickets.push(t);
+        const rawChair = String(t.seatId || t.seat?.id || t.seat?.seatNumber || '01');
+        const isTk = String(t.seat?.seatNumber || rawChair).toUpperCase().includes('TK');
+        const cleanSeatNum = isTk ? 0 : (Number(rawChair.replace(/[^0-9]/g, '')) || 1);
+        const seatKey = isTk ? 'TK-01' : String(cleanSeatNum);
+
+        const current = seatOrderMap.get(seatKey);
+        const ticketNum = t.orderNumber || t.id;
+
+        if (!current) {
+          const itemsMap = new Map<string, any>();
+          (t.items || []).forEach((it: any) => {
+            const dishName = it.nameSnapshot || it.name || it.dish_name || `Dish ${it.menuItemId || 1}`;
+            const itemKey = `${dishName.toLowerCase().trim()}:${it.notes || ''}`;
+            const existingItem = itemsMap.get(itemKey);
+            if (!existingItem) {
+              itemsMap.set(itemKey, {
+                ...it,
+                nameSnapshot: dishName,
+                quantity: it.quantity || 1,
+              });
+            } else {
+              // If duplicate identical item was re-punched, preserve the most advanced preparation stage
+              if (it.itemStage === 'READY' || (it.itemStage === 'COOKING' && existingItem.itemStage === 'QUEUED')) {
+                existingItem.itemStage = it.itemStage;
+              }
+            }
+          });
+
+          seatOrderMap.set(seatKey, {
+            id: t.id,
+            orderNumber: ticketNum,
+            orderNumbers: new Set([ticketNum].filter(Boolean)),
+            seatId: cleanSeatNum,
+            overallStage: t.overallStage || 'PLACED',
+            totalAmount: t.totalAmount || 0,
+            placedAt: t.placedAt || new Date().toISOString(),
+            seat: t.seat || {
+              id: cleanSeatNum,
+              seatNumber: isTk ? 'TK-01' : `S${String(cleanSeatNum).padStart(3, '0')}`,
+              zone: isTk ? 'TAKEAWAY' : 'COUNTER_A',
+              currentStatus: 'OCCUPIED',
+            },
+            itemsMap,
+          });
+        } else {
+          // Merge additional items into existing seat card and keep latest authoritative ticket number
+          if (ticketNum) current.orderNumbers.add(ticketNum);
+          current.orderNumber = ticketNum;
+          (t.items || []).forEach((it: any) => {
+            const dishName = it.nameSnapshot || it.name || it.dish_name || `Dish ${it.menuItemId || 1}`;
+            const itemKey = `${dishName.toLowerCase().trim()}:${it.notes || ''}`;
+            const existingItem = current.itemsMap.get(itemKey);
+            if (!existingItem) {
+              current.itemsMap.set(itemKey, {
+                ...it,
+                nameSnapshot: dishName,
+                quantity: it.quantity || 1,
+              });
+            } else {
+              if (it.itemStage === 'READY' || (it.itemStage === 'COOKING' && existingItem.itemStage === 'QUEUED')) {
+                existingItem.itemStage = it.itemStage;
+              }
+            }
+          });
         }
       });
 
-      setOrders(dedupedTickets);
+      const consolidatedTickets = Array.from(seatOrderMap.values()).map((entry) => ({
+        id: entry.id,
+        orderNumber: entry.orderNumber,
+        seatId: entry.seatId,
+        overallStage: entry.overallStage,
+        totalAmount: entry.totalAmount,
+        placedAt: entry.placedAt,
+        seat: entry.seat,
+        items: Array.from(entry.itemsMap.values()),
+      }));
+
+      setOrders(consolidatedTickets);
     } catch (err: any) {
       console.warn('Failed to load kitchen tickets:', err);
     }

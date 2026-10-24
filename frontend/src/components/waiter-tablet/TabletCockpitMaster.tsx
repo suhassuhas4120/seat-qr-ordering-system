@@ -830,7 +830,15 @@ export const TabletCockpitMaster: React.FC = () => {
 
     try {
       // Determine Ticket Number: Reuse existing active ticket if present, else generate fresh
-      const existingTicket = activeTicketNumber || undefined;
+      let existingTicket = activeTicketNumber || undefined;
+      if (!existingTicket) {
+        try {
+          const seatDetails = await realtimeBridge.getOrderForSeat(cleanChair);
+          if (seatDetails?.order?.ticket_number) {
+            existingTicket = seatDetails.order.ticket_number;
+          }
+        } catch {}
+      }
       const ticketNum = existingTicket || `ORD-${padChair}-${String(Date.now()).slice(-4)}`;
 
       // Calculate batch total for only the newly fired items
