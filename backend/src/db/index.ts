@@ -30,6 +30,7 @@ export interface DatabaseState {
   users: StaffUser[];
   serviceAlerts: any[];
   promos?: any[];
+  pettyExpenses?: any[];
 }
 
 class InDatabase {
@@ -43,6 +44,7 @@ class InDatabase {
     users: [],
     serviceAlerts: [],
     promos: [],
+    pettyExpenses: [],
   };
 
   private isWriting = false;
@@ -59,6 +61,7 @@ class InDatabase {
         this.data = JSON.parse(raw);
         if (!this.data.serviceAlerts) this.data.serviceAlerts = [];
         if (!this.data.promos) this.data.promos = [];
+        if (!this.data.pettyExpenses) this.data.pettyExpenses = [];
         console.log(`📦 Loaded existing database state from ${STATE_FILE}`);
         this.ensureTakeawaySeat();
         return;

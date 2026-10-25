@@ -199,6 +199,7 @@ export type KDSCallbacks = {
   onBillSettled?: (data: { chairId: string; rawChairId?: string; normChairId?: string; amount?: number; paymentMethod?: string; ticketNumber?: string }) => void;
   onCashHandover?: (data: { id: string; staffId: string; staffName: string; amount: number; timestamp: string; receivedBy: string }) => void;
   onPromosUpdated?: (rules: any[]) => void;
+  onPettyExpensesUpdated?: (expenses: any[]) => void;
   onClearAll?: () => void;
 };
 
@@ -600,6 +601,17 @@ function initSocketBridge() {
           mode,
           ticketNumber: payload.ticketNumber,
         });
+      });
+    });
+
+    socket.on('petty:updated', (expenses: any[]) => {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('thoogudeepa_v2_petty_expenses', JSON.stringify(expenses));
+        } catch {}
+      }
+      activeKdsSubscribers.forEach((cb) => {
+        if (cb.onPettyExpensesUpdated) cb.onPettyExpensesUpdated(expenses);
       });
     });
   } catch (err) {
@@ -2573,6 +2585,90 @@ export const realtimeBridge = {
     return this.getSettledBills();
   },
 
+  // Get petty expenses vouchers history
+  getPettyExpenses(): any[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('thoogudeepa_v2_petty_expenses');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  // Sync petty expenses with Fastify backend database
+  async syncPettyExpensesWithBackend(): Promise<any[]> {
+    if (typeof window === 'undefined') return this.getPettyExpenses();
+    try {
+      const backendUrl = getBackendUrl();
+      if (!backendUrl) return this.getPettyExpenses();
+      const res = await safeFetchWithTimeout(`${backendUrl}/api/petty-expenses`, {}, 2000);
+      if (res.ok) {
+        const serverExpenses = await res.json();
+        if (Array.isArray(serverExpenses)) {
+          const local = this.getPettyExpenses();
+          const merged = [...local];
+          serverExpenses.forEach((se: any) => {
+            if (!merged.some((le) => le.id === se.id)) {
+              merged.push(se);
+            }
+          });
+          localStorage.setItem('thoogudeepa_v2_petty_expenses', JSON.stringify(merged));
+          return merged;
+        }
+      }
+    } catch {}
+    return this.getPettyExpenses();
+  },
+
+  // Record a new petty expense voucher
+  async recordPettyExpense(expense: any): Promise<any[]> {
+    const local = this.getPettyExpenses();
+    const updated = [expense, ...local];
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('thoogudeepa_v2_petty_expenses', JSON.stringify(updated));
+      } catch {}
+    }
+    broadcastRealtime('PETTY_EXPENSES_UPDATED', { expenses: updated });
+
+    try {
+      const backendUrl = getBackendUrl();
+      if (backendUrl) {
+        safeFetchWithTimeout(`${backendUrl}/api/petty-expenses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(expense),
+        }).catch(() => {});
+      }
+    } catch {}
+
+    return updated;
+  },
+
+  // Void/Delete a petty expense voucher
+  async voidPettyExpense(id: string): Promise<any[]> {
+    const local = this.getPettyExpenses();
+    const updated = local.filter((e) => e.id !== id);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('thoogudeepa_v2_petty_expenses', JSON.stringify(updated));
+      } catch {}
+    }
+    broadcastRealtime('PETTY_EXPENSES_UPDATED', { expenses: updated });
+
+    try {
+      const backendUrl = getBackendUrl();
+      if (backendUrl) {
+        safeFetchWithTimeout(`${backendUrl}/api/petty-expenses/${id}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+    } catch {}
+
+    return updated;
+  },
+
   // Get cash handover receipts to manager till safe
   getCashHandovers(): Array<{
     id: string;
@@ -3138,6 +3234,10 @@ export const realtimeBridge = {
         } else if (data.type === 'PROMOS_UPDATED') {
           activeKdsSubscribers.forEach((cb) => {
             if (cb.onPromosUpdated) cb.onPromosUpdated(data.rules);
+          });
+        } else if (data.type === 'PETTY_EXPENSES_UPDATED') {
+          activeKdsSubscribers.forEach((cb) => {
+            if (cb.onPettyExpensesUpdated) cb.onPettyExpensesUpdated(data.expenses);
           });
         } else if (data.type === 'CLEAR_ALL_ORDERS') {
           activeKdsSubscribers.forEach((cb) => {

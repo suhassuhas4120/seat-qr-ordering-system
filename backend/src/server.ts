@@ -419,6 +419,53 @@ app.get('/api/payments/settled', async () => {
   });
 });
 
+// 9C. Petty Cash Expense Vouchers & Float Management
+app.get('/api/petty-expenses', async () => {
+  return db.data.pettyExpenses || [];
+});
+
+app.post('/api/petty-expenses', async (req, reply) => {
+  const body = req.body as any;
+  if (!body.description || !body.amount) {
+    return reply.status(400).send({ error: 'Description and amount are required' });
+  }
+
+  const newExpense = {
+    id: body.id || `pe-${Date.now()}`,
+    voucherNumber: body.voucherNumber || `V-${(db.data.pettyExpenses?.length || 0) + 101}`,
+    description: body.description.trim(),
+    category: body.category || 'Dairy & Fresh',
+    amount: Number(body.amount) || 0,
+    paidTo: body.paidTo || 'Vendor',
+    paidBy: body.paidBy || 'Manjunath (Duty Lead)',
+    time: body.time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    date: body.date || new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+  };
+
+  if (!db.data.pettyExpenses) db.data.pettyExpenses = [];
+  db.data.pettyExpenses.unshift(newExpense);
+  db.saveState();
+
+  if (io) {
+    io.emit('petty:updated', db.data.pettyExpenses);
+  }
+
+  return reply.status(201).send({ success: true, item: newExpense, expenses: db.data.pettyExpenses });
+});
+
+app.delete('/api/petty-expenses/:id', async (req, reply) => {
+  const { id } = req.params as { id: string };
+  if (!db.data.pettyExpenses) db.data.pettyExpenses = [];
+  db.data.pettyExpenses = db.data.pettyExpenses.filter((e: any) => e.id !== id);
+  db.saveState();
+
+  if (io) {
+    io.emit('petty:updated', db.data.pettyExpenses);
+  }
+
+  return reply.send({ success: true, id, expenses: db.data.pettyExpenses });
+});
+
 // 10. Webhook endpoint for Razorpay / Stripe
 app.post('/api/payments/webhook', async (req, reply) => {
   const { seatId, gateway, paymentId } = req.body as any;
