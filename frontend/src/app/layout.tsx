@@ -5,8 +5,8 @@ import { Toaster } from 'sonner';
 import { NetworkStatusBanner } from '@/components/common/NetworkStatusBanner';
 
 export const metadata: Metadata = {
-  title: 'Thoogudeepa Donne Biryani Mane',
-  description: '100-Seat Real-Time Restaurant Management System',
+  title: 'Nelja UrQR | Next-Gen Real-Time Dining & Hospitality Platform',
+  description: 'Ultra-low latency QR ordering, live KDS, captain POS & manager ERP for hotels, restaurants, cafes, bakeries & food chains',
 };
 
 export const viewport: Viewport = {
